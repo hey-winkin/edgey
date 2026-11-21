@@ -113,7 +113,7 @@ function toFamily(row: FamilyRow): Family {
 }
 
 // Every family with at least one published variant, in catalogue order.
-const listFamilies = cache(async (): Promise<Family[]> => {
+export const listFamilies = cache(async (): Promise<Family[]> => {
   const { data, error } = await publicClient().from("products").select(FAMILY_SELECT)
     .eq("variants.publication_status", "published").order("sort_order").order("slug");
   if (error) throw new Error("Catalogue read failed: " + error.message);

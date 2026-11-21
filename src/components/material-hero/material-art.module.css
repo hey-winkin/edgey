@@ -1,0 +1,72 @@
+.drawing,
+.swatch {
+  --contour: var(--edgey-drawing-contour);
+  --ridge: var(--edgey-drawing-ridge);
+  --core: var(--edgey-drawing-core-fill);
+  --liner: color-mix(in srgb, #bba482 45%, var(--core));
+  --paper: color-mix(in srgb, #cdb693 60%, var(--edgey-product-plate));
+  --metal: color-mix(in srgb, #c3caca 84%, var(--edgey-drawing-plate));
+  --metal-edge: color-mix(in srgb, #828b89 80%, var(--core));
+  display: block;
+  width: 100%;
+  height: auto;
+  background-color: var(--edgey-drawing-plate);
+  font-family: var(--edgey-font-mono);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drawing {
+  background-image: radial-gradient(var(--edgey-drawing-dots) 0.65px, transparent 0.85px);
+  background-size: 17px 17px;
+}
+
+.leader {
+  fill: none;
+  stroke: var(--edgey-text-muted);
+  stroke-width: 0.9;
+}
+
+.leader text {
+  fill: var(--edgey-text);
+  stroke: none;
+  font-size: 12px;
+}
+
+.leader circle {
+  fill: var(--edgey-text);
+  stroke: var(--edgey-drawing-plate);
+  stroke-width: 0.7;
+}
+
+.swatch {
+  background: transparent;
+  height: 100%;
+}
+
+.compactLeaders {
+  display: none;
+}
+
+@container cutaway (max-width: 540px) {
+  .leader {
+    display: none;
+  }
+
+  .compactLeaders {
+    display: inline;
+    fill: none;
+    stroke: var(--edgey-text-muted);
+    stroke-width: 1.5;
+  }
+
+  .compactLeaders rect {
+    fill: var(--edgey-drawing-plate);
+  }
+
+  .compactLeaders text {
+    fill: var(--edgey-text);
+    stroke: none;
+    font-size: 22px;
+  }
+}

@@ -1,0 +1,327 @@
+.hero {
+  padding-block: clamp(32px, 4vw, 64px);
+  overflow-wrap: anywhere;
+}
+
+.chooser {
+  display: grid;
+  grid-template-columns: minmax(0, .6fr) minmax(0, 1.4fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "intro tiles" "quality tiles";
+  align-items: start;
+  gap: 26px clamp(32px, 4vw, 64px);
+}
+
+.intro {
+  grid-area: intro;
+}
+
+.title {
+  margin: 14px 0;
+  font-size: clamp(2.6rem, 5.4vw, 6.2rem);
+  text-wrap: balance;
+  scroll-margin-top: 150px;
+}
+
+.intro > p:last-child {
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.2vw, 1.16rem);
+}
+
+.label, .tileNote, .plateHead, .specs dt, .fit dt {
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+.label, .plateHead {
+  font-size: .74rem;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+.quality {
+  grid-area: quality;
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed var(--muted);
+  font-size: .88rem;
+}
+
+.quality .label span {
+  display: inline-block;
+  margin-inline-end: 4px;
+  padding: 2px 5px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.quality p + p {
+  margin-top: 6px;
+}
+
+.tiles {
+  grid-area: tiles;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tiles, .fitList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.featured {
+  grid-area: span 2 / span 2;
+}
+
+.tile {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+
+.tile:hover {
+  border-color: var(--muted);
+}
+
+.swatch, .canvas {
+  background: radial-gradient(var(--edgey-drawing-dots) .65px, transparent .85px) 0 0 / 14px 14px, var(--edgey-drawing-plate);
+}
+
+.swatch {
+  display: grid;
+  flex: 1;
+  min-height: 48px;
+  place-items: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.swatch svg {
+  width: min(50%, 67px);
+  height: auto;
+}
+
+.featured .swatch svg {
+  width: min(85%, 275px);
+}
+
+.tileCaption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 5px;
+  padding: 8px 10px;
+  line-height: 1.2;
+}
+
+.tileCaption strong {
+  font-size: .88rem;
+  font-weight: 550;
+}
+
+.featured .tileCaption {
+  padding: 12px;
+}
+
+.featured .tileCaption strong {
+  font-size: 1.09rem;
+}
+
+.tileArrow {
+  font-size: .92rem;
+  color: var(--muted);
+}
+
+.tile:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tileNote {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: .71rem;
+}
+
+.empty {
+  grid-area: tiles;
+}
+
+.detailHead {
+  display: flex;
+  align-items: end;
+  gap: 8px 24px;
+  justify-content: space-between;
+  margin-bottom: clamp(14px, 2vw, 27px);
+}
+
+.detailHead .title {
+  margin-bottom: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  flex: none;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, .38fr);
+  align-items: start;
+  gap: clamp(16px, 2vw, 28px);
+}
+
+.plate {
+  min-width: 0;
+  container: cutaway / inline-size;
+  border: 1px solid var(--line);
+  background: var(--edgey-drawing-plate);
+}
+
+.plateHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+}
+
+.canvas svg {
+  width: 100%;
+  height: auto;
+  max-width: 900px;
+  margin-inline: auto;
+}
+
+.caption {
+  display: block;
+  padding: 12px;
+}
+
+.specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(115px, 100%), 1fr));
+  gap: 8px 14px;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.specs dt, .fit dt {
+  font-size: .74rem;
+}
+
+.specTag {
+  display: none;
+}
+
+.specs dd, .fit dd, .fit dl {
+  margin: 0;
+}
+
+.specs dd {
+  font-weight: 550;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fit {
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+  padding: clamp(14px, 2vw, 26px);
+}
+
+.fit h2 {
+  margin-top: 5px;
+  font-size: clamp(1.65rem, 3vw, 2.7rem);
+}
+
+.reference, .evidence {
+  color: var(--muted);
+}
+
+.reference {
+  margin-top: 5px;
+}
+
+.fitList {
+  margin-top: 14px;
+}
+
+.fit dl > div {
+  border-top: 1px solid var(--line);
+  padding-block: 7px;
+}
+
+.evidence {
+  margin: 10px 0 16px;
+  font-size: .79rem;
+}
+
+@media (max-width: 1020px) {
+  .tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .chooser {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: "intro" "tiles" "quality";
+    gap: 18px;
+  }
+
+  .title {
+    font-size: clamp(2.6rem, 8.8vw, 4.7rem);
+    text-wrap: initial;
+  }
+
+  .detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailHead {
+    flex-wrap: wrap;
+    align-items: start;
+  }
+}
+
+@media (max-width: 460px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .featured {
+    grid-area: span 1 / span 2;
+  }
+
+  .featured .swatch svg {
+    max-width: 190px;
+  }
+}
+
+@container cutaway (max-width: 540px) {
+  .specTag {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-inline-end: 5px;
+    border: 1px solid var(--muted);
+    color: var(--ink);
+  }
+}

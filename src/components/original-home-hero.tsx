@@ -2,7 +2,8 @@ import Link from "next/link";
 import { FindBladeLink } from "./find-blade-link";
 import { MaterialStudy } from "./material-study";
 
-export function Hero() {
+// Original homepage hero from the approved Edgey-preview.html, kept for reuse.
+export function OriginalHomeHero() {
   return (
     <section className="hero frame" aria-labelledby="headline">
       <div className="hero-copy">
