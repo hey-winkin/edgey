@@ -137,16 +137,20 @@ test("an unknown shop URL keeps the buyer navigation and returns 404", async ({ 
   await expect(shopNav(page).getByRole("link", { name: "All blades" })).toBeVisible();
 });
 
-test("enlarged text and a populated selection keep compact controls separate", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 640 });
+test("enlarged text and a populated selection keep masthead controls separate across breakpoints", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("edgey-storefront-selection-v1", '{"42e5ce02-4d5e-5c39-9f1b-f76c46c8b386":200}');
   });
   await page.goto("/contact");
   await expect(page.getByRole("button", { name: "Selection 200 blades" })).toBeEnabled();
-  for (const size of ["125%", "200%"]) {
+  for (const size of ["100%", "125%", "200%"]) {
     await page.locator("html").evaluate((element, value) => { element.style.fontSize = value; }, size);
-    await expectUsableMasthead(page, 320);
+    for (const width of [320, 491, 740, 741, 800, 920, 921]) {
+      await page.setViewportSize({ width, height: 640 });
+      await test.step(`${width}px at ${size} text`, async () => {
+        await expectUsableMasthead(page, width);
+      });
+    }
   }
 });
 

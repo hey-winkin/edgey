@@ -10,7 +10,7 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 }
 .mast .nav-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(44px, 1fr) minmax(44px, max-content) minmax(max-content, 1fr);
   align-items: center;
   gap: 0;
   height: calc(var(--mast-height) - 1px);
@@ -21,6 +21,7 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   min-height: 44px;
   grid-column: 1;
 }
+.mast .brand, .mast .brand svg { max-width: 100%; }
 .mast .nav-tools {
   grid-column: 3;
   justify-self: end;
@@ -167,25 +168,24 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 
 @media (max-width: 920px) {
   .staff-mast .brand svg { width: 112px; }
+  .mast .theme-label { display: none; }
 }
 @media (max-width: 740px) {
   :root { --mast-height: 63px; }
   .shop-wide-theme { display: none; }
   .shop-compact-theme { display: block; }
   .mast .nav-tools { gap: 4px; }
+  .mast-search span, .mast .tray-label { display: none; }
+  .mast .tray-trigger { justify-content: center; min-width: 48px; }
+  .fold-tools .theme-label { display: inline; }
   .fold-panel { height: calc(100dvh - var(--mast-height)); }
   .fold-groups, .staff-mast .fold-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 490px) {
   :root { --mast-height: max(59px, 2.25rem); }
-  .mast .nav-inner {
-    grid-template-columns: minmax(44px, 1fr) minmax(44px, max-content) minmax(max-content, 1fr);
-  }
-  .mast .brand, .mast .brand svg { max-width: 100%; }
   .fold-toggle { display: flex; white-space: normal; padding-inline: 7px 14px; gap: 6px; line-height: 1.15; }
   .fold-cross { flex: 0 0 11px; }
-  .mast-search span, .staff-shop-prefix { display: none; }
-  .mast .tray-trigger { justify-content: center; min-width: 48px; }
+  .staff-shop-prefix { display: none; }
   .staff-mast .brand { flex-direction: column; align-items: start; justify-content: center; gap: 0; }
   .staff-mast .brand svg { width: 78px; }
   .staff-identity { border: 0; padding: 0; font-size: .62rem; }
