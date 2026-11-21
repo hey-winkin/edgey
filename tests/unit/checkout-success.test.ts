@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import CheckoutSuccessPage from "@/app/checkout/success/page";
+import CheckoutSuccessPage from "@/app/(shop)/checkout/success/page";
 import { readCheckoutSuccess } from "@/lib/payments/success";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));

@@ -1,3 +1,4 @@
+import { openStaffMenu, signOutFromStaffMenu } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
@@ -15,7 +16,7 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   expect(before.error).toBeNull();
 
   await signInStaff(page, staff);
-  await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Pick and dispatch" }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Pick and dispatch" }).click();
   const orderLink = page.getByRole("link", { name: reference, exact: true });
   await expect(orderLink).toHaveAttribute("href", `/admin/warehouse/${order.id}`);
   for (const lookup of [order.id, ` ${reference.toLowerCase()} `]) {
@@ -80,7 +81,7 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   await expect(page.getByText("All units from this return have been restored.")).toBeVisible();
   expect((await stock()).data?.stock_on_hand).toBe(after.data!.stock_on_hand + 1);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromStaffMenu(page);
   await expect(page.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();
   await page.goto(dispatchedPath);
   await expect(page.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();
@@ -93,7 +94,7 @@ test("a warehouse receipt updates the variant balance and ledger", async ({ page
   if (before.error) throw before.error;
   const staff = await createLocalAdminUser("warehouse");
   await signInStaff(page, staff);
-  await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Stock", exact: true }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
   await page.getByLabel("Received quantity").fill("3");
   await page.getByRole("button", { name: "Record stock receipt" }).click();

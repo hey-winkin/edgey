@@ -5,7 +5,7 @@ import { MaterialLink } from "./catalogue-links";
 // Substrates without approved swatch artwork get a plain neutral swatch.
 export function MaterialIndex({ materials }: { materials: CatalogueView["materials"] }) {
   return (
-    <section className={"materials frame" + (materials.length > 4 ? " is-long" : "")} id="materials" aria-labelledby="materials-title">
+    <section className={"materials frame" + (materials.length > 4 ? " is-long" : "")} id="materials" tabIndex={-1} aria-labelledby="materials-title">
       <div className="mat-copy">
         <p className="kicker">
           <span className="register" aria-hidden="true" />

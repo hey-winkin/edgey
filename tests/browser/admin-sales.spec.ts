@@ -1,3 +1,4 @@
+import { openStaffMenu } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser } from "../../scripts/seed-admin";
 import { connectAccountDb, createAccountCatalogue, createAccountOrder, accountEmail } from "../helpers/account-fixture";
@@ -15,7 +16,7 @@ test("sales works at 320px with keyboard sorting, date filters, chart data and d
     await page.setViewportSize({ width: 320, height: 720 });
     await setVerifiedStaffSession(page, await createLocalAdminUser("finance"), baseURL);
     await page.goto("/admin");
-    await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Sales", exact: true }).click();
+    await (await openStaffMenu(page)).getByRole("link", { name: "Sales", exact: true }).click();
     await page.getByLabel("Period").selectOption("custom");
     await page.getByLabel("From", { exact: true }).fill("2001-10-27");
     await page.getByLabel("To", { exact: true }).fill("2001-10-29");

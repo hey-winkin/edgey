@@ -3,11 +3,13 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-export function focusCatalogueSearch() {
+export function focusCatalogueSearch(scroll = true) {
   const finder = document.getElementById("finder");
   if (!finder) return false;
-  if (finder.closest("[data-search-first]")) finder.scrollIntoView({ block: "center" });
-  else document.getElementById("catalogue")?.scrollIntoView();
+  if (scroll) {
+    if (finder.closest("[data-search-first]")) finder.scrollIntoView({ block: "center" });
+    else document.getElementById("catalogue")?.scrollIntoView();
+  }
   finder.focus({ preventScroll: true });
   return true;
 }
@@ -17,16 +19,16 @@ export function SearchShortcut() {
   const pathname = usePathname();
   const focusOnRoute = useRef(false);
   useEffect(() => {
-    if (pathname === "/blades" && focusOnRoute.current) {
+    if (pathname === "/blades" && (focusOnRoute.current || window.location.hash === "#finder")) {
+      focusCatalogueSearch(focusOnRoute.current);
       focusOnRoute.current = false;
-      focusCatalogueSearch();
     }
   }, [pathname]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (document.querySelector("dialog[open]")) return;
+      if (document.querySelector("dialog[open], .fold[open]")) return;
       if (event.target instanceof Element && event.target.closest('input, select, textarea, [contenteditable]:not([contenteditable="false"])')) return;
       event.preventDefault();
       if (!focusCatalogueSearch()) {

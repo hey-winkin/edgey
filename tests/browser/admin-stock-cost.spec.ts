@@ -1,3 +1,4 @@
+import { openStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
@@ -36,7 +37,7 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
   await expect(page.getByText("Selling data saved.", { exact: true })).toBeVisible();
   expect((await db.from("variants").select("price_1_4_pence").eq("id", id).single()).data?.price_1_4_pence).toBe(2085);
 
-  await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Stock", exact: true }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
   await page.getByLabel("Received quantity").fill("8");
   await page.getByText("Add receipt costs (optional)").click();

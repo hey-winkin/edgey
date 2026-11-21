@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { connectAccountDb } from "../helpers/account-fixture";
 import { scanBothThemes } from "../helpers/accessibility";
+import { resetBrowserQuoteBudget } from "../helpers/quote-budget";
 import { signInStaff } from "./admin-fixtures";
 
 test.use({ trace: "off" });
@@ -131,7 +133,7 @@ async function fillDelivery(page: Page) {
 async function capture(page: Page, name: string, theme: "dark" | "light", width: number, height: number) {
   await page.setViewportSize({ width, height });
   if (await page.locator("html").getAttribute("data-theme") !== theme) {
-    await page.getByRole("button", { name: `Switch to ${theme} mode` }).click();
+    await switchTheme(page, theme);
   }
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
@@ -236,6 +238,7 @@ test("Net 30 confirmation and the trade panel read only the verified buyer's ord
 test("the launch flag gates Net 30 and credit reasons leave card available", async ({ page }) => {
   const fixture = await stage();
   try {
+    await resetBrowserQuoteBudget(fixture.db);
     await page.goto("/account");
     await signIn(page, fixture.other);
     await checkout(page, fixture.variantId);

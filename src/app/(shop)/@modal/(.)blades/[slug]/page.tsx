@@ -10,7 +10,7 @@ type Props = {
 };
 
 // A card opened from a catalogue page shows the approved dialog over it.
-// A direct visit to the same address renders app/blades/[slug]/page.tsx.
+// A direct visit to the same address renders the full blade page.
 export default async function ProductModal({ params, searchParams }: Props) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const family = await getFamily(slug);

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { persistSelectionChange } from "@/app/checkout/success/selection-handoff";
+import { persistSelectionChange } from "@/app/(shop)/checkout/success/selection-handoff";
 import { forgetCheckoutAttempt } from "@/lib/checkout/attempt-token";
 import type { LineRequest } from "@/lib/commerce";
 

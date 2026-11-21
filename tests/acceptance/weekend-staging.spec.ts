@@ -1,3 +1,4 @@
+import { signOutFromStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test as base, type Page } from "@playwright/test";
@@ -328,7 +329,7 @@ test("Isolation and trials", async ({ db, page, browser, request }) => {
   await page.getByRole("button", { name: "Record eligible decision" }).click();
   await expect(page.getByRole("table", { name: "Trial blade units" })).toContainText("EDG-Z1");
   expect(await balance()).toEqual(stock);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromStaffMenu(page);
   await expect(page).toHaveURL("/admin/sign-in");
   await signInStaff(page, warehouse);
   await page.goto(trialPath);

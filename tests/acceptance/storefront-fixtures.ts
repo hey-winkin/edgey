@@ -1,3 +1,4 @@
+import { openStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -150,7 +151,7 @@ export async function confirmation(recipient: string) {
 
 export async function pickList(page: Page, orderId: string, reference: string) {
   await signInStaff(page, await createLocalAdminUser("warehouse"));
-  await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Pick and dispatch" }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Pick and dispatch" }).click();
   await page.getByRole("link", { name: reference, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/admin/warehouse/${orderId}$`));
   await page.getByRole("link", { name: "Printable pick list" }).click();

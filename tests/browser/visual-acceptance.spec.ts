@@ -1,22 +1,7 @@
-import { createHmac } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { connectAccountDb } from "../helpers/account-fixture";
 import { scanAccessibility, themes, saveThemeBeforeLoad } from "../helpers/accessibility";
-
-async function resetBrowserQuoteBudget() {
-  const key = process.env.EDGEY_BROWSER_REQUEST_KEY;
-  if (!key) throw new Error("The local Playwright server must set the browser request key.");
-  const db = await connectAccountDb();
-  try {
-    const ip = createHmac("sha256", key).update("ip\0local").digest("hex");
-    await db.query(
-      "delete from private.request_rate_limits where scope = 'selection_quote' and dimension = 'ip' and key = $1",
-      [ip],
-    );
-  } finally {
-    await db.end();
-  }
-}
+import { resetBrowserQuoteBudget } from "../helpers/quote-budget";
 
 async function verifyBoardContrast(page: Page, incomplete: Awaited<ReturnType<typeof scanAccessibility>>) {
   const measuredArtwork = new Map([
@@ -167,13 +152,21 @@ for (const theme of themes) {
               expect(view.top).toBeGreaterThan(label.bottom);
               expect(view.right).toBeLessThanOrEqual(width);
             }
+            await page.evaluate(() => window.scrollTo(0, 0));
             const incomplete = await scanAccessibility(page, theme);
             if (width === 1440) await verifyBoardContrast(page, incomplete);
           }
         });
       }
 
-      if (width === 320) await resetBrowserQuoteBudget();
+      if (width === 320) {
+        const db = await connectAccountDb();
+        try {
+          await resetBrowserQuoteBudget(db);
+        } finally {
+          await db.end();
+        }
+      }
       await page.goto("/blades/edg-z10");
       await page.locator("html").evaluate((html) => { html.style.fontSize = "200%"; });
       const priceBreaks = page.getByRole("region", { name: "Price breaks per blade for EDG-Z10" });

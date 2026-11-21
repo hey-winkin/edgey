@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -64,7 +65,7 @@ for (const width of [320, 390, 800]) {
     test(`both hero states fit ${width}px in ${theme} mode`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(preview);
-      if (theme === "light") await page.getByRole("button", { name: "Switch to light mode" }).click();
+      if (theme === "light") await switchTheme(page, "light");
 
       for (const state of ["tiles", "detail"]) {
         if (state === "detail") await hero(page).getByRole("link", { name: /^Corrugated board/ }).click();

@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -221,7 +222,7 @@ for (const width of [320, 390, 1440]) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/enquiry?q=NOT-FOUND");
     for (const theme of ["dark", "light"]) {
-      if (theme === "light") await page.getByRole("button", { name: "Switch to light mode" }).click();
+      if (theme === "light") await switchTheme(page, "light");
       for (const route of ["/enquiry?q=NOT-FOUND", "/enquiry?postcode=HS1%202AA", "/sample-pack", "/trade"]) {
         await page.goto(route);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -230,7 +231,10 @@ for (const width of [320, 390, 1440]) {
         if (width === 320) {
           await page.evaluate(() => { document.documentElement.style.fontSize = "125%"; });
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-          await expect(page.getByRole("navigation", { name: "Footer" }).getByRole("link", { name: "Trade accounts" })).toBeVisible();
+          const menu = page.locator("summary").filter({ hasText: /^Menu$/ });
+          await menu.click();
+          await expect(page.getByRole("navigation", { name: "Shop navigation" }).getByRole("link", { name: "Trade accounts" })).toBeVisible();
+          await menu.click();
         }
       }
     }

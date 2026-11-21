@@ -1,3 +1,4 @@
+import { signOutFromStaffMenu } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser } from "../../scripts/seed-admin";
 import { signInStaff } from "../browser/admin-fixtures";
@@ -19,7 +20,7 @@ test("warehouse settings quote an agreed card service and capture uses the reser
     await page.goto("/admin/delivery");
     await expect(page).toHaveURL("/admin");
     await expect(page.getByRole("link", { name: "Delivery settings" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromStaffMenu(page);
     await expect(page).toHaveURL("/admin/sign-in");
     await signInStaff(page, await createLocalAdminUser("warehouse"));
     await page.getByRole("link", { name: "Delivery settings" }).click();

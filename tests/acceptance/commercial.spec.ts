@@ -1,3 +1,4 @@
+import { signOutFromStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser } from "../../scripts/seed-admin";
@@ -53,7 +54,7 @@ test("records an exact match through card authorisation, dispatch and a structur
     await expect(warehousePage.getByText("Fixture return details")).toHaveCount(0);
     await warehousePage.screenshot({ path: test.info().outputPath("commercial-measures.png"), fullPage: true });
 
-    await warehousePage.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromStaffMenu(warehousePage);
     await expect(warehousePage).toHaveURL("/admin/sign-in");
     await warehousePage.goto("/admin/commercial");
     await expect(warehousePage.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();

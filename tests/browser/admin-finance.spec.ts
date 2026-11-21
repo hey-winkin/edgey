@@ -1,3 +1,4 @@
+import { openStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -18,7 +19,7 @@ test("finance sees cancellation without a refund and the separate flagged paymen
   if (result.error) throw result.error;
   try {
     await signInStaff(page, finance);
-    await page.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Finance" }).click();
+    await (await openStaffMenu(page)).getByRole("link", { name: "Finance" }).click();
     const captures = page.getByRole("table", { name: "Outstanding captures" });
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })).toContainText(formatGbp(cancelled.gross));
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })
