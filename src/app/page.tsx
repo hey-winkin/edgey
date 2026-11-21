@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { CatalogueSection } from "@/components/catalogue-section";
-import { Hero } from "@/components/hero";
-import { MaterialIndex } from "@/components/material-index";
+import { HomeContent } from "@/components/home-content";
+import { OriginalHomeHero } from "@/components/original-home-hero";
 import { readFilters, type RouteQuery } from "@/lib/catalogue";
 import { loadCatalogue } from "@/lib/catalogue/server";
 import { siteUrl } from "@/lib/catalogue/site-url";
@@ -18,11 +17,5 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export default async function HomePage({ searchParams }: Props) {
   const filters = readFilters(await searchParams);
   const view = await loadCatalogue(filters);
-  return (
-    <main>
-      <Hero />
-      <CatalogueSection view={view} filters={filters} />
-      <MaterialIndex materials={view.materials} />
-    </main>
-  );
+  return <HomeContent hero={<OriginalHomeHero />} view={view} filters={filters} />;
 }
