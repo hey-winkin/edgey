@@ -332,6 +332,7 @@ describe("live checkout adapter", () => {
 
   function mockSupabase() {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fake-anonymous-key");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://127.0.0.1:3000");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-role-key");
     vi.stubEnv("EDGEY_REQUEST_HASH_KEY", "test-only-request-hash-key-at-least-32-bytes");
@@ -340,7 +341,8 @@ describe("live checkout adapter", () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (target) => {
       const path = new URL(String(target)).pathname;
       return Response.json(path.endsWith("/consume_request_rate_limit") ? true : path.endsWith("/checkout_delivery_terms") ? terms :
-        path.endsWith("/checkout_warehouse_calendar") ? calendar : [row]);
+        path.endsWith("/checkout_warehouse_calendar") ? calendar :
+        path.endsWith("/variants") ? [{ id: z10Id, products: { name: "Flat-stock drag blade" } }] : [row]);
     });
     vi.stubGlobal("fetch", fetch);
     return fetch;
@@ -348,11 +350,11 @@ describe("live checkout adapter", () => {
 
   it("only fetches requested published variants without caching or exposing stock or the order input", async () => {
     const fetch = mockSupabase();
-    const quote = ok(await quoteSelection([line(2), line(3, z10Id.toUpperCase())], fields.postcode));
-    expect(fetch).toHaveBeenCalledTimes(3);
+    const quote = ok(await quoteSelection([line(2), line(3, z10Id.toUpperCase())], fields.postcode, true));
+    expect(fetch).toHaveBeenCalledTimes(4);
     expect(String(fetch.mock.calls[0]?.[0])).toMatch(/\/rpc\/consume_request_rate_limit$/);
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({ p_scope: "selection_quote" });
-    const [, deliveryCall, call] = fetch.mock.calls;
+    const [, deliveryCall, call, namesCall] = fetch.mock.calls;
     expect(new URL(String(deliveryCall?.[0])).pathname).toBe("/rest/v1/rpc/checkout_delivery_terms");
     expect(deliveryCall?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ p_postcode: "SW1A 1AA" }) });
     if (!call) throw new Error("No request was made");
@@ -362,13 +364,37 @@ describe("live checkout adapter", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ p_variant_ids: [z10Id], p_quantities: [5] });
     expect(init).toMatchObject({ method: "POST", cache: "no-store" });
     expect(new Headers(init?.headers).get("apikey")).toBe("fake-service-role-key");
+    const namesUrl = new URL(String(namesCall?.[0]));
+    expect(namesUrl.pathname).toBe("/rest/v1/variants");
+    expect(Object.fromEntries(namesUrl.searchParams)).toEqual({
+      select: "id,products!inner(name)", publication_status: "eq.published", id: `in.(${z10Id})`,
+    });
+    expect(namesCall?.[1]?.method).toBe("GET");
+    expect(new Headers(namesCall?.[1]?.headers).get("apikey")).toBe("fake-anonymous-key");
     expect(quote.photos).toEqual({ [z10Id]: "drag.webp" });
+    expect(quote.productNames).toEqual({ [z10Id]: "Flat-stock drag blade" });
     expect(JSON.stringify(quote)).not.toMatch(/75321|4098|71223|service-role|quote_limit|stock_on_hand|stock_reserved|warehouseCalendar|cutoffMinutes/);
     expect(await startCheckoutAttempt(input([line(5)], quote.quoteKey))).toMatchObject({
       status: "ready", orderInput: { totals: { grossPence: 12804 } },
     });
-    expect(fetch).toHaveBeenCalledTimes(5);
-    expect(fetch.mock.calls[4]?.[1]?.method).toBe("POST");
+    expect(fetch).toHaveBeenCalledTimes(6);
+    expect(fetch.mock.calls.slice(4).map(([, init]) => init?.method)).toEqual(["POST", "POST"]);
+  });
+
+  it("keeps the same usable quote and fingerprint when the name lookup fails", async () => {
+    const fetch = mockSupabase();
+    const named = ok(await quoteSelection([line(1)], fields.postcode, true));
+    fetch.mockResolvedValueOnce(Response.json(true));
+    fetch.mockResolvedValueOnce(Response.json(terms));
+    fetch.mockResolvedValueOnce(Response.json([row]));
+    fetch.mockResolvedValueOnce(Response.json({ message: "restricted provider error" }, { status: 500 }));
+    const unnamed = ok(await quoteSelection([line(1)], fields.postcode, true));
+    const { productNames, ...baseQuote } = named;
+    expect(productNames).toEqual({ [z10Id]: "Flat-stock drag blade" });
+    expect(unnamed).toEqual(baseQuote);
+    fetch.mockClear();
+    expect(ok(await quoteSelection([line(1)], fields.postcode))).toEqual(baseQuote);
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it("rejects oversized or throttled public quotes without reading inventory", async () => {

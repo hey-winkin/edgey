@@ -3,6 +3,16 @@ import type { QuoteResult } from "@/lib/checkout/types";
 
 type Quote = Extract<QuoteResult, { status: "ok" }>;
 
+export function SelectionLineIdentity({ line, name }: { line: BasketLine; name?: string }) {
+  return (
+    <>
+      <strong className="selection-code">{line.sku}</strong>
+      {name && <span>{name}</span>}
+      {line.optionLabel && <span className="fine">{line.optionLabel}</span>}
+    </>
+  );
+}
+
 export function SelectionLinePrice({ line, vatRate }: { line: BasketLine; vatRate: number }) {
   return (
     <>
@@ -51,25 +61,40 @@ export function formatDispatchDate(date: string) {
 }
 
 export function DispatchEstimate({ quote, onAccount = false }: { quote: Quote; onAccount?: boolean }) {
+  const { coverage, dispatchDate, estimatedDeliveryDate } = quote;
+  const deliveryDate = coverage === "unchecked" || coverage === "covered" ? estimatedDeliveryDate : null;
+  const delivery = deliveryDate ? formatDispatchDate(deliveryDate)
+    : coverage === "unsupported" ? "Ask us"
+    : coverage === "invalid" ? "Enter a supported postcode"
+    : null;
+  const service = coverage === "covered" ? quote.basket?.delivery.quote.serviceName : undefined;
+  if (!dispatchDate && !delivery && !service) return null;
+
   return (
     <>
       <dl className="specs checkout-promise">
-        <dt>Dispatch</dt>
-        <dd>{quote.dispatchDate ? formatDispatchDate(quote.dispatchDate) : "Estimate unavailable"}</dd>
-        <dt>Estimated delivery</dt>
-        <dd>
-          {quote.estimatedDeliveryDate && (quote.coverage === "unchecked" || quote.coverage === "covered")
-            ? formatDispatchDate(quote.estimatedDeliveryDate)
-            : quote.coverage === "unsupported" ? "Ask us" : quote.coverage === "invalid" ? "Enter a supported postcode" : "Estimate unavailable"}
-        </dd>
-        {quote.coverage === "covered" && quote.basket && (
+        {dispatchDate && (
+          <>
+            <dt>Dispatch</dt>
+            <dd>{formatDispatchDate(dispatchDate)}</dd>
+          </>
+        )}
+        {delivery && (
+          <>
+            <dt>Estimated delivery</dt>
+            <dd>{delivery}</dd>
+          </>
+        )}
+        {service && (
           <>
             <dt>Service</dt>
-            <dd>{quote.basket.delivery.quote.serviceName}</dd>
+            <dd>{service}</dd>
           </>
         )}
       </dl>
-      <p className="fine">{onAccount ? "Dates are provisional until your invoice is issued." : "Dates are provisional until payment."}</p>
+      {(dispatchDate || deliveryDate) && (
+        <p className="fine">{onAccount ? "Dates are provisional until your invoice is issued." : "Dates are provisional until payment."}</p>
+      )}
     </>
   );
 }

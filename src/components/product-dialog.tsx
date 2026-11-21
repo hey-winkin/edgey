@@ -41,7 +41,7 @@ export function ProductDialog({ children }: { children: ReactNode }) {
             ×
           </button>
         </div>
-        <div className="dialog-scroll" role="region" aria-label="Blade specifications and options" tabIndex={0}>{children}</div>
+        {children}
       </div>
     </dialog>
   );

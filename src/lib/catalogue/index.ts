@@ -64,6 +64,12 @@ export function familyBrands(family: Family): { slug: string; name: string }[] {
   return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export function referenceToolFit(variant: Variant, references = variant.compatibility): string[] {
+  const tools = references.map(({ tool }) => tool).filter((tool): tool is string => Boolean(tool));
+  const adapters = references.flatMap(({ adapter }) => adapter ? ["Adapter: " + adapter] : []);
+  return [...new Set([...(tools.length ? tools : variant.tool ? [variant.tool] : []), ...adapters])];
+}
+
 // What tells one variant from a similar one: holder, angle, shank or size.
 export function variantFit(variant: Variant, includeDimensions = true): string[] {
   const parts = [

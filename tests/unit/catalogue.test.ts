@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildCatalogueView, productHref, queryValue, readFilters, type Family, type Variant } from "@/lib/catalogue";
+import { buildCatalogueView, productHref, queryValue, readFilters, referenceToolFit, type Family, type Variant } from "@/lib/catalogue";
 import { unitPricePence, withVatPence } from "@/lib/catalogue/display-prices";
 
 const materials = ["vinyl", "textile"].map((slug, sortOrder) => ({ slug, name: slug, sortOrder, swatch: null }));
@@ -54,6 +54,14 @@ test("the displayed price applies each break to every blade and rounds VAT on th
   expect([1, 4, 5, 9, 10].map((quantity) => unitPricePence(prices, quantity))).toEqual([2250, 2250, 1995, 1995, 1750]);
   expect(withVatPence(unitPricePence(prices, 5) * 5)).toBe(11970);
   expect(withVatPence(1598)).toBe(1918);
+});
+
+test("verified fit deduplicates heads and adapters, with a fallback to the recorded variant tool", () => {
+  const blade = { ...family.variants[0]!, tool: "HF VibraCut (6 mm adapter)" };
+  const reference = { ...blade.compatibility[0]!, tool: "HF VibraCut", adapter: "6 mm" };
+  expect(referenceToolFit(blade, [reference, { ...reference, code: "SECOND" }]))
+    .toEqual(["HF VibraCut", "Adapter: 6 mm"]);
+  expect(referenceToolFit(blade)).toEqual(["HF VibraCut (6 mm adapter)"]);
 });
 
 test("route inputs keep the first value, strip control characters and cap search length", () => {

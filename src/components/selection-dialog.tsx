@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { BasketLine } from "@/lib/commerce";
 import { useSelection } from "./selection-provider";
-import { DispatchEstimate, SelectionLinePrice, SelectionTotals } from "./selection-summary";
+import { DispatchEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
 import { useSelectionQuote } from "./use-selection-quote";
 
 export function SelectionTrigger() {
@@ -30,9 +30,10 @@ export function SelectionTrigger() {
 }
 
 function SelectionItem({
-  line, value, vatRate, photo, remove, onChange, onUpdate,
+  line, name, value, vatRate, photo, remove, onChange, onUpdate,
 }: {
   line: BasketLine;
+  name?: string;
   value: string;
   vatRate: number;
   photo?: string;
@@ -54,8 +55,7 @@ function SelectionItem({
         ? <Image className="tray-plate" src={`/photos/${photo}`} alt="" width={56} height={44} unoptimized />
         : <span className="tray-plate" aria-hidden="true" />}
       <div className="tray-line">
-        <strong className="selection-code">{line.sku}</strong>
-        {line.optionLabel && <span className="fine">{line.optionLabel}</span>}
+        <SelectionLineIdentity line={line} name={name} />
         <SelectionLinePrice line={line} vatRate={vatRate} />
         <form className="tray-quantity" onSubmit={update} noValidate>
           <label htmlFor={id}>Quantity<span className="sr"> for {line.sku}</span></label>
@@ -178,7 +178,7 @@ export function SelectionDialog() {
                   const original = lines.find(({ variantId }) => variantId === line.variantId);
                   if (!original) return null;
                   return (
-                    <SelectionItem key={line.variantId} line={line}
+                    <SelectionItem key={line.variantId} line={line} name={priced.productNames?.[line.variantId]}
                       value={drafts[line.variantId] ?? String(priced.corrections.length ? line.quantity : original.quantity)}
                       vatRate={basket.vatRateBasisPoints / 100} photo={priced.photos?.[line.variantId]} remove={remove}
                       onChange={(value) => changeDraft(line.variantId, value)}

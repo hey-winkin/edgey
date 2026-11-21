@@ -13,6 +13,7 @@ export type QuoteResult =
       coverage: "unchecked" | "covered" | "unsupported" | "invalid";
       postcode?: string;
       photos?: Record<string, string>;
+      productNames?: Record<string, string>;
       quoteKey: string;
     };
 
