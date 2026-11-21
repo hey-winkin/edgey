@@ -11,7 +11,7 @@ test("the preview uses the homepage shell and public material links without inde
 
   await page.goto(preview + "?study=unknown");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find a blade by material.");
-  await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", "noindex, follow");
+  await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", "noindex, nofollow");
   await expect(page.getByRole("heading", { level: 2, name: "Blade catalogue" })).toBeVisible();
   const materials = await page.locator("#materials li strong").allTextContents();
   expect(materials).toContain("Corrugated board");
@@ -22,13 +22,15 @@ test("the preview uses the homepage shell and public material links without inde
   await expect(page.locator(".filter-status")).toContainText("Vinyl");
 
   await page.goto(corrugated);
-  await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", "noindex, follow");
+  await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", "noindex, nofollow");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Corrugated board.");
   await expect(hero(page).getByRole("figure")).toContainText("clean slit");
   await expect(hero(page).getByRole("figure").locator("dd")).toHaveText(["26 mm", "7.4 mm", "0.63 mm", "54°", "Oscillating"]);
+  await expect(hero(page).locator("svg").getByText("Blade length · 26 mm", { exact: true })).toBeVisible();
   await expect(hero(page).getByText("Material thickness range")).toHaveCount(0);
   await expect(hero(page).getByText("Zünd G3, S3, L3")).toBeVisible();
   await expect(hero(page).getByText("EOT, POT, UCT")).toBeVisible();
+  await expect(hero(page).getByText(/BLD-SF216|Kongsberg/)).toHaveCount(0);
   await hero(page).getByRole("link", { name: "View blade details" }).click();
   await expect(page).toHaveURL(/\/blades\/edg-z16$/);
   await expect(page.getByRole("heading", { name: "Fit and technical detail" })).toBeVisible();
@@ -39,6 +41,10 @@ test.describe("without JavaScript", () => {
 
   test("keyboard navigation opens the deep link and returns to materials", async ({ page }) => {
     await page.goto(preview + "?material=vinyl");
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("main")).toBeFocused();
     const tile = hero(page).getByRole("link", { name: /^Corrugated board/ });
     await tile.focus();
     await page.keyboard.press("Enter");
@@ -53,7 +59,7 @@ test.describe("without JavaScript", () => {
   });
 });
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 800]) {
   for (const theme of ["dark", "light"]) {
     test(`both hero states fit ${width}px in ${theme} mode`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
@@ -65,8 +71,10 @@ for (const width of [320, 390]) {
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
         const options = state === "tiles" ? "Find a blade by material." : "Corrugated board.";
-        await expect(hero(page).getByRole("heading", { level: 1, name: options })).toBeInViewport();
+        const heading = hero(page).getByRole("heading", { level: 1, name: options });
+        await expect(heading).toBeInViewport();
         if (state === "detail") {
+          await expect(heading).toBeFocused();
           const figure = hero(page).getByRole("figure");
           await expect(figure.locator("svg").getByText("A", { exact: true })).toBeVisible();
           await expect(figure.locator("figcaption").getByText("A", { exact: true })).toBeVisible();
@@ -74,6 +82,9 @@ for (const width of [320, 390]) {
         const accessibility = await new AxeBuilder({ page }).include("section[aria-labelledby='material-hero-title']").analyze();
         expect(accessibility.violations).toEqual([]);
       }
+
+      await hero(page).getByRole("link", { name: "All materials" }).click();
+      await expect(hero(page).getByRole("heading", { level: 1, name: "Find a blade by material." })).toBeFocused();
     });
   }
 }

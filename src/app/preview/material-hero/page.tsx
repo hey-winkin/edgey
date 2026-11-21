@@ -7,7 +7,7 @@ import { listFamilies, loadCatalogue } from "@/lib/catalogue/server";
 
 export const metadata: Metadata = {
   title: "Choose by material · Homepage preview",
-  robots: { index: false, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export default async function MaterialHeroPreview({ searchParams }: { searchParams: Promise<RouteQuery> }) {
@@ -17,6 +17,7 @@ export default async function MaterialHeroPreview({ searchParams }: { searchPara
   const family = families.find(({ slug }) => slug === featuredFamilySlug) ?? null;
   return (
     <HomeContent
+      skipTarget="main-content"
       view={view}
       filters={filters}
       hero={

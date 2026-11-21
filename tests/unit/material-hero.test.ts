@@ -25,7 +25,11 @@ const variant: Variant = {
   prices: { oneToFour: 1000, fiveToNine: 900, tenPlus: 800 },
   availability: "in_stock",
   substrates: [material],
-  compatibility: [reference, { ...reference, kind: "item_number", code: "ITEM" }],
+  compatibility: [
+    reference,
+    { ...reference, kind: "item_number", code: "ITEM" },
+    { ...reference, brand: { slug: "other", name: "Other" }, machine: "Other machine" },
+  ],
 };
 const family: Family = {
   id: "fixture",
@@ -77,6 +81,7 @@ describe("corrugated hero study", () => {
 
   it("does not substitute a different product or show a study when the mapping is absent", () => {
     expect(buildCorrugatedStudy(null)).toBeNull();
+    expect(buildCorrugatedStudy({ ...family, toolType: { ...family.toolType, slug: "drag" } })).toBeNull();
     expect(buildCorrugatedStudy({ ...family, variants: [{ ...variant, sku: "OTHER" }] })).toBeNull();
     expect(buildCorrugatedStudy({ ...family, variants: [{ ...variant, substrates: [] }] })).toBeNull();
     expect(buildCorrugatedStudy({ ...family, variants: [{ ...variant, compatibility: [] }] })).toBeNull();

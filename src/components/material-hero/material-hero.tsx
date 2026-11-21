@@ -14,8 +14,8 @@ function studyHref(filters: CatalogueFilters, study?: string) {
 function QualityPlaceholder() {
   return (
     <div className={styles.quality}>
-      <p className={styles.label}>Blade quality · Placeholder</p>
-      <p>Two or three verified facts to come from the owner.</p>
+      <p className={styles.label}><span>Placeholder</span> Blade quality</p>
+      <p>The owner will supply two or three verified facts.</p>
     </div>
   );
 }
@@ -73,7 +73,6 @@ export function MaterialHero({
 }
 
 function CorrugatedDetail({ study, filters }: { study: CorrugatedStudy; filters: CatalogueFilters }) {
-  const bladeLabel = [study.brand, study.model ?? study.sku].join(" ");
   const annotations = Object.fromEntries(study.annotations.map(({ key, label, value }) => [key, label + " · " + value]));
 
   return (
@@ -111,8 +110,8 @@ function CorrugatedDetail({ study, filters }: { study: CorrugatedStudy; filters:
         <div className={styles.sidebar}>
           <div className={styles.fit}>
             <p className={styles.label}>{study.sku}</p>
-            <h2>{bladeLabel}</h2>
-            <p className={styles.bladeName}>{study.name}</p>
+            <h2>{study.name}</h2>
+            {study.model && <p className={styles.reference}>OEM reference: {study.brand} {study.model}</p>}
             {study.fits.length > 0 && (
               <ul className={styles.fitList} role="list" aria-label="Compatible machines and tools">
                 {study.fits.map(({ machine, tool, adapter }) => (

@@ -43,13 +43,21 @@
 .quality {
   grid-area: quality;
   width: 100%;
-  padding: 13px 0 0;
-  border-top: 1px solid var(--line);
+  padding: 12px;
+  border: 1px dashed var(--muted);
   font-size: .88rem;
 }
 
+.quality .label span {
+  display: inline-block;
+  margin-inline-end: 4px;
+  padding: 2px 5px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
 .quality p + p {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .tiles {
@@ -173,6 +181,7 @@
 
 .plate {
   min-width: 0;
+  container: cutaway / inline-size;
   border: 1px solid var(--line);
   background: var(--edgey-drawing-plate);
 }
@@ -240,8 +249,12 @@
   font-size: clamp(1.65rem, 3vw, 2.7rem);
 }
 
-.bladeName, .evidence {
+.reference, .evidence {
   color: var(--muted);
+}
+
+.reference {
+  margin-top: 5px;
 }
 
 .fitList {
@@ -301,7 +314,7 @@
   }
 }
 
-@media (max-width: 490px) {
+@container cutaway (max-width: 540px) {
   .specTag {
     display: inline-grid;
     place-items: center;

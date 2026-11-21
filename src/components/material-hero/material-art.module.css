@@ -48,7 +48,7 @@
   display: none;
 }
 
-@media (max-width: 490px) {
+@container cutaway (max-width: 540px) {
   .leader {
     display: none;
   }
