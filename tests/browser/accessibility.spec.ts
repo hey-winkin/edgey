@@ -51,6 +51,7 @@ test("every App Router page is accounted for in the accessibility suite", () => 
     "enquiry/page.tsx",
     "page.tsx",
     "preview/material-hero/page.tsx",
+    "preview/original-hero/page.tsx",
     "privacy/page.tsx",
     "sample-pack/page.tsx",
     "trade/page.tsx",
@@ -87,10 +88,12 @@ for (const theme of themes) {
 
     test("public catalogue, fit details and not-found states", async ({ page }) => {
       await scanRoutes(page, theme, [
-        ["/", /The cutting/],
-        ["/?q=3910301", /The cutting/],
+        ["/", "Find a blade."],
+        ["/?q=3910301", "Find a blade."],
+        ["/?material=vinyl", "Find a blade."],
         ["/preview/material-hero", "Find a blade by material."],
         ["/preview/material-hero?study=corrugated-board", "Corrugated board."],
+        ["/preview/original-hero", "The cutting room."],
         ["/blades", "Blade catalogue"],
         ["/blades?q=spb%200030", "Blade catalogue"],
         ["/blades?q=no-such-reference", "Blade catalogue"],

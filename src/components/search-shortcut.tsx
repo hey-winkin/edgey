@@ -6,7 +6,8 @@ import { useEffect, useRef } from "react";
 export function focusCatalogueSearch() {
   const finder = document.getElementById("finder");
   if (!finder) return false;
-  document.getElementById("catalogue")?.scrollIntoView();
+  if (finder.closest("[data-search-first]")) finder.scrollIntoView({ block: "center" });
+  else document.getElementById("catalogue")?.scrollIntoView();
   finder.focus({ preventScroll: true });
   return true;
 }

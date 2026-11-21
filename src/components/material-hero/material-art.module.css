@@ -21,6 +21,17 @@
   background-size: 17px 17px;
 }
 
+.coreSheet {
+  --plastic: color-mix(in srgb, #aabdbb 65%, var(--core));
+  --cavity: color-mix(in srgb, #485759 65%, var(--core));
+  --foam: color-mix(in srgb, #d3d1c8 78%, var(--core));
+  --foam-edge: color-mix(in srgb, #b1b2a8 60%, var(--core));
+  --film: color-mix(in srgb, #93afbf 78%, var(--core));
+  --film-back: color-mix(in srgb, #d1dbdc 80%, var(--core));
+  --cloth: color-mix(in srgb, #76586c 80%, var(--core));
+  --cloth-edge: color-mix(in srgb, #9c6289 72%, var(--contour));
+}
+
 .leader {
   fill: none;
   stroke: var(--edgey-text-muted);

@@ -78,6 +78,27 @@ test("column grants keep stock counts and supplier identifiers private", async (
   await expect(db.query("select stock_on_hand from public.variants")).rejects.toMatchObject({ code: "42501" });
 });
 
+test("public machine lookup data excludes private and unapproved compatibility rows on published variants", async () => {
+  await db.query("reset role");
+  await db.query("begin");
+  try {
+    const fixture = await db.query(`
+      update public.compatibility c set machine = 'Local test model ' || c.code
+      from public.variants v
+      where c.variant_id = v.id and v.publication_status = 'published'
+        and ((v.sku = 'EDG-Z10' and c.code = 'PRIV-Z10-ALIAS' and c.is_private)
+          or (v.sku = 'EDG-MIM-A45' and c.code = 'MD300V' and c.verification_state = 'candidate'))
+    `);
+    expect(fixture.rowCount).toBe(2);
+    await db.query("set local role anon");
+    const { rows } = await db.query("select machine from public.compatibility where machine like 'Local test model %'");
+    expect(rows).toEqual([]);
+  } finally {
+    await db.query("rollback");
+    await db.query("set role anon");
+  }
+});
+
 test("the import has exactly one SKU per order line and the three retained drafts", async () => {
   await db.query("reset role");
   try {

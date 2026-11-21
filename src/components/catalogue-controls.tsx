@@ -30,12 +30,14 @@ function writeFilters(form: HTMLFormElement | null, filters?: CatalogueFilters) 
 // so results are server-rendered, shareable and work without JavaScript.
 export function CatalogueControls({
   filters,
-  toolTypes,
-  machines,
+  toolTypes = [],
+  machines = [],
+  searchFirst = false,
 }: {
   filters: CatalogueFilters;
-  toolTypes: Option[];
-  machines: Option[];
+  toolTypes?: Option[];
+  machines?: Option[];
+  searchFirst?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,14 +58,16 @@ export function CatalogueControls({
 
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [pathname]);
 
-  function push(element: HTMLFormElement, delay: number) {
+  function push(element: HTMLFormElement, delay: number, showResults = false) {
     if (timer.current) clearTimeout(timer.current);
     const data = new FormData(element);
     const query = filterQuery((name) => String(data.get(name) ?? ""));
     timer.current = setTimeout(() => {
       timer.current = null;
       requested.current = [...requested.current.filter((prior) => prior !== query).slice(-7), query];
-      startTransition(() => router.replace(pathname + (query ? "?" + query : ""), { scroll: false }));
+      const href = pathname + (query ? "?" + query : "");
+      startTransition(() => router.replace(href + (showResults ? "#catalogue" : ""), { scroll: showResults }));
+      if (showResults) document.getElementById("catalogue")?.focus();
     }, delay);
   }
 
@@ -73,6 +77,7 @@ export function CatalogueControls({
       className="controls"
       id="catalogue-controls"
       role="search"
+      data-search-first={searchFirst || undefined}
       action={pathname + "#catalogue"}
       method="get"
       aria-busy={isPending}
@@ -81,31 +86,56 @@ export function CatalogueControls({
         if (timer.current) clearTimeout(timer.current);
         timer.current = null;
         requested.current = [];
-        writeFilters(event.currentTarget);
+        writeFilters(event.currentTarget, filters);
       }}
       onSubmit={(event) => {
         event.preventDefault();
-        push(event.currentTarget, 0);
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+        push(event.currentTarget, 0, searchFirst && submitter !== null);
       }}
       onChange={(event) => push(event.currentTarget, event.target === event.currentTarget.elements.namedItem("q") ? 160 : 0)}
     >
+      {searchFirst && <label htmlFor="finder">Search blades</label>}
       <label className="search-field">
         <span className="search-icon" aria-hidden="true" />
-        <span className="sr">Search by part number, machine or material</span>
+        {!searchFirst && <span className="sr">Search by part number, machine or material</span>}
         <input
           id="finder"
           name="q"
           type="search"
-          placeholder="Search blades"
+          placeholder={searchFirst ? "e.g. 3910301" : "Search blades"}
+          aria-describedby={searchFirst ? "finder-hint" : undefined}
           autoComplete="off"
           maxLength={80}
           defaultValue={filters.q}
         />
         <kbd aria-hidden="true">/</kbd>
       </label>
+      {searchFirst
+        ? <button className="primary" type="submit">Search</button>
+        : <CatalogueFacets filters={filters} toolTypes={toolTypes} machines={machines} />}
+      {filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
+      {!searchFirst && (
+        <noscript>
+          <button className="secondary" type="submit">Search</button>
+        </noscript>
+      )}
+      {searchFirst && <p id="finder-hint">Enter a part number, OEM code, machine or blade name.</p>}
+    </form>
+  );
+}
+
+export function CatalogueFacets({ filters, toolTypes, machines, form }: {
+  filters: CatalogueFilters;
+  toolTypes: Option[];
+  machines: Option[];
+  form?: string;
+}) {
+  return (
+    <>
       <label className="select-field">
         <span className="sr">Tool type</span>
-        <select name="type" defaultValue={filters.type}>
+        <select name="type" form={form} defaultValue={filters.type} onChange={form ? (event) => event.currentTarget.form?.requestSubmit() : undefined}>
           <option value="">All tool types</option>
           {toolTypes.map((option) => (
             <option key={option.slug} value={option.slug}>
@@ -116,7 +146,7 @@ export function CatalogueControls({
       </label>
       <label className="select-field">
         <span className="sr">Machine</span>
-        <select name="machine" defaultValue={filters.machine}>
+        <select name="machine" form={form} defaultValue={filters.machine} onChange={form ? (event) => event.currentTarget.form?.requestSubmit() : undefined}>
           <option value="">All machines</option>
           {machines.map((option) => (
             <option key={option.slug} value={option.slug}>
@@ -125,12 +155,7 @@ export function CatalogueControls({
           ))}
         </select>
       </label>
-      {filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
-      <noscript>
-        <button className="secondary" type="submit">
-          Search
-        </button>
-      </noscript>
-    </form>
+      {form && <noscript><button className="secondary" form={form} type="submit">Apply filters</button></noscript>}
+    </>
   );
 }
