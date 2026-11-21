@@ -1,4 +1,15 @@
+import { createHmac } from "node:crypto";
 import type { Client } from "pg";
+
+export async function resetBrowserQuoteBudget(db: Client) {
+  const key = process.env.EDGEY_BROWSER_REQUEST_KEY;
+  if (!key) throw new Error("The local Playwright server must set the browser request key.");
+  const ip = createHmac("sha256", key).update("ip\0local").digest("hex");
+  await db.query(
+    "delete from private.request_rate_limits where scope = 'selection_quote' and dimension = 'ip' and key = $1",
+    [ip],
+  );
+}
 
 export async function withExhaustedQuoteBudget(db: Client, ipKey: string, runCheckout: () => Promise<void>) {
   await db.query(`
