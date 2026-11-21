@@ -169,9 +169,11 @@ for (const theme of themes) {
       await page.goto("/blades");
       await page.getByRole("link", { name: /EDG-Z10 Flat-stock drag blade/ }).click();
       const dialog = page.getByRole("dialog", { name: "Flat-stock drag blade" });
-      const photo = await dialog.locator(".dialog-img").boundingBox();
-      expect(photo?.height).toBeGreaterThanOrEqual(120);
-      expect(photo?.height).toBeLessThanOrEqual(175);
+      const artwork = dialog.locator(".figure-plate");
+      await expect(artwork.getByAltText("Line drawing for EDG-Z10")).toHaveAttribute("src", "/line-art/drag-line.svg");
+      const plate = await artwork.boundingBox();
+      expect(plate?.height).toBeGreaterThanOrEqual(120);
+      expect(plate?.height).toBeLessThanOrEqual(175);
       for (const pack of ["1", "5", "10"]) {
         const box = await dialog.getByRole("button", { name: pack, exact: true }).boundingBox();
         expect(box?.width).toBeGreaterThanOrEqual(48);

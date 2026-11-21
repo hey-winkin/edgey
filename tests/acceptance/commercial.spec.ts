@@ -17,7 +17,7 @@ test("records an exact match through card authorisation, dispatch and a structur
     await page.goto("/blades");
     await page.getByRole("searchbox").fill(available.sku);
     const result = page.locator(".cards").getByRole("link", { name: /Account test blades/ });
-    await expect(result).toContainText("Exact match");
+    await expect(result).toHaveAccessibleDescription(/Exact match/);
     await expect.poll(async () => (await page.context().cookies()).find((c) => c.name === "edgey-finder-match"))
       .toMatchObject({ path: "/api/checkout", sameSite: "Strict", value: expect.stringMatching(/^[a-f0-9-]{36}$/) });
     await result.click();
@@ -99,7 +99,7 @@ test("links truthful public shells and lists only published families in a fresh 
     await page.screenshot({ path: test.info().outputPath("privacy-shell.png"), fullPage: true });
 
     await page.goto("/blades?q=3910301");
-    await expect(page.locator(".cards").getByRole("link").filter({ hasText: "Exact match" })).toBeVisible();
+    await expect(page.locator(".p-card").filter({ hasText: "Exact match" }).getByRole("link")).toBeVisible();
     expect((await page.context().cookies()).map(({ name }) => name)).not.toContain("edgey-finder-match");
     const cutoff = (await db.query<{ since: Date }>("select clock_timestamp() as since")).rows[0]!.since;
     const bench = await request.get("/blades?q=3910301", { headers: { "User-Agent": "EdgeyBenchmarkBot/1.0" } });

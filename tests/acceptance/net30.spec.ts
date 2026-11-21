@@ -163,7 +163,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await buyerPage.getByRole("button", { name: "Turn on Finder analytics" }).click();
         await expect(buyerPage.getByRole("button", { name: "Turn off Finder analytics" })).toBeVisible();
         await buyerPage.goto(`/blades?q=${encodeURIComponent(sku)}`);
-        await expect(buyerPage.locator(".cards").getByRole("link").filter({ hasText: "Exact match" })).toContainText(sku);
+        await expect(buyerPage.locator(".p-card").filter({ hasText: "Exact match" })).toContainText(sku);
         await expect.poll(async () => (await buyerContext.cookies()).some(({ name }) => name === "edgey-finder-match")).toBe(true);
         await buyerPage.goto("/checkout");
         await buyerPage.getByLabel("Business name").fill(company);

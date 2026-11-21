@@ -5,7 +5,11 @@ import { quoteSelection } from "@/app/checkout/actions";
 import type { QuoteResult } from "@/lib/checkout/types";
 import type { LineRequest } from "@/lib/commerce";
 
-export function useSelectionQuote(lines: LineRequest[], enabled: boolean, postcode?: string) {
+export function useSelectionQuote(
+  lines: LineRequest[],
+  enabled: boolean,
+  { postcode, includeProductNames = true }: { postcode?: string; includeProductNames?: boolean } = {},
+) {
   const [refresh, setRefresh] = useState(0);
   const request = JSON.stringify({ lines, postcode });
   const [settled, setSettled] = useState<{ request: string; refresh: number; quote: QuoteResult }>();
@@ -18,7 +22,7 @@ export function useSelectionQuote(lines: LineRequest[], enabled: boolean, postco
       const { lines, postcode } = JSON.parse(request) as { lines: LineRequest[]; postcode?: string };
       let quote: QuoteResult;
       try {
-        quote = await quoteSelection(lines, postcode);
+        quote = await quoteSelection(lines, postcode, includeProductNames);
       } catch {
         quote = { status: "error", message: "We couldn’t check these prices. Try again." };
       }
@@ -28,7 +32,7 @@ export function useSelectionQuote(lines: LineRequest[], enabled: boolean, postco
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [request, enabled, refresh]);
+  }, [request, enabled, refresh, includeProductNames]);
 
   return {
     quote: current && enabled ? settled.quote : undefined,

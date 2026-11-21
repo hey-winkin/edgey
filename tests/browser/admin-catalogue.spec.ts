@@ -95,7 +95,8 @@ test("a catalogue operator approves and publishes a draft for public search", as
   expect((await db.from("variants").select("publication_status").eq("sku", "EDG-Z11").single()).data?.publication_status).toBe("published");
 
   await page.goto("/blades?q=3910309");
-  await expect(page.getByRole("link", { name: /EDG-Z11 Tight-corner drag blade/ })).toContainText("Exact match · 3910309");
+  await expect(page.getByRole("link", { name: /EDG-Z11 Tight-corner drag blade/ }))
+    .toHaveAccessibleDescription(/Exact match · 3910309/);
   await page.goto(variantPath);
   await page.getByRole("button", { name: "Unpublish variant" }).click();
   await expect(page.getByRole("button", { name: "Publish variant", exact: true })).toBeVisible();

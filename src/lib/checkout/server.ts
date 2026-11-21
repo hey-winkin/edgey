@@ -1,10 +1,12 @@
 import "server-only";
 
 import { getBuyerSession } from "@/lib/auth/server";
+import { publicClient } from "@/lib/catalogue/supabase";
 import { readWarehouseSchedule, resolveCheckoutDelivery } from "@/lib/delivery/server";
 import { serviceClient } from "@/lib/supabase/service";
 import { prepareCheckoutAttempt } from "./attempt";
 import { quoteSelectionWith, type QuoteDependencies } from "./quote";
+import type { QuoteResult } from "./types";
 
 const lookup: QuoteDependencies["lookup"] = async (lines) => {
   const { data, error } = await serviceClient().rpc("lookup_selection_quote", {
@@ -35,6 +37,28 @@ const deps: QuoteDependencies = { lookup, now: () => new Date(), resolveDelivery
 
 export function quoteCurrentSelection(lines: unknown, postcode?: unknown) {
   return quoteSelectionWith(lines, postcode, deps);
+}
+
+export async function withSelectionProductNames(quote: QuoteResult): Promise<QuoteResult> {
+  if (quote.status !== "ok" || !quote.lines.length) return quote;
+
+  try {
+    const { data, error } = await publicClient().from("variants")
+      .select("id, products!inner(name)")
+      .eq("publication_status", "published")
+      .in("id", quote.lines.map(({ variantId }) => variantId))
+      .abortSignal(AbortSignal.timeout(1_000))
+      .overrideTypes<{ id: string; products: { name: string } }[], { merge: false }>();
+    if (error) {
+      console.warn("Checkout product names could not be loaded.");
+      return quote;
+    }
+    if (!data?.length) return quote;
+    return { ...quote, productNames: Object.fromEntries(data.map(({ id, products }) => [id, products.name])) };
+  } catch {
+    console.warn("Checkout product names could not be loaded.");
+    return quote;
+  }
 }
 
 export function priceCheckoutAttempt(input: unknown) {

@@ -17,8 +17,10 @@ export default async function ProductModal({ params, searchParams }: Props) {
   if (!family) {
     return (
       <ProductDialog>
-        <h2 id="detail-title">Blade not available</h2>
-        <p>This blade is no longer listed. Close this window and refresh the catalogue to see the current range.</p>
+        <div className="dialog-scroll">
+          <h2 id="detail-title">Blade not available</h2>
+          <p>This blade is no longer listed. Close this window and refresh the catalogue to see the current range.</p>
+        </div>
       </ProductDialog>
     );
   }

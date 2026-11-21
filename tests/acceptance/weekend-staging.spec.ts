@@ -38,8 +38,8 @@ test("Exact, ambiguous and unknown searches", async ({ page }) => {
   for (const query of ["edg z10", "eDG-Z10", " 3910-301 "]) {
     await page.goto("/?q=" + encodeURIComponent(query));
     const results = page.locator(".cards").getByRole("link");
-    await expect(results.first()).toHaveAccessibleName(/Exact match.*EDG-Z10 Flat-stock drag blade.*£22.50 ex VAT/);
-    await expect(results.first()).toContainText("Exact match");
+    await expect(results.first()).toHaveAccessibleName("EDG-Z10 Flat-stock drag blade");
+    await expect(results.first()).toHaveAccessibleDescription(/Exact match.*£22.50 ex VAT/);
     await results.first().click();
     const dialog = page.getByRole("dialog", { name: "Flat-stock drag blade" });
     await expect(dialog).toContainText("3910301");
@@ -47,7 +47,7 @@ test("Exact, ambiguous and unknown searches", async ({ page }) => {
   }
   await page.goto("/blades?q=spb%200030");
   const family = page.getByRole("link", { name: /EDG-MIM-45/ });
-  await expect(family).toContainText("45° · 1.5 mm diameter or 60° · 1.5 mm diameter");
+  await expect(page.locator(".p-card").filter({ has: family })).toContainText("45° · 1.5 mm diameter or 60° · 1.5 mm diameter");
   await family.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Choose the configuration");
@@ -85,7 +85,12 @@ test("Variant isolation", async ({ page, db }) => {
     await expect(paymentButton(page)).toBeEnabled();
     expect((await providerSessions()).sessions).toHaveLength(sessionCount);
     await page.goto(mimaki + "?variant=EDG-MIM-A60");
-    await expect(page.getByRole("button", { name: /60°.*Out of stock/i })).toBeDisabled();
+    const sold = page.getByRole("button", { name: /60°.*Out of stock/i });
+    await expect(sold).toBeEnabled();
+    await expect(sold).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Add to selection" })).toBeDisabled();
+    await expect(page.getByRole("table", { name: "Price breaks per blade for EDG-MIM-A60" })).toContainText("£11.95");
+    await expect(page.getByText(/removed from your selection/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "45°", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "45°", exact: true }).click();
     await expect(page.getByRole("button", { name: "Add to selection" })).toBeEnabled();
@@ -439,7 +444,7 @@ test("Weekend staging — exact packet to confirmation and dispatch; only one bu
     await Promise.all([page, other].map(async (buyer) => {
       await buyer.goto("/?q=edg%20mim-a45");
       const exact = buyer.getByRole("link", { name: /EDG-MIM-45/ });
-      await expect(exact).toContainText("Exact match · EDG-MIM-A45");
+      await expect(exact).toHaveAccessibleDescription(/Exact match · EDG-MIM-A45/);
       await exact.click();
       await expect(buyer.getByRole("button", { name: "45°", exact: true })).toHaveAttribute("aria-pressed", "true");
       await addBlade(buyer);

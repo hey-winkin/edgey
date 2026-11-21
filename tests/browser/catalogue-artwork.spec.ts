@@ -3,7 +3,8 @@ import { expect, test } from "@playwright/test";
 test("the drawing follows the exact plotter option on the card and product page", async ({ page }) => {
   await page.goto("/blades?q=EDG-MIM-A60");
   const card = page.getByRole("link", { name: /EDG-MIM-45 Mimaki-pattern plotter blade/ });
-  await expect(card.locator("img")).toHaveAttribute("src", "/line-art/edg-mim-a60-line.svg");
+  await expect(page.locator(".p-card").filter({ has: card }).locator("img"))
+    .toHaveAttribute("src", "/line-art/edg-mim-a60-line.svg");
   await card.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByAltText("Line drawing for EDG-MIM-A60")).toHaveAttribute("src", "/line-art/edg-mim-a60-line.svg");

@@ -10,9 +10,11 @@ import {
   variantLabel,
   variantReference,
   type Family,
+  type Media,
   type Variant,
 } from "@/lib/catalogue";
-import { formatPence, PRICE_BREAKS, VAT_RATE_PERCENT, type PriceTiers } from "@/lib/catalogue/display-prices";
+import { formatPence, PRICE_BREAKS, unitPricePence, VAT_RATE_PERCENT, withVatPence } from "@/lib/catalogue/display-prices";
+import { MAX_ORDER_INTEGER } from "@/lib/checkout/validation";
 import { formatGbp } from "@/lib/commerce";
 import { useSelection } from "./selection-provider";
 import { formatDispatchDate } from "./selection-summary";
@@ -27,11 +29,11 @@ export function ProductDetail({
   family,
   initialSku,
   mode,
-  grossBreaks,
 }: {
   family: Family;
   initialSku: string | null;
-} & ({ mode: "dialog"; grossBreaks?: never } | { mode: "page"; grossBreaks: Record<string, PriceTiers> })) {
+  mode: "dialog" | "page";
+}) {
   const id = useId();
   const preselected =
     family.variants.find((variant) => variant.sku === initialSku) ??
@@ -52,44 +54,66 @@ export function ProductDetail({
   const materials = (variant ? variant.substrates : familySubstrates(family)).map((substrate) => substrate.name);
   const fit = variant ? variantFit(variant, mode === "dialog") : [];
   const quantity = Number(quantityInput);
-  const maxQuantity = 2_147_483_647;
-  const validQuantity = Number.isInteger(quantity) && quantity >= 1 && quantity <= maxQuantity;
-  const variantId = variant?.id;
-  const lines = variantId && validQuantity ? [{ variantId, quantity }] : [];
-  const { quote, pending, retry } = useSelectionQuote(lines, lines.length > 0);
+  const validQuantity = Number.isInteger(quantity) && quantity >= 1 && quantity <= MAX_ORDER_INTEGER;
+  const outOfStock = variant?.availability === "out_of_stock";
+  const lines = variant && validQuantity && !outOfStock ? [{ variantId: variant.id, quantity }] : [];
+  const { quote, pending, retry } = useSelectionQuote(lines, lines.length > 0, { includeProductNames: false });
   const priced = quote?.status === "ok" ? quote : null;
-  const line = priced?.corrections.length ? undefined : priced?.basket?.lines[0];
-  const gross = variant && grossBreaks?.[variant.sku];
+  const quotedLine = priced?.basket?.lines[0];
+  const line = priced?.corrections.length ? undefined : quotedLine;
+  const unitNetPence = variant && unitPricePence(variant.prices, quantity);
+  const catalogueNet = unitNetPence === null ? null : unitNetPence * quantity;
+  const catalogueGross = catalogueNet !== null && catalogueNet <= MAX_ORDER_INTEGER ? withVatPence(catalogueNet) : null;
+  const displayLine = line ?? (outOfStock && validQuantity && catalogueNet !== null &&
+    catalogueGross !== null && catalogueGross <= MAX_ORDER_INTEGER && unitNetPence !== null ? {
+      unitNetPence,
+      lineNetPence: catalogueNet,
+      lineGrossPence: catalogueGross,
+    } : null);
+  const availability = !variant ? "Choose a variant"
+    : priced && !quotedLine ? "Unavailable"
+    : availabilityWords[variant.availability];
   const blocked = !variant
     ? "Choose a variant before adding this blade."
-    : priced?.corrections.length
-      ? priced.corrections.join(" ")
-      : !priced && variant.availability === "out_of_stock"
+    : outOfStock
       ? "This variant is out of stock and cannot be added."
-      : null;
+      : priced?.corrections.length
+        ? quotedLine
+          ? "There isn’t enough stock for this quantity. Try a smaller quantity."
+          : "This variant is no longer available to add."
+        : null;
+  const priceBreaks = mode === "page" && variant && (
+    <div className="table-scroll" role="region" tabIndex={0} aria-labelledby={id + "-price-breaks"}>
+      <table className="data-table breaks">
+        <caption id={id + "-price-breaks"}>Price breaks per blade for {variant.sku}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Quantity</th>
+            <th scope="col" className="num">ex VAT</th>
+            <th scope="col" className="num">inc VAT ({VAT_RATE_PERCENT}%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PRICE_BREAKS.map(({ from, label, tier }, index) => (
+            <tr key={from} aria-current={validQuantity && quantity >= from &&
+              (PRICE_BREAKS[index + 1]?.from ?? Infinity) > quantity ? "true" : undefined}>
+              <th scope="row">{label} blades</th>
+              <td className="num">{formatPence(variant.prices[tier])}</td>
+              <td className="num">{formatPence(withVatPence(variant.prices[tier]))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   const details = (
     <>
-      {mode === "dialog" &&
-        (media.photo ? (
-          <Image
-            className="dialog-img"
-            src={"/photos/" + media.photo}
-            alt={"Illustrative " + family.name.toLowerCase() + " · " + figureCode}
-            width={450}
-            height={175}
-            unoptimized
-          />
-        ) : (
-          media.drawing ? <figure className="mb-3">
-            <div className="dialog-plate">
-              <Image className="h-full w-full object-contain" src={"/line-art/" + media.drawing}
-                alt={"Line drawing for " + figureCode} width={320} height={176} unoptimized />
-            </div>
-            <figcaption className="fine">Drawing for identification. Not to scale.</figcaption>
-          </figure> : <div className="dialog-plate"><span className="plate-code">{figureCode}</span></div>
-        ))}
-      <p className="eyebrow">{variant?.sku ?? family.familyCode}</p>
+      <div className={mode === "dialog" ? "dialog-product-id" : undefined}>
+        <p className="eyebrow">{figureCode}</p>
+        {mode === "dialog" && media.drawing && <span className="fine">Drawing not to scale</span>}
+        {mode === "dialog" && media.photo && <a className="textlink" href={"/photos/" + media.photo}>View photograph</a>}
+      </div>
       <Heading id={mode === "dialog" ? "detail-title" : undefined}>{family.name}</Heading>
       <dl className="specs">
         <dt>OEM / reference</dt>
@@ -106,11 +130,11 @@ export function ProductDetail({
         <dt>Materials</dt>
         <dd>{materials.join(", ") || "Ask us"}</dd>
         <dt>Availability</dt>
-        <dd>{variant ? (priced ? priced.lines.length ? "In stock" : "Out of stock" : availabilityWords[variant.availability]) : "Choose a variant"}</dd>
-        <dt>Dispatch</dt>
-        <dd>{priced?.dispatchDate ? formatDispatchDate(priced.dispatchDate) : "Estimate unavailable"}</dd>
-        <dt>Estimated delivery</dt>
-        <dd>{priced?.estimatedDeliveryDate ? `${formatDispatchDate(priced.estimatedDeliveryDate)} · provisional` : "Check at checkout"}</dd>
+        <dd>{availability}</dd>
+        {priced?.dispatchDate && line && <>
+          <dt>Dispatch</dt>
+          <dd>{formatDispatchDate(priced.dispatchDate)} · provisional</dd>
+        </>}
       </dl>
 
       {family.variants.length > 1 && (
@@ -122,7 +146,6 @@ export function ProductDetail({
                 key={candidate.sku}
                 type="button"
                 aria-pressed={candidate.sku === sku}
-                disabled={candidate.availability === "out_of_stock"}
                 onClick={() => choose(candidate)}
               >
                 {variantLabel(candidate)}
@@ -138,6 +161,19 @@ export function ProductDetail({
 
       {variant && <fieldset className="quantity-set">
         <legend><label htmlFor={id + "-qty"}>Quantity</label></legend>
+        {mode === "dialog" && (
+          <div className="dialog-breaks" role="group" aria-labelledby={id + "-price-breaks"}>
+            <p id={id + "-price-breaks"} className="fine">Price breaks per blade · ex VAT</p>
+            <dl>
+              {PRICE_BREAKS.map(({ from, label, tier }) => (
+                <div key={from}>
+                  <dt>{label} blades</dt>
+                  <dd>{formatPence(variant.prices[tier])}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
         <div className="qty-row">
           <div className="qty-options">
             {PRICE_BREAKS.map((priceBreak) => (
@@ -157,7 +193,7 @@ export function ProductDetail({
             type="number"
             inputMode="numeric"
             min={1}
-            max={maxQuantity}
+            max={MAX_ORDER_INTEGER}
             step={1}
             value={quantityInput}
             aria-invalid={!validQuantity || undefined}
@@ -168,18 +204,21 @@ export function ProductDetail({
       </fieldset>}
 
       <div className="detail-total" aria-live="polite">
-        {line && priced?.basket ? (
+        {displayLine ? (
           <>
-            <span><strong>{formatGbp(line.lineNetPence)}</strong> <span className="fine">ex VAT</span></span>
-            <span className="fine detail-prices">
-              <span>{formatGbp(line.unitNetPence)} each · ex VAT</span>
-              <span>{formatGbp(line.lineGrossPence)} inc VAT ({priced.basket.vatRateBasisPoints / 100}%)</span>
+            <span className="fine">{formatGbp(displayLine.unitNetPence)} each · ex VAT</span>
+            <span className="detail-prices">
+              <span className="fine">Total for {quantity} {quantity === 1 ? "blade" : "blades"}</span>
+              <span><strong>{formatGbp(displayLine.lineNetPence)}</strong> <span className="fine">ex VAT</span></span>
+              <span>{formatGbp(displayLine.lineGrossPence)} inc VAT ({(priced?.basket?.vatRateBasisPoints ?? VAT_RATE_PERCENT * 100) / 100}%)</span>
             </span>
-            {line.savingPence > 0 && <span className="fine">Quantity saving: {formatGbp(line.savingPence)} ex VAT</span>}
-            {line.savingPrompt && <span className="fine">{line.savingPrompt.message}</span>}
+            {line && line.savingPence > 0 && <span className="fine">Quantity saving: {formatGbp(line.savingPence)} ex VAT</span>}
+            {line?.savingPrompt && <span className="fine">{line.savingPrompt.message}</span>}
           </>
         ) : variant && !validQuantity ? (
           <span className="fine" id={id + "-quantity-error"}>Enter a positive whole quantity to see the total.</span>
+        ) : outOfStock ? (
+          <span className="fine">This quantity exceeds the checkout limit. Try a smaller quantity.</span>
         ) : pending ? <span className="fine">Checking current price…</span> : null}
       </div>
 
@@ -200,54 +239,27 @@ export function ProductDetail({
       </div>
       {quote?.status === "error" && <button type="button" className="textlink" onClick={retry}>Retry price</button>}
 
-      {mode === "dialog" && (
-        <p className="fine">
-          <a className="textlink" href={productHref(family.slug, family.variants.length > 1 ? variant?.sku : null)}>
-            Full specification and price <span className="spec-link-end">breaks <ArrowUpRight size={13} aria-hidden="true" /></span>
-          </a>
-        </p>
-      )}
-
-      {variant && gross && (
-        <div className="table-scroll" role="region" tabIndex={0} aria-labelledby={id + "-price-breaks"}>
-          <table className="data-table breaks">
-            <caption id={id + "-price-breaks"}>Price breaks per blade for {variant.sku}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Quantity</th>
-                <th scope="col" className="num">
-                  ex VAT
-                </th>
-                <th scope="col" className="num">
-                  inc VAT ({VAT_RATE_PERCENT}%)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {PRICE_BREAKS.map((priceBreak) => (
-                <tr key={priceBreak.from}>
-                  <th scope="row">{priceBreak.label} blades</th>
-                  <td className="num">{formatPence(variant.prices[priceBreak.tier])}</td>
-                  <td className="num">{formatPence(gross[priceBreak.tier])}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {priceBreaks}
     </>
   );
 
-  if (mode === "dialog") return details;
+  if (mode === "dialog") return (
+    <>
+      <div className="dialog-scroll" role="region" aria-label="Blade specifications and options" tabIndex={0}>
+        <ProductArtwork media={media} code={figureCode} />
+        {details}
+      </div>
+      <div className="product-dialog-footer">
+        <a className="textlink" href={productHref(family.slug, family.variants.length > 1 ? variant?.sku : null)}>
+          Full specification and price <span className="spec-link-end">breaks <ArrowUpRight size={13} aria-hidden="true" /></span>
+        </a>
+      </div>
+    </>
+  );
   return (
     <div className="product-grid">
       <div className="product-artwork">
-        <figure className={"figure-plate" + (media.drawing ? "" : " figure-plate-plain")} data-proof={media.drawing ? media.proof : undefined}>
-          {media.drawing ? (
-            <Image src={"/line-art/" + media.drawing} alt={"Line drawing of the " + family.name.toLowerCase() + " · " + figureCode}
-              width={776} height={400} priority unoptimized />
-          ) : <span className="plate-code">{figureCode}</span>}
-        </figure>
+        <ProductArtwork media={media} code={figureCode} priority />
         {media.drawing && (
           <p className="fine figure-note">
             Drawing for identification. Not to scale.
@@ -257,5 +269,16 @@ export function ProductDetail({
       </div>
       <section className="product-panel" aria-label="Fit, availability and price">{details}</section>
     </div>
+  );
+}
+
+function ProductArtwork({ media, code, priority }: { media: Media; code: string; priority?: boolean }) {
+  return (
+    <figure className={"figure-plate" + (media.drawing ? "" : " figure-plate-plain")} data-proof={media.drawing ? media.proof : undefined}>
+      {media.drawing ? (
+        <Image src={"/line-art/" + media.drawing} alt={"Line drawing for " + code}
+          width={776} height={400} priority={priority} unoptimized />
+      ) : <span className="plate-code">{code}</span>}
+    </figure>
   );
 }

@@ -23,8 +23,8 @@ test("costs stay out of buyer surfaces and retiring a SKU preserves its paid ord
 
     const privateContent = /supplier_unit_minor|landed_unit_pence|staff_current_variant_costs|24\.13|29\.41|Staff cost fixture/;
     await page.goto(`/blades?q=${available.sku}`);
-    const result = page.getByRole("link", { name: new RegExp(`^Exact match · ${available.sku} `) });
-    await expect(result).toBeVisible();
+    const result = page.locator(".cards").getByRole("link", { name: /Account test blades/ });
+    await expect(result).toHaveAccessibleDescription(new RegExp(`^Exact match · ${available.sku} `));
     expect(await page.content()).not.toMatch(privateContent);
     await result.click();
     expect(await page.content()).not.toMatch(privateContent);

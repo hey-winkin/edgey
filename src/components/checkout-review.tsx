@@ -17,7 +17,7 @@ import { activePaymentKey, readActivePayment, sameActivePayment, storeActivePaym
 import { CheckoutPaymentMethod, tradeUnavailableMessage, type CheckoutTrade, type TradeUnavailableReason } from "./checkout-payment-method";
 import styles from "./checkout-payment-method.module.css";
 import { useSelection } from "./selection-provider";
-import { DispatchEstimate, SelectionLinePrice, SelectionTotals } from "./selection-summary";
+import { DispatchEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
 import { useSelectionQuote } from "./use-selection-quote";
 
 const initialFields: CheckoutFields = {
@@ -74,12 +74,14 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   const summaryTitle = useRef<HTMLHeadingElement>(null);
   const parsedPostcode = parseUkPostcode(values.postcode);
   const postcode = parsedPostcode.ok ? parsedPostcode.value.normalised : undefined;
-  const { quote, pending, previousQuote, retry } = useSelectionQuote(lines, hydrated && lines.length > 0, postcode);
+  const { quote, pending, previousQuote, retry } = useSelectionQuote(lines, hydrated && lines.length > 0, { postcode });
   const response = result?.lines === lines ? result.value : undefined;
   const shown = response?.status === "review" ? response.quote : quote ?? (pending ? previousQuote : undefined);
   const priced = shown?.status === "ok" ? shown : null;
+  const productNames = priced?.productNames ?? (quote?.status === "ok" ? quote.productNames : undefined);
   const basket = priced?.basket;
   const corrections = priced?.corrections ?? [];
+  const paymentQuoteNote = !pending && (corrections.length > 0 || shown?.status === "error");
   const errors = response?.status === "invalid" ? response.errors : {};
   const unsupported = !pending && priced?.coverage === "unsupported";
   const available = trade && "availableCreditPence" in trade ? trade.availableCreditPence : undefined;
@@ -393,53 +395,6 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
 
   return (
     <div className="checkout-grid">
-      <section className="checkout-panel checkout-summary" aria-labelledby={id + "-summary"}>
-        <div className="checkout-section-head">
-          <h2 id={id + "-summary"} ref={summaryTitle} tabIndex={-1}>Order summary</h2>
-          <button type="button" className="textlink" aria-haspopup="dialog" disabled={submitting} onClick={(event) => open(event.currentTarget)}>
-            Edit selection
-          </button>
-        </div>
-        <div role="status">
-          {pending && response?.status !== "review" && <p className={basket ? "sr" : "fine"}>Checking prices and delivery…</p>}
-          {shown?.status === "error" && <p className="fine">{shown.message}</p>}
-          {response?.status === "review" && <p className="fine">{response.message}</p>}
-          {!pending && corrections.length > 0 && (
-            <div className="selection-notice">
-              <p>Review the changes to your selection before continuing.</p>
-              <ul>{corrections.map((message, index) => <li key={index}>{message}</li>)}</ul>
-            </div>
-          )}
-        </div>
-        {shown?.status === "error" && <button type="button" className="secondary tray-action" onClick={() => {
-          setResult(null);
-          retry();
-        }}>Retry prices</button>}
-        {basket && priced && (
-          <div aria-busy={pending}>
-            <ul className="selection-lines checkout-lines">
-              {basket.lines.map((line) => (
-                <li className="tray-line" key={line.variantId}>
-                  <strong className="selection-code">{line.sku}</strong>
-                  {line.optionLabel && <span className="fine">{line.optionLabel}</span>}
-                  <SelectionLinePrice line={line} vatRate={basket.vatRateBasisPoints / 100} />
-                </li>
-              ))}
-            </ul>
-            <SelectionTotals quote={priced} />
-            {priced.coverage === "unchecked" && <p className="fine">Delivery and the total are estimates until you enter your postcode.</p>}
-            <DispatchEstimate quote={priced} onAccount={method === "net30"} />
-          </div>
-        )}
-        {!pending && corrections.length > 0 && priced && (
-          <button type="button" className="secondary tray-action" onClick={() => {
-            summaryTitle.current?.focus();
-            setResult(null);
-            replace(priced.lines);
-          }}>Accept changes</button>
-        )}
-      </section>
-
       <form ref={form} className="checkout-panel checkout-form" onSubmit={submit} noValidate>
         <fieldset>
           <legend>Business and contact</legend>
@@ -490,7 +445,16 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
             <p className="checkout-amount"><span>{priced.coverage === "unchecked" ? "Estimated total inc VAT" : "Total inc VAT"}</span>
               <strong>{formatGbp(basket.totalGrossPence)}</strong></p>
           )}
+          {paymentQuoteNote && (
+            <p id={id + "-payment-quote-note"} className="fine checkout-payment-note">
+              {corrections.length > 0 ? "Stock has changed. " : "We couldn’t check your prices. "}
+              <a className="textlink" href={"#" + id + "-summary"}>
+                {corrections.length > 0 ? "Review changes in your order summary" : "Retry prices in your order summary"}
+              </a>
+            </p>
+          )}
           <button type="submit" className="primary full" aria-disabled={submitting || undefined}
+            aria-describedby={paymentQuoteNote ? id + "-payment-quote-note" : undefined}
             disabled={!submitting && (pending || !basket || corrections.length > 0 || unsupported || (method === "net30" && !net30Allowed))}>
             {submitting ? "Checking checkout…" : method === "net30" ? "Place order on account" : "Continue to payment"}
           </button>
@@ -501,6 +465,52 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
           </div>
         </div>
       </form>
+
+      <section className="checkout-panel checkout-summary" aria-labelledby={id + "-summary"}>
+        <div className="checkout-section-head">
+          <h2 id={id + "-summary"} ref={summaryTitle} tabIndex={-1}>Order summary</h2>
+          <button type="button" className="textlink" aria-haspopup="dialog" disabled={submitting} onClick={(event) => open(event.currentTarget)}>
+            Edit selection
+          </button>
+        </div>
+        <div role="status">
+          {pending && response?.status !== "review" && <p className={basket ? "sr" : "fine"}>Checking prices and delivery…</p>}
+          {shown?.status === "error" && <p className="fine">{shown.message}</p>}
+          {response?.status === "review" && <p className="fine">{response.message}</p>}
+          {!pending && corrections.length > 0 && (
+            <div className="selection-notice">
+              <p>Review the changes to your selection before continuing.</p>
+              <ul>{corrections.map((message, index) => <li key={index}>{message}</li>)}</ul>
+            </div>
+          )}
+        </div>
+        {shown?.status === "error" && <button type="button" className="secondary tray-action" onClick={() => {
+          setResult(null);
+          retry();
+        }}>Retry prices</button>}
+        {basket && priced && (
+          <div aria-busy={pending}>
+            <ul className="selection-lines checkout-lines">
+              {basket.lines.map((line) => (
+                <li className="tray-line" key={line.variantId}>
+                  <SelectionLineIdentity line={line} name={productNames?.[line.variantId]} />
+                  <SelectionLinePrice line={line} vatRate={basket.vatRateBasisPoints / 100} />
+                </li>
+              ))}
+            </ul>
+            <SelectionTotals quote={priced} />
+            {priced.coverage === "unchecked" && <p className="fine">Delivery and the total are estimates until you enter your postcode.</p>}
+            <DispatchEstimate quote={priced} onAccount={method === "net30"} />
+          </div>
+        )}
+        {!pending && corrections.length > 0 && priced && (
+          <button type="button" className="secondary tray-action" onClick={() => {
+            summaryTitle.current?.focus();
+            setResult(null);
+            replace(priced.lines);
+          }}>Accept changes</button>
+        )}
+      </section>
     </div>
   );
 }

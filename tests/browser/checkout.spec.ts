@@ -39,6 +39,9 @@ test("a keyboard add opens the selection, which reprices, persists and can be em
   const tray = selection(page);
   await expect(tray).toBeVisible();
   await expect(product).not.toBeVisible();
+  await expect(tray.getByText("Flat-stock drag blade", { exact: true })).toBeVisible();
+  await expect(tray.getByText("Dispatch", { exact: true })).toBeVisible();
+  await expect(tray.getByText("Estimated delivery", { exact: true })).toHaveCount(0);
   await expect(tray).toContainText("5 × £19.95 = £99.75");
   await expect(tray).toContainText("£50.25 more ex VAT for free delivery");
   await expect(tray).toContainText("£128.04");
@@ -82,6 +85,26 @@ test("blocked storage leaves the in-memory selection usable across navigation", 
   await expect(page.getByRole("region", { name: "Order summary" })).toContainText("1 × £22.50 = £22.50");
 });
 
+for (const width of [1440, 390]) {
+  test(`checkout puts the form first at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await addZ10(page, "1");
+    await selection(page).getByRole("link", { name: "Go to checkout" }).click();
+    const summary = page.getByRole("region", { name: "Order summary" });
+    await expect(summary.getByText("Flat-stock drag blade", { exact: true })).toBeVisible();
+    await expect(summary.getByText("Dispatch", { exact: true })).toBeVisible();
+    await expect(summary.getByText("Estimated delivery", { exact: true })).toHaveCount(0);
+    await expect(summary).toContainText("Delivery and the total are estimates until you enter your postcode.");
+    const grid = page.locator(".checkout-grid");
+    await expect(grid.locator(":scope > :first-child")).toHaveClass(/checkout-form/);
+    const address = await grid.locator("form").boundingBox();
+    const order = await summary.boundingBox();
+    if (!address || !order) throw new Error("Checkout panels are missing");
+    if (width === 1440) expect(address.x + address.width).toBeLessThanOrEqual(order.x);
+    else expect(address.y + address.height).toBeLessThanOrEqual(order.y);
+  });
+}
+
 test("selection changes in another tab update the masthead and preserve both additions", async ({ page, context }) => {
   await addZ10(page);
   await selection(page).getByRole("button", { name: "Continue browsing" }).click();
@@ -120,6 +143,18 @@ test("stale selections identify unavailable lines and require acceptance before 
   await tray.getByRole("link", { name: "Go to checkout" }).click();
   await expect(page.getByRole("region", { name: "Order summary" })).toContainText("10 × £17.50 = £175.00");
   await expect(page.getByRole("button", { name: "Selection 10 blades" })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/checkout");
+  const pay = page.getByRole("button", { name: "Continue to payment" });
+  const review = page.getByRole("link", { name: "Review changes in your order summary" });
+  await expect(pay).toBeDisabled();
+  await expect(pay).toHaveAccessibleDescription("Stock has changed. Review changes in your order summary");
+  await review.click();
+  await expect(page.getByRole("heading", { name: "Order summary" })).toBeFocused();
+  await page.getByRole("button", { name: "Accept changes" }).click();
+  await expect(review).toHaveCount(0);
+  await expect(pay).toBeEnabled();
 });
 
 test("checkout validates before payment and retains the same attempt until a material change", async ({ page }) => {
@@ -151,6 +186,7 @@ test("checkout validates before payment and retains the same attempt until a mat
 
   await page.getByLabel("Postcode").fill("sw1a1aa");
   await expect(summary).toContainText("Next working day");
+  await expect(summary.getByText("Estimated delivery", { exact: true })).toBeVisible();
   await expect(summary).toContainText("Dates are provisional until payment.");
   await expect(summary).toContainText("£6.95");
   await expect(summary).toContainText("£21.34");
