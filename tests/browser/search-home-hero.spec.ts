@@ -9,6 +9,8 @@ const materials = [
   { name: "Textile", slug: "textile", sku: "EDG-Z50", href: "/blades/edg-z50", count: 1, fit: "DRT, PRT" },
 ] as const;
 
+const stagedFamilyCodes = /^EDG-(?:Z10|Z16|SR6223|Z50|Z71|Z1|SUM-DRG|SUM-TAN|MIM-45)\s/;
+
 test("the homepage showcases corrugated by default without filtering the first catalogue view", async ({ page }) => {
   await page.goto("/");
   const hero = page.getByRole("region", { name: "Find a blade." });
@@ -17,7 +19,7 @@ test("the homepage showcases corrugated by default without filtering the first c
   await expect(study).toContainText("Zünd G3, S3, L3");
   await expect(hero.getByText(/blade quality|owner will supply/i)).toHaveCount(0);
   await expect(hero.getByRole("link", { name: "Corrugated board", exact: true })).toHaveAttribute("aria-current", "true");
-  await expect(page.locator("#catalogue .cards .p-card")).toHaveCount(9);
+  await expect(page.locator("#catalogue").getByRole("link", { name: stagedFamilyCodes })).toHaveCount(9);
   await expect(page.locator(".mat-list")).toHaveCount(0);
   await hero.getByRole("link", { name: "See 2 blades for Corrugated board" }).click();
   await expect(page).toHaveURL(/\?material=corrugated-board#catalogue$/);
@@ -79,7 +81,7 @@ test("the homepage finder uses the catalogue for OEM, SKU, machine and blade-nam
   await page.getByRole("link", { name: "Clear filters" }).click();
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
-  await expect(cards.locator(".p-card")).toHaveCount(9);
+  await expect(cards.getByRole("link", { name: stagedFamilyCodes })).toHaveCount(9);
 
   const toolType = page.getByRole("combobox", { name: "Tool type" });
   await toolType.focus();
