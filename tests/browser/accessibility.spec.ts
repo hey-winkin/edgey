@@ -50,6 +50,7 @@ test("every App Router page is accounted for in the accessibility suite", () => 
     "contact/page.tsx",
     "enquiry/page.tsx",
     "page.tsx",
+    "preview/material-hero/page.tsx",
     "privacy/page.tsx",
     "sample-pack/page.tsx",
     "trade/page.tsx",
@@ -88,6 +89,8 @@ for (const theme of themes) {
       await scanRoutes(page, theme, [
         ["/", /The cutting/],
         ["/?q=3910301", /The cutting/],
+        ["/preview/material-hero", "Find a blade by material."],
+        ["/preview/material-hero?study=corrugated-board", "Corrugated board."],
         ["/blades", "Blade catalogue"],
         ["/blades?q=spb%200030", "Blade catalogue"],
         ["/blades?q=no-such-reference", "Blade catalogue"],
