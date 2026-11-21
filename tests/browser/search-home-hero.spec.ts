@@ -115,6 +115,19 @@ test("other and unknown material links don't select an unrelated study", async (
   }
 });
 
+test("jumping to the same material's results keeps its search scope", async ({ page }) => {
+  await page.goto("/?material=textile");
+  await page.getByRole("link", { name: "See 1 blade for Textile" }).click();
+  await expect(page).toHaveURL("/?material=textile#catalogue");
+  const search = page.getByRole("searchbox");
+  await search.fill("3910306");
+  await expect(page).toHaveURL((url) =>
+    url.searchParams.get("q") === "3910306" && url.searchParams.get("material") === "textile",
+  );
+  await expect(page.getByRole("link", { name: "No match · Ask us" })).toBeVisible();
+  await expect(page.locator("#catalogue .cards .p-card")).toHaveCount(0);
+});
+
 test("selecting a material takes precedence over an in-flight search", async ({ page }) => {
   let markRequest!: () => void;
   let releaseRequest!: () => void;

@@ -86,7 +86,7 @@ export function CatalogueControls({
         if (timer.current) clearTimeout(timer.current);
         timer.current = null;
         requested.current = [];
-        writeFilters(event.currentTarget);
+        writeFilters(event.currentTarget, filters);
       }}
       onSubmit={(event) => {
         event.preventDefault();
