@@ -7,7 +7,7 @@ const hero = (page: Page) => page.locator("section[aria-labelledby='material-her
 
 test("the preview uses the homepage shell and public material links without indexing either state", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "The cutting room." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Find a blade." })).toBeVisible();
 
   await page.goto(preview + "?study=unknown");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find a blade by material.");

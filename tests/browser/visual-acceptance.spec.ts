@@ -87,12 +87,12 @@ for (const theme of themes) {
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ reducedMotion: "reduce" });
       await saveThemeBeforeLoad(page, theme);
-      for (const route of ["/", "/blades", "/blades?q=3910301"]) {
+      for (const route of ["/", "/preview/original-hero", "/blades", "/blades?q=3910301"]) {
         await test.step(route, async () => {
           await page.goto(route);
           await expect(page.locator("body")).toHaveCSS("font-size", "16px");
           const caption = page.locator(".study figcaption");
-          if (route === "/" && width === 320) {
+          if (route === "/preview/original-hero" && width === 320) {
             await expect(caption).toBeVisible();
             const [label, view] = await caption.locator(":scope > *").evaluateAll((elements) =>
               elements.map((element) => element.getBoundingClientRect().toJSON()));
@@ -116,12 +116,22 @@ for (const theme of themes) {
             });
           })).toEqual([]);
           if (route === "/") {
-            await expect(page.locator(".mat-copy > p").last()).toHaveCSS("font-size", "32px");
             await page.keyboard.press("Tab");
             const skip = page.getByRole("link", { name: "Skip to catalogue" });
             await expect(skip).toBeFocused();
             await skip.press("Enter");
             await expect(page.locator("#catalogue")).toBeFocused();
+            await page.keyboard.press("/");
+            await expect(page.getByRole("searchbox", { name: "Search blades" })).toBeFocused();
+            await scanAccessibility(page, theme);
+          }
+          if (route === "/preview/original-hero") {
+            await expect(page.locator(".mat-copy > p").last()).toHaveCSS("font-size", "32px");
+            await page.keyboard.press("Tab");
+            const skip = page.getByRole("link", { name: "Skip to main content" });
+            await expect(skip).toBeFocused();
+            await skip.press("Enter");
+            await expect(page.locator("#main-content")).toBeFocused();
             await page.keyboard.press("/");
             await expect(page.getByRole("searchbox")).toBeFocused();
             expect(await page.locator(".proof-option span").evaluateAll((labels) => labels
@@ -207,7 +217,7 @@ test("proof names and the populated masthead fit at 320px with enlarged text", a
   await page.addInitScript(() => {
     localStorage.setItem("edgey-storefront-selection-v1", '{"42e5ce02-4d5e-5c39-9f1b-f76c46c8b386":200}');
   });
-  await page.goto("/");
+  await page.goto("/preview/original-hero");
   const selection = page.getByRole("button", { name: "Selection 200 blades" });
   await expect(selection).toBeVisible();
   const names = page.locator(".proof-option span");

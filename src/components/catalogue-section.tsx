@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { bladeCount, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
-import { CatalogueControls } from "./catalogue-controls";
+import { CatalogueControls, CatalogueFacets } from "./catalogue-controls";
 import { ClearFiltersLink } from "./catalogue-links";
 import { FinderAttribution } from "./finder-attribution";
 import { ProductCard } from "./product-card";
@@ -9,10 +9,12 @@ export function CatalogueSection({
   view,
   filters,
   asPage = false,
+  heroSearch = false,
 }: {
   view: CatalogueView;
   filters: CatalogueFilters;
   asPage?: boolean;
+  heroSearch?: boolean;
 }) {
   const query = filters.q.trim();
   const count = bladeCount(view.cards.length);
@@ -27,7 +29,11 @@ export function CatalogueSection({
           <Heading id="catalogue-title" className={asPage ? "page-title" : undefined}>
             Blade catalogue
           </Heading>
-          <CatalogueControls filters={filters} toolTypes={view.toolTypes} machines={view.machines} />
+          {heroSearch ? (
+            <div className="controls">
+              <CatalogueFacets filters={filters} toolTypes={view.toolTypes} machines={view.machines} form="catalogue-controls" />
+            </div>
+          ) : <CatalogueControls filters={filters} toolTypes={view.toolTypes} machines={view.machines} />}
         </div>
         {view.filtered && (
           <div className="filter-status">

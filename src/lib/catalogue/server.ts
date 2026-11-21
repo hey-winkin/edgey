@@ -5,6 +5,7 @@ import {
   type Family, type SearchHit,
 } from "./index";
 import { resolveCatalogueMedia } from "./media";
+import { searchMachineModels } from "./machine-search";
 import { publicClient } from "./supabase";
 import { recordFinderSearch } from "@/lib/requests/finder-events";
 
@@ -154,7 +155,8 @@ const searchBlades = cache(async (query: string): Promise<SearchHit[]> => {
 
 export async function loadCatalogue(filters: CatalogueFilters) {
   const query = filters.q.trim();
-  const [families, hits] = await Promise.all([listFamilies(), query ? searchBlades(query) : null]);
+  const [families, rpcHits] = await Promise.all([listFamilies(), query ? searchBlades(query) : null]);
+  const hits = rpcHits?.length === 0 ? searchMachineModels(families, query) : rpcHits;
   const view = buildCatalogueView(families, hits, filters);
   if (hits) view.finderEventId = await recordFinderSearch(filters, hits, view);
   return view;

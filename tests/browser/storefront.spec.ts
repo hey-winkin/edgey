@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("restores the theme but resets the material proof and view on reload", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/preview/original-hero");
   const study = page.locator(".study");
   await expect(study).toHaveAttribute("data-mode", "ink");
   await expect(page.getByRole("button", { name: "Prism", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -247,16 +247,18 @@ for (const width of [1440, 390, 320]) {
 for (const width of [390, 320]) {
   test(`the home, catalogue and product fit at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: width === 320 ? 640 : 844 });
-    for (const route of ["/", "/blades", "/blades/edg-z10", "/blades/edg-mim-45?variant=EDG-MIM-A45", "/enquiry?q=5201345"]) {
+    for (const route of ["/", "/preview/original-hero", "/blades", "/blades/edg-z10", "/blades/edg-mim-45?variant=EDG-MIM-A45", "/enquiry?q=5201345"]) {
       await page.goto(route);
       const overflows = () =>
         page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
       expect(await overflows()).toBe(false);
-      if (route === "/") {
+      if (route === "/preview/original-hero") {
         const key = page.locator(".layer-key");
         await expect(key).toBeVisible();
         await expect(key).toHaveText("Print face / Fluted core / Back liner");
         await expect(page.getByRole("button", { name: "Glacier", exact: true })).toBeVisible();
+      }
+      if (route === "/" || route === "/preview/original-hero") {
         await expect(page.locator(".cards")).toHaveCSS("grid-template-columns", /^\d+px \d+px$/);
       }
       if (route.startsWith("/blades/")) await expect(page.locator(".detail-total")).toBeInViewport({ ratio: 1 });
