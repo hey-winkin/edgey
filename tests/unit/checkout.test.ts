@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { quoteSelection } from "@/app/checkout/actions";
+import { quoteSelection } from "@/app/(shop)/checkout/actions";
 import { prepareCheckoutAttempt } from "@/lib/checkout/attempt";
 import { quoteSelectionWith, type QuoteDependencies } from "@/lib/checkout/quote";
 import { startCheckoutAttempt } from "@/lib/checkout/server";

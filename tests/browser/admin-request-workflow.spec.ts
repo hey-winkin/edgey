@@ -1,3 +1,4 @@
+import { signOutFromStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -80,7 +81,7 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await expect(page.getByRole("table", { name: "Trial blade units" })).toContainText(sku);
   expect((await readStock()).data).toMatchObject({ stock_reserved: stock.stock_reserved });
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromStaffMenu(page);
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
   await signInStaff(page, warehouse);
   const count = page.getByText("Trials linked to a first purchase:", { exact: false });
@@ -145,7 +146,7 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await page.goto("/admin");
   await expect(count.locator("span")).toHaveText(String(initial));
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromStaffMenu(page);
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
   await signInStaff(page, catalogue);
   await page.goto(trialPath);

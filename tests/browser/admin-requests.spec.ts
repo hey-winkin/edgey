@@ -1,3 +1,4 @@
+import { signOutFromStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
@@ -32,7 +33,7 @@ test("requests inbox shows states only for the signed-in staff role", async ({ p
   await expect(trialRow).toContainText("Pending");
   await expect(page.getByRole("table", { name: "Trade applications" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromStaffMenu(page);
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
   await signInStaff(page, await createLocalAdminUser("finance"));
   await page.goto("/admin/requests");

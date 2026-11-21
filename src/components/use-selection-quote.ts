@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { quoteSelection } from "@/app/checkout/actions";
+import { quoteSelection } from "@/app/(shop)/checkout/actions";
 import type { QuoteResult } from "@/lib/checkout/types";
 import type { LineRequest } from "@/lib/commerce";
 

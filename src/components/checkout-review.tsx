@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Net30CheckoutResult } from "@/app/api/checkout/net30/route";
 import type { CheckoutSessionResult } from "@/app/api/checkout/session/route";
-import { withCheckoutAttemptLock } from "@/app/checkout/attempt-lock";
+import { withCheckoutAttemptLock } from "@/app/(shop)/checkout/attempt-lock";
 import {
   clearNet30Attempt, net30AttemptKey, net30SelectionScope, readNet30Attempt, rememberNet30Order, startNet30Attempt, type ActiveNet30,
-} from "@/app/checkout/net30-attempt";
-import { captureCheckoutSelection, rememberCheckoutSelection } from "@/app/checkout/success/selection-handoff";
+} from "@/app/(shop)/checkout/net30-attempt";
+import { captureCheckoutSelection, rememberCheckoutSelection } from "@/app/(shop)/checkout/success/selection-handoff";
 import { forgetCheckoutAttempt, materialValue, prepareCheckoutToken } from "@/lib/checkout/attempt-token";
 import type { CheckoutFields } from "@/lib/checkout/types";
 import { formatGbp, parseUkPostcode, type LineRequest } from "@/lib/commerce";

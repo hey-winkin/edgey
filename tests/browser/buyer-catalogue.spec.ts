@@ -62,7 +62,7 @@ test("brand references align with the site frame and show artwork, verified fit 
   await expect(catalogue).not.toContainText(/PRIV-Z10-ALIAS|500-9802/);
   const [brandFrame, headerFrame] = await Promise.all([
     page.getByRole("main").boundingBox(),
-    page.locator("header.mast .frame").boundingBox(),
+    page.locator("header.mast > .nav-inner").boundingBox(),
   ]);
   expect(brandFrame?.width).toBeGreaterThan(1000);
   expect(brandFrame?.width).toBe(headerFrame?.width);

@@ -1,4 +1,4 @@
-import { withCheckoutAttemptLock } from "@/app/checkout/attempt-lock";
+import { withCheckoutAttemptLock } from "@/app/(shop)/checkout/attempt-lock";
 
 export const activePaymentKey = "edgey-active-payment-v1";
 

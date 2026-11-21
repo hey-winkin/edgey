@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -131,7 +132,7 @@ async function fillDelivery(page: Page) {
 async function capture(page: Page, name: string, theme: "dark" | "light", width: number, height: number) {
   await page.setViewportSize({ width, height });
   if (await page.locator("html").getAttribute("data-theme") !== theme) {
-    await page.getByRole("button", { name: `Switch to ${theme} mode` }).click();
+    await switchTheme(page, theme);
   }
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);

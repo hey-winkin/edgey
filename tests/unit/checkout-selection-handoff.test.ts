@@ -6,7 +6,7 @@ import {
   clearConfirmedCheckoutSelection,
   persistSelectionChange,
   rememberCheckoutSelection,
-} from "@/app/checkout/success/selection-handoff";
+} from "@/app/(shop)/checkout/success/selection-handoff";
 
 const sessionId = "cs_test_session1";
 const scope = createHash("sha256").update(sessionId).digest("hex");

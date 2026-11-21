@@ -167,6 +167,7 @@ for (const theme of themes) {
               expect(view.top).toBeGreaterThan(label.bottom);
               expect(view.right).toBeLessThanOrEqual(width);
             }
+            await page.evaluate(() => window.scrollTo(0, 0));
             const incomplete = await scanAccessibility(page, theme);
             if (width === 1440) await verifyBoardContrast(page, incomplete);
           }

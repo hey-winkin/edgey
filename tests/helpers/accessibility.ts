@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { switchTheme } from "./navigation";
 
 export const themes = ["dark", "light"] as const;
 export type Theme = (typeof themes)[number];
@@ -39,8 +40,8 @@ export async function scanBothThemes(page: Page) {
   const initial = (await html.getAttribute("data-theme")) === "light" ? "light" : "dark";
   await scanAccessibility(page, initial);
   const other = initial === "dark" ? "light" : "dark";
-  await page.getByRole("button", { name: `Switch to ${other} mode`, exact: true }).click();
+  await switchTheme(page, other);
   await scanAccessibility(page, other);
-  await page.getByRole("button", { name: `Switch to ${initial} mode`, exact: true }).click();
+  await switchTheme(page, initial);
   await expect(html).toHaveAttribute("data-theme", initial);
 }

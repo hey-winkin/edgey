@@ -2,31 +2,10 @@
   min-height: 58vh;
   padding-block: clamp(25px, 4vw, 56px) clamp(38px, 6vw, 86px);
 }
-body:has(> .admin) .footer-proof { display: none; }
-
-.admin-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 24px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.admin-bar nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 20px;
-}
-
-.admin-bar nav a, .admin-secondary {
+.admin-secondary {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-}
-
-.admin-secondary {
   border: 1px solid var(--line);
   padding: 4px 12px;
 }

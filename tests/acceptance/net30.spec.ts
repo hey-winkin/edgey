@@ -1,3 +1,4 @@
+import { openStaffMenu, signOutFromStaffMenu } from "../helpers/navigation";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -134,7 +135,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await expect(method).toHaveAccessibleDescription("Your trade account isn’t approved for Net 30.");
 
         await signInStaff(financePage, finance);
-        await financePage.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Requests" }).click();
+        await (await openStaffMenu(financePage)).getByRole("link", { name: "Requests" }).click();
         await financePage.getByRole("table", { name: "Trade applications" }).getByRole("row")
           .filter({ hasText: buyer.email }).getByRole("link", { name: company }).click();
         await expect(financePage).toHaveURL(`/admin/requests/trade/${application}`);
@@ -226,7 +227,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
 
       await test.step("Warehouse records real dispatch and tracking while the invoice stays unpaid", async () => {
         await signInStaff(warehousePage, warehouse);
-        await warehousePage.getByRole("navigation", { name: "Staff areas" }).getByRole("link", { name: "Pick and dispatch" }).click();
+        await (await openStaffMenu(warehousePage)).getByRole("link", { name: "Pick and dispatch" }).click();
         await warehousePage.getByRole("link", { name: orderReference, exact: true }).click();
         await expect(warehousePage.getByText("Invoiced", { exact: true })).toBeVisible();
         await warehousePage.getByRole("button", { name: "Start picking" }).click();
@@ -323,7 +324,7 @@ test("an agreed Net 30 service survives invoice-send recovery and later payment"
     await staffPage.getByLabel("Initial credit limit (£)").fill("200");
     await staffPage.getByRole("button", { name: "Approve trade account" }).click();
     await expect(staffPage.getByRole("link", { name: "View trade account" })).toBeVisible();
-    await staffPage.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromStaffMenu(staffPage);
     await expect(staffPage).toHaveURL("/admin/sign-in");
     await signInStaff(staffPage, warehouse);
 

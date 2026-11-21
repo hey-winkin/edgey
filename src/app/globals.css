@@ -54,12 +54,8 @@ svg, img { display: block; }
 .skip { position: fixed; top: -8rem; left: 1rem; padding: 12px 18px; background: white; z-index: 30; }
 .skip:focus { top: 1rem; }
 .frame { width: min(100% - var(--edgey-gutter-total), var(--edgey-frame-max)); margin-inline: auto; }
-.layer-key, .nav-short { display: none; }
-.mast { border-bottom: 1px solid var(--line); }
-.nav-inner { height: 74px; display: flex; align-items: center; gap: clamp(36px, 6vw, 96px); }
-.nav-inner nav { display: flex; gap: clamp(22px, 3.2vw, 48px); }
-.nav-inner nav a { color: #494c4a; font-size: .94rem; padding-block: 9px; }
-.nav-inner nav a:hover, .textlink:hover { color: #151614; text-decoration: underline; text-underline-offset: 4px; }
+.layer-key { display: none; }
+.textlink:hover { color: #151614; text-decoration: underline; text-underline-offset: 4px; }
 .tray-trigger { margin-left: auto; display: inline-flex; align-items: center; border: 1px solid #b6bab4; min-height: 38px; padding: 0 11px; gap: 9px; font-size: .89rem; }
 .tray-trigger:not(:disabled):hover, .secondary:hover { background: #e9ebe6; }
 .tray-count { border-left: 1px solid var(--line); padding-left: 9px; font: .79rem/1.5 var(--mono); }
@@ -220,7 +216,6 @@ footer { padding-top: 22px; }
 .proof-wordmark { display: block; width: var(--edgey-wordmark-footer-width); margin: 2% 6%; }
 .foot-inner { padding-block: 19px; }
 [data-theme="light"] { color-scheme: light; }
-[data-theme="dark"] .nav-inner nav a,
 [data-theme="dark"] .intro,
 [data-theme="dark"] .view-tag,
 [data-theme="dark"] .layer-key,
@@ -229,7 +224,6 @@ footer { padding-top: 22px; }
 [data-theme="dark"] .p-card-foot,
 [data-theme="dark"] .search-field input::placeholder,
 [data-theme="dark"] kbd { color: var(--muted); }
-[data-theme="dark"] .nav-inner nav a:hover,
 [data-theme="dark"] .textlink:hover { color: white; }
 [data-theme="dark"] .tray-trigger,
 [data-theme="dark"] .theme-switch,
@@ -284,11 +278,9 @@ footer { padding-top: 22px; }
 }
 @media (max-width: 740px) {
   .frame { width: calc(100% - 38px); }
-  .nav-inner { height: 62px; gap: 16px; }
   .brand { width: 112px; }
   .theme-label { display: none; }
   .theme-switch { width: 38px; padding: 0; }
-  .nav-inner nav { gap: 14px; }
   .hero { grid-template-columns: minmax(0,1fr); gap: 30px; padding-block: 35px; }
   .hero-copy { padding: 0; }
   h1 { font-size: var(--edgey-h1-compact-size); margin: 17px 0 14px; }
@@ -307,18 +299,12 @@ footer { padding-top: 22px; }
   .foot-inner { flex-wrap: wrap; gap: 12px 20px; }
 }
 @media (max-width: 490px) {
-  .nav-inner { gap: 8px; height: auto; min-height: 58px; flex-wrap: wrap; justify-content: space-between; }
-  .nav-inner nav { gap: 10px; }
   .brand { width: 88px; }
-  .nav-tools { gap: 4px; margin-left: 0; }
-  .theme-switch { width: 32px; min-height: 34px; }
   .proof-options { grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.25rem), 1fr)); gap: 4px; padding: 0 6px 7px; }
   .proof-option span { font-size: .69rem; padding-inline: 4px 0; }
   .proof-option span::after { width: 6px; height: 6px; right: 3px; top: 3px; bottom: auto; background: var(--ink); box-shadow: 0 0 0 1px var(--paper); }
-  .nav-inner nav a { font-size: .87rem; }
-  .nav-wide, .tray-label { display: none; }
-  .nav-short { display: inline; }
-  .tray-trigger { margin-left: 0; padding: 0 8px; min-height: 34px; }
+  .tray-label { display: none; }
+  .tray-trigger { padding: 0 8px; }
   .annotation { display: none; }
   .layer-key { display: block; margin: 0 11px 10px; color: #515951; font: .73rem/1.5 var(--mono); }
   .layer-key span { padding: 0 2px; }
@@ -339,12 +325,7 @@ footer { padding-top: 22px; }
 }
 @media (max-width: 370px) {
   .frame { width: calc(100% - 28px); }
-  .nav-inner { gap: 4px; }
   .brand { width: 72px; }
-  .nav-tools { gap: 3px; }
-  .theme-switch { width: 28px; border-color: transparent; }
-  .nav-inner nav { gap: 10px; }
-  .nav-inner nav a { font-size: .82rem; }
   .tray-trigger { padding-inline: 6px; gap: 6px; }
   .tray-count { padding-left: 6px; }
   .hero-actions .primary { padding-left: 11px; padding-right: 30px; gap: 6px; }

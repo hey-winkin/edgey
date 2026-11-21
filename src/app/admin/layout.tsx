@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { AdminLink } from "./ui";
+import Link from "next/link";
+import { FoldNavigation } from "@/components/fold-navigation";
+import { ThemeSwitch } from "@/components/theme-switch";
+import { Wordmark } from "@/components/wordmark";
 import { staffSession } from "@/lib/admin/auth";
+import { staffNavigation } from "@/lib/admin/navigation";
 import { signOutStaff } from "./session-actions";
 import "./admin.css";
 
@@ -14,24 +18,33 @@ export const metadata: Metadata = {
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const staff = await staffSession();
-  const roles = staff?.roles ?? [];
 
   return (
-    <main className="admin frame" id="main-content" tabIndex={-1}>
-      {staff && (
-        <div className="admin-bar">
-          <nav aria-label="Staff areas">
-            <AdminLink href="/admin">Staff desk</AdminLink>
-            <AdminLink href="/admin/sales">Sales</AdminLink>
-            {roles.includes("warehouse") && <><AdminLink href="/admin/warehouse">Pick and dispatch</AdminLink><AdminLink href="/admin/stock">Stock</AdminLink></>}
-            {(roles.includes("catalogue") || roles.includes("finance")) && <AdminLink href="/admin/catalogue">Catalogue</AdminLink>}
-            {roles.includes("finance") && <AdminLink href="/admin/finance">Finance</AdminLink>}
-            <AdminLink href="/admin/requests">Requests</AdminLink>
-          </nav>
-          <form action={signOutStaff}><button className="admin-secondary">Sign out</button></form>
+    <>
+      <header className="mast staff-mast" aria-label="Edgey staff">
+        <div className="frame nav-inner">
+          <Link className="brand" href={staff ? "/admin" : "/admin/sign-in"} aria-label={staff ? "Edgey staff desk" : "Edgey staff sign-in"}>
+            <Wordmark />
+            <span className="staff-identity">Staff</span>
+          </Link>
+          {staff && (
+            <FoldNavigation label="Staff menu" title="Staff index" landmark="Staff areas" groups={staffNavigation(staff.roles)}>
+              <form action={signOutStaff} className="fold-tools">
+                <button type="submit" className="mast-tool">Sign out</button>
+              </form>
+            </FoldNavigation>
+          )}
+          <div className="nav-tools">
+            <ThemeSwitch />
+            <Link className="mast-tool" href="/" prefetch={false} aria-label="View shop">
+              <span className="staff-shop-prefix">View </span>shop
+            </Link>
+          </div>
         </div>
-      )}
-      {children}
-    </main>
+      </header>
+      <main className="admin frame" id="main-content" tabIndex={-1}>
+        {children}
+      </main>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import { Wordmark } from "./wordmark";
 
 export function SiteFooter() {
   return (
-    <footer>
+    <footer className="site-footer">
       <div className="frame footer-proof">
         <Link href="#top" className="proof-wordmark" aria-label="Edgey back to top">
           <Wordmark />
@@ -11,13 +11,9 @@ export function SiteFooter() {
       </div>
       <div className="frame foot-inner">
         <p>Staging catalogue · Test data · UK trade pricing ex VAT</p>
-        <nav aria-label="Footer" className="ml-auto flex flex-wrap gap-x-4 gap-y-2 [&_.textlink]:ml-0!">
+        <nav aria-label="Footer">
           <Link className="textlink" href="/contact">Contact</Link>
           <Link className="textlink" href="/privacy">Privacy</Link>
-          <Link className="textlink" href="/enquiry">Enquiries</Link>
-          <Link className="textlink" href="/sample-pack">Two-blade trial</Link>
-          <Link className="textlink" href="/trade">Trade accounts</Link>
-          <Link className="textlink" href="/account">Account</Link>
           <Link className="textlink" href="#top">Back to top</Link>
         </nav>
       </div>

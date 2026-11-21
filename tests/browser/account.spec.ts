@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -42,7 +43,8 @@ async function focusByKeyboard(page: Page, target: Locator) {
 
 async function signIn(page: Page, email: string) {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Footer" }).getByRole("link", { name: "Account", exact: true }).click();
+  await page.locator("summary").filter({ hasText: /^Menu$/ }).click();
+  await page.getByRole("navigation", { name: "Shop navigation" }).getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(isAccount);
   await expect(signInHeading(page)).toBeVisible();
   await focusByKeyboard(page, emailField(page));
@@ -148,7 +150,7 @@ async function cleanUpHistory(db: Client, email: string, fixture?: Awaited<Retur
 async function setTheme(page: Page, theme: "light" | "dark") {
   const html = page.locator("html");
   if (await html.getAttribute("data-theme") !== theme) {
-    await page.getByRole("button", { name: `Switch to ${theme} mode` }).click();
+    await switchTheme(page, theme);
   }
   await expect(html).toHaveAttribute("data-theme", theme);
 }
