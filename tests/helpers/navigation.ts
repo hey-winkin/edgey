@@ -1,7 +1,7 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export async function openStaffMenu(page: Page) {
-  await page.locator("summary").filter({ hasText: "Staff menu" }).click();
+  await page.locator('summary[aria-label="Edgey staff menu"]').click();
   return page.getByRole("navigation", { name: "Staff areas" });
 }
 
@@ -11,10 +11,8 @@ export async function signOutFromStaffMenu(page: Page) {
 }
 
 export async function switchTheme(page: Page, theme: "dark" | "light") {
-  const toggle = page.getByRole("button", { name: `Switch to ${theme} mode`, exact: true });
-  const inMenu = !await toggle.isVisible();
-  const menu = page.locator("summary").filter({ hasText: /^Menu$/ });
-  if (inMenu) await menu.click();
-  await toggle.click();
-  if (inMenu) await menu.click();
+  const toggle = page.getByRole("switch", { name: "Light theme" });
+  const enabled = String(theme === "light");
+  if (await page.locator("html").getAttribute("data-theme") !== theme) await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", enabled);
 }

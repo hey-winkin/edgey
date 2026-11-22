@@ -23,7 +23,7 @@ function reply(result: Net30CheckoutResult, status: number) {
 }
 
 function closed() {
-  return reply({ status: "error", attemptClosed: true, message: "This account checkout is closed. Review your selection and try again." }, 409);
+  return reply({ status: "error", attemptClosed: true, message: "This account checkout is closed. Review your basket and try again." }, 409);
 }
 
 function pending() {

@@ -1,4 +1,4 @@
-:root { --mast-height: 75px; }
+:root { --mast-height: max(75px, 3.1rem); }
 html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 
 .mast {
@@ -10,31 +10,32 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 }
 .mast .nav-inner {
   display: grid;
-  grid-template-columns: minmax(44px, 1fr) minmax(44px, max-content) minmax(max-content, 1fr);
+  grid-template-columns: minmax(max-content, 1fr) minmax(44px, max-content) minmax(max-content, 1fr);
   align-items: center;
   gap: 0;
   height: calc(var(--mast-height) - 1px);
 }
-.mast .brand {
+.mast-leading, .mast .nav-tools {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  grid-column: 1;
+  gap: 6px;
 }
-.mast .brand, .mast .brand svg { max-width: 100%; }
+.mast-leading {
+  grid-column: 1;
+  justify-self: start;
+}
 .mast .nav-tools {
   grid-column: 3;
   justify-self: end;
-  gap: 6px;
 }
 .mast .tray-trigger,
-.mast .theme-switch,
+.theme-switch,
 .mast-tool,
 .fold-toggle {
   min-height: 44px;
   min-width: 44px;
 }
-.mast-tool, .fold-toggle {
+.mast-tool, .theme-switch, .fold-toggle {
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -44,55 +45,100 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   font-size: .89rem;
   white-space: nowrap;
 }
-.mast-tool:hover, .fold-toggle:hover { background: var(--panel); }
-.mast-search { gap: 6px; }
-.mast-search svg {
-  width: 17px;
-  height: 17px;
+.mast-tool:hover, .theme-switch:hover, .fold-toggle:hover { background: var(--panel); }
+.mast-home, .mast-search, .theme-switch { width: 44px; padding: 0; }
+.mast-home svg, .mast-search svg, .basket-icon {
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.65;
   stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
 }
-.staff-mast .brand { width: max-content; gap: 12px; }
-.staff-mast .brand svg { width: var(--edgey-wordmark-header-width); flex-shrink: 0; }
+.mast-search:focus-visible svg { transform: rotate(-14deg) scale(1.13); }
+@media (hover: hover) {
+  .mast-search:hover svg { transform: rotate(-14deg) scale(1.13); }
+}
+.mast-search:active svg { transform: rotate(-14deg) scale(.87); }
+.theme-track {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 36px;
+  height: 22px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+}
+.theme-track svg {
+  width: 17px;
+  height: 20px;
+  padding: 2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[data-theme="dark"] .theme-track .moon-symbol,
+[data-theme="light"] .theme-track .sun-symbol {
+  background: var(--edgey-primary-fill);
+  color: var(--edgey-primary-text);
+}
+@media (forced-colors: active) {
+  [data-theme="dark"] .theme-track .moon-symbol,
+  [data-theme="light"] .theme-track .sun-symbol {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+.mast-mark {
+  display: grid;
+  justify-items: center;
+  width: var(--edgey-wordmark-header-width);
+  max-width: 100%;
+  flex: none;
+}
+.mast-mark .wordmark { width: 100%; }
 .staff-identity {
-  border-inline-start: 1px solid var(--line);
-  padding-inline-start: 12px;
   color: var(--muted);
   font: 600 .72rem/1.4 var(--mono);
   text-transform: uppercase;
   letter-spacing: .06em;
 }
 .staff-shop-prefix { margin-inline-end: .27em; }
-.shop-compact-theme { display: none; }
-
-.fold { grid-column: 2; }
+.fold, .mast-brand-static { grid-column: 2; min-width: 0; }
+.mast-brand-static { display: grid; place-items: center; }
+.staff-mast .mast-mark { width: min(var(--edgey-wordmark-header-width), 126px); }
 .fold-toggle {
+  display: flex;
   position: relative;
-  gap: 8px;
-  padding-inline: 11px 22px;
+  width: 100%;
+  height: calc(var(--mast-height) - 12px);
+  border-color: transparent;
+  padding-inline: 18px;
   list-style: none;
   cursor: pointer;
 }
 .fold-toggle::-webkit-details-marker { display: none; }
-.fold-toggle::after {
-  content: "";
+.fold-chevron {
   position: absolute;
-  inset: 0 0 0 auto;
-  width: 10px;
-  border-inline-start: 1px solid var(--line);
-  background: repeating-linear-gradient(var(--edgey-hatch-angle), transparent 0 3px, currentColor 3px 4px, transparent 4px var(--edgey-hatch-pitch));
-  opacity: .32;
+  inset-inline-end: 3px;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.fold-cross {
-  width: 11px;
-  height: 11px;
-  background: linear-gradient(currentColor, currentColor) center / 1px 100% no-repeat,
-    linear-gradient(currentColor, currentColor) center / 100% 1px no-repeat;
-}
-.fold[open] .fold-cross { transform: rotate(45deg); }
-.fold[open] .fold-toggle { border-color: var(--muted); background: var(--panel); }
+.fold[open] .fold-chevron { transform: rotate(180deg); }
+.fold[open] .mast-mark { transform: translateY(-2px); }
+.fold[open] .fold-toggle, .fold-toggle:hover { border-color: var(--line); background: var(--panel); }
 .fold:not([open]) > :not(summary) { display: none; }
 .fold-backdrop, .fold-panel { position: fixed; inset: var(--mast-height) 0 auto; }
 .fold-backdrop {
@@ -110,10 +156,15 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
-.fold[open] .fold-panel { animation: fold-reveal 180ms cubic-bezier(.2, .7, .3, 1) both; }
+@media (prefers-reduced-motion: no-preference) {
+  .fold[open] .fold-panel { animation: fold-reveal 180ms cubic-bezier(.2, .7, .3, 1) both; }
+  .mast-mark .wordmark { animation: trace-mark 360ms cubic-bezier(.22, .62, .32, 1) backwards; }
+  .fold-chevron, .fold-toggle .mast-mark, .mast-search svg { transition: transform 145ms ease-out; }
+}
 @keyframes fold-reveal { from { clip-path: inset(0 0 100%); } to { clip-path: inset(0); } }
+@keyframes trace-mark { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .fold[open] .fold-panel { animation: none; }
+  .fold[open] .mast-mark, .mast-search svg, .mast-search:is(:hover, :focus-visible, :active) svg { transform: none; }
 }
 .fold-inner { padding-block: 18px 26px; }
 .fold-index { color: var(--muted); padding-bottom: 14px; }
@@ -159,41 +210,38 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 .fold-group a:focus-visible { outline-offset: -2px; }
 .fold-empty { color: var(--muted); font-size: .9rem; padding-block-start: 8px; }
 .fold-tools { margin-block-start: 20px; }
-.fold-tools .theme-switch { width: auto; padding-inline: 11px; }
-.fold-tools .theme-label { display: inline; }
 .site-footer .foot-inner { justify-content: space-between; gap: 0 16px; }
 .site-footer .foot-inner p { text-align: start; }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .site-footer .textlink { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; margin: 0; }
 
-@media (max-width: 920px) {
-  .staff-mast .brand svg { width: 112px; }
-  .mast .theme-label { display: none; }
-}
 @media (max-width: 740px) {
-  :root { --mast-height: 63px; }
-  .shop-wide-theme { display: none; }
-  .shop-compact-theme { display: block; }
-  .mast .nav-tools { gap: 4px; }
-  .mast-search span, .mast .tray-label { display: none; }
+  :root { --mast-height: max(63px, 2.55rem); }
+  .mast-leading, .mast .nav-tools { gap: 4px; }
+  .mast .tray-label { display: none; }
   .mast .tray-trigger { justify-content: center; min-width: 48px; }
-  .fold-tools .theme-label { display: inline; }
+  .mast .mast-mark { width: 112px; }
+  .staff-mast .mast-mark { width: 92px; }
+  .mast :is(.mast-tool, .theme-switch, .tray-trigger, .fold-toggle):focus-visible { outline-offset: -2px; }
   .fold-panel { height: calc(100dvh - var(--mast-height)); }
   .fold-groups, .staff-mast .fold-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 490px) {
   :root { --mast-height: max(59px, 2.25rem); }
-  .fold-toggle { display: flex; white-space: normal; padding-inline: 7px 14px; gap: 6px; line-height: 1.15; }
-  .fold-cross { flex: 0 0 11px; }
+  .fold-toggle { padding-inline: 14px; }
+  .fold-chevron { width: 10px; height: 10px; inset-inline-end: 1px; }
+  .mast .mast-mark { width: 88px; }
   .staff-shop-prefix { display: none; }
-  .staff-mast .brand { flex-direction: column; align-items: start; justify-content: center; gap: 0; }
-  .staff-mast .brand svg { width: 78px; }
-  .staff-identity { border: 0; padding: 0; font-size: .62rem; }
+  .staff-identity { font-size: clamp(.56rem, 2.5vw, .68rem); }
   .staff-mast .nav-tools .mast-tool { padding-inline: 5px; }
   .staff-mast .nav-tools a { text-transform: capitalize; }
   .fold-groups, .staff-mast .fold-groups { gap: 10px 14px; }
 }
 @media (max-width: 370px) {
-  .mast .nav-tools { gap: 3px; }
-  .staff-mast .brand svg { width: 66px; }
+  .mast-leading, .mast .nav-tools { gap: 3px; }
+  .fold-toggle { padding-inline: 11px; }
+  .mast .mast-mark { width: 72px; }
+  .mast .basket-icon { width: 15px; height: 15px; }
+  .mast .tray-trigger { min-width: 44px; padding-inline: 4px; gap: 3px; }
+  .mast .tray-count { border: 0; padding-inline-start: 0; }
 }

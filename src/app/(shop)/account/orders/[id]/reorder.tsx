@@ -42,11 +42,11 @@ export function Reorder({ orderId }: { orderId: string }) {
       <button type="button" className="primary" ref={start} disabled={!selection.hydrated || pending} onClick={check}>
         {pending ? "Checking stock and prices…" : "Reorder"}
       </button>
-      <p role="status" className={added ? styles.actions : "sr"}>{added ? "Your selection has been replaced." : ""}</p>
+      <p role="status" className={added ? styles.actions : "sr"}>{added ? "Your basket has been replaced." : ""}</p>
       {added && (
         <div className={styles.actions}>
           <button type="button" className="textlink" ref={open} onClick={(event) => selection.open(event.currentTarget)}>
-            Open selection
+            Open basket
           </button>
         </div>
       )}
@@ -84,10 +84,10 @@ export function Reorder({ orderId }: { orderId: string }) {
               {review.lines.length ? (
                 <>
                   <p>Goods subtotal: <strong className={styles.figure}>{formatGbp(review.goodsNetPence)}</strong> ex VAT</p>
-                  <p className="muted">{selection.lines.length ? "Confirming will replace every item in your current selection." : "Confirming will add the available items to your empty selection."}</p>
-                  {selectionChanged && <p role="status">Your selection changed. Check the reorder again before replacing it.</p>}
+                  <p className="muted">{selection.lines.length ? "Confirming will replace every item in your current basket." : "Confirming will add the available items to your empty basket."}</p>
+                  {selectionChanged && <p role="status">Your basket changed. Check the reorder again before replacing it.</p>}
                 </>
-              ) : <p>None of these items can be added. Your selection will stay as it is.</p>}
+              ) : <p>None of these items can be added. Your basket will stay as it is.</p>}
             </>
           )}
           <div className={styles.actions}>
@@ -96,7 +96,7 @@ export function Reorder({ orderId }: { orderId: string }) {
                 selection.replace(review.lines);
                 setPreview(undefined);
                 setAdded(true);
-              }}>Replace selection</button>
+              }}>Replace basket</button>
             )}
             <button type="button" className="secondary" disabled={pending} onClick={() => {
               setPreview(undefined);

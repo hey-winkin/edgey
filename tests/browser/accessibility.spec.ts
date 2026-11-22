@@ -132,10 +132,10 @@ for (const theme of themes) {
     });
 
     test("product and selection dialogs, populated checkout and validation", async ({ page }) => {
-      const tray = page.getByRole("dialog", { name: "Your selection" });
+      const tray = page.getByRole("dialog", { name: "Your basket" });
       await page.goto("/blades");
-      await page.getByRole("button", { name: "Selection 0 blades" }).click();
-      await expect(tray).toContainText("Your selection is empty");
+      await page.getByRole("button", { name: "Basket 0 blades" }).click();
+      await expect(tray).toContainText("Your basket is empty");
       await scanAccessibility(page, theme);
       await page.keyboard.press("Escape");
 
@@ -147,7 +147,7 @@ for (const theme of themes) {
       await page.getByRole("link", { name: /EDG-Z10 Flat-stock drag blade/ }).click();
       await expect(dialog).toContainText(product);
       await scanAccessibility(page, theme);
-      await dialog.getByRole("button", { name: "Add to selection" }).click();
+      await dialog.getByRole("button", { name: "Add to basket" }).click();
       await expect(tray.getByRole("button", { name: "Remove EDG-Z10" })).toBeVisible();
       await scanAccessibility(page, theme);
 

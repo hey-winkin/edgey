@@ -31,7 +31,7 @@ export default async function CheckoutPage() {
       <div className="checkout-heading">
         <p className="kicker"><span className="register" aria-hidden="true" /> Trade orders</p>
         <h1>Checkout</h1>
-        <p className="muted">Review your selection and tell us where to deliver it.</p>
+        <p className="muted">Review your basket and tell us where to deliver it.</p>
       </div>
       <CheckoutReview trade={trade} />
     </main>

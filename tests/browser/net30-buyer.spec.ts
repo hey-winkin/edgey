@@ -397,17 +397,17 @@ test("a confirming Net 30 order clears only the submitted selection after author
     await page.getByRole("button", { name: "Place order on account" }).click();
     await expect(page).toHaveURL(confirmation(fixture.pending));
     await expect(page.getByRole("heading", { name: "Confirming your invoice" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Selection 5 blades" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Basket 5 blades" })).toBeVisible();
     await fixture.issue(fixture.pending, pendingReference, 12804);
     await page.getByRole("button", { name: "Check invoice status" }).click();
     await expect(page.getByRole("heading", { name: "Order confirmed" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Selection 0 blades" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Basket 0 blades" })).toBeVisible();
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), attemptKey)).toBeNull();
 
     await checkout(page, fixture.variantId);
     await page.goto(confirmation(fixture.issued));
     await expect(page.getByRole("heading", { name: "Order confirmed" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Selection 5 blades" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Basket 5 blades" })).toBeVisible();
   } finally {
     await fixture.clean();
   }

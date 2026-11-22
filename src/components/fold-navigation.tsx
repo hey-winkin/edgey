@@ -11,9 +11,10 @@ export type NavigationGroup = {
 };
 
 export function FoldNavigation({
-  label, title, landmark, groups, children,
+  label, mark, title, landmark, groups, children,
 }: {
   label: string;
+  mark: ReactNode;
   title: string;
   landmark: string;
   groups: NavigationGroup[];
@@ -67,9 +68,11 @@ export function FoldNavigation({
 
   return (
     <details className="fold" ref={disclosure}>
-      <summary ref={summary} className="fold-toggle">
-        <span className="fold-cross" aria-hidden="true" />
-        {label}
+      <summary ref={summary} className="fold-toggle" aria-label={label} title={label}>
+        {mark}
+        <svg className="fold-chevron" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="m2 4 4 4 4-4" />
+        </svg>
       </summary>
       <div className="fold-backdrop" aria-hidden="true" onClick={() => {
         if (disclosure.current) disclosure.current.open = false;

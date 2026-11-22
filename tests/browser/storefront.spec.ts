@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 
 test("restores the theme but resets the material proof and view on reload", async ({ page }) => {
@@ -17,7 +18,7 @@ test("restores the theme but resets the material proof and view on reload", asyn
   await page.getByRole("button", { name: "Outline", exact: true }).click();
   await page.getByRole("button", { name: "Glacier", exact: true }).click();
   await expect(study).toHaveAttribute("data-mode", "ink");
-  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await switchTheme(page, "light");
   await expect(texture).toHaveAttribute("href", "/proofs/proof-cyan.webp");
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(250, 250, 248)");
   await page.reload();
@@ -52,7 +53,7 @@ test("the home keyboard path opens a shareable dialog and returns focus on Escap
   await expect(dialog).toContainText("£99.75");
   await expect(dialog).toContainText("£19.95 each · ex VAT");
   await expect(dialog).toContainText("£119.70 inc VAT (20%)");
-  await expect(dialog.getByRole("button", { name: "Add to selection" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\?q=3910-301$/);
   await expect(dialog).not.toBeVisible();
@@ -163,7 +164,7 @@ test("direct visits render a standalone verified product with per-blade price br
 test("out-of-stock options remain inspectable, but are never addable", async ({ page }) => {
   await page.goto("/blades/edg-sum-drg?variant=EDG-SUM-DRG-60");
   const sold = page.getByRole("button", { name: "60° · Out of stock" });
-  const add = page.getByRole("button", { name: "Add to selection" });
+  const add = page.getByRole("button", { name: "Add to basket" });
   await expect(sold).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Out of stock", { exact: true })).toBeVisible();
   await expect(add).toBeDisabled();
@@ -171,7 +172,7 @@ test("out-of-stock options remain inspectable, but are never addable", async ({ 
   const disabledFill = await add.evaluate((button) => getComputedStyle(button).backgroundColor);
   await add.hover();
   await expect(add).toHaveCSS("background-color", disabledFill);
-  await expect(page.getByText(/removed from your selection/i)).toHaveCount(0);
+  await expect(page.getByText(/removed from your basket/i)).toHaveCount(0);
   await expect(page.locator(".product-panel")).toContainText("Summa 391-231");
   await expect(page.getByRole("table", { name: "Price breaks per blade for EDG-SUM-DRG-60" })).toContainText("£11.95");
   await page.getByRole("button", { name: "5", exact: true }).click();
@@ -185,7 +186,7 @@ test("out-of-stock options remain inspectable, but are never addable", async ({ 
   await sold.click();
   await expect(add).toBeDisabled();
   await expect(page).toHaveURL(/variant=EDG-SUM-DRG-60$/);
-  await expect(page.getByRole("button", { name: "Selection 0 blades" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Basket 0 blades" })).toBeVisible();
 
   await page.goto("/blades");
   await page.getByRole("link", { name: "EDG-SUM-DRG Summa-pattern drag plotter blade" }).click();
@@ -193,8 +194,8 @@ test("out-of-stock options remain inspectable, but are never addable", async ({ 
   await modal.getByRole("button", { name: "60° · Out of stock" }).click();
   await expect(modal).toContainText("Summa 391-231");
   await expect(modal.getByRole("group", { name: "Price breaks per blade · ex VAT" })).toContainText("£11.95");
-  await expect(modal.getByRole("button", { name: "Add to selection" })).toBeDisabled();
-  await expect(modal.getByText(/removed from your selection/i)).toHaveCount(0);
+  await expect(modal.getByRole("button", { name: "Add to basket" })).toBeDisabled();
+  await expect(modal.getByText(/removed from your basket/i)).toHaveCount(0);
 });
 
 test("malformed searches do not crash and an unknown product returns 404", async ({ page }) => {
@@ -207,7 +208,7 @@ test("malformed searches do not crash and an unknown product returns 404", async
 });
 
 for (const width of [1440, 390, 320]) {
-  for (const theme of ["dark", "light"]) {
+  for (const theme of ["dark", "light"] as const) {
     test(`quick view shows the same artwork and all price breaks at ${width}px in ${theme}`, async ({ page }) => {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : width === 390 ? 844 : 640 });
       await page.emulateMedia({ reducedMotion: "reduce" });
@@ -226,7 +227,7 @@ for (const width of [1440, 390, 320]) {
       await expect(plate).toHaveCSS("background-color", background);
       await expect(plate).toHaveAttribute("data-proof", proof!);
       await expect(dialog.getByRole("link", { name: "View photograph" })).toHaveAttribute("href", "/photos/drag.webp");
-      await expect(dialog.getByRole("button", { name: "Add to selection" })).toBeEnabled();
+      await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeEnabled();
       await expect(dialog.getByRole("button", { name: "Close blade details" })).toBeInViewport({ ratio: 1 });
       await expect(dialog.getByRole("link", { name: "Full specification and price breaks" })).toBeInViewport({ ratio: 1 });
       const tiers = dialog.getByRole("group", { name: "Price breaks per blade · ex VAT" });

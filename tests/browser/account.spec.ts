@@ -43,7 +43,7 @@ async function focusByKeyboard(page: Page, target: Locator) {
 
 async function signIn(page: Page, email: string) {
   await page.goto("/");
-  await page.locator("summary").filter({ hasText: /^Menu$/ }).click();
+  await page.locator('summary[aria-label="Edgey shop menu"]').click();
   await page.getByRole("navigation", { name: "Shop navigation" }).getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(isAccount);
   await expect(signInHeading(page)).toBeVisible();
@@ -309,13 +309,14 @@ test("verified buyers can read and reorder their history without exposing foreig
       await expect(unavailable).toContainText(/Out of stock/i);
       const repriced = preview.getByRole("listitem").filter({ hasText: catalogue.available.sku });
       await expect(repriced).toContainText(/price changed from £21\.00 to £23\.50/i);
-      await expect(page.getByRole("button", { name: "Selection 3 blades" })).toBeVisible();
+      await expect(preview).toContainText("Confirming will replace every item in your current basket.");
+      await expect(page.getByRole("button", { name: "Basket 3 blades" })).toBeVisible();
       await preview.getByRole("button", { name: "Cancel", exact: true }).press("Enter");
       await expect(preview).toHaveCount(0);
       const readSelection = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), selectionKey);
       expect(await readSelection()).toEqual(oldSelection);
       await reorderButton(page).press("Enter");
-      const replace = preview.getByRole("button", { name: "Replace selection", exact: true });
+      const replace = preview.getByRole("button", { name: "Replace basket", exact: true });
       await expect(replace).toBeEnabled();
       const otherTab = await page.context().newPage();
       try {
@@ -324,7 +325,7 @@ test("verified buyers can read and reorder their history without exposing foreig
           key: selectionKey, id: catalogue.selected.id,
         });
         await expect(replace).toBeDisabled();
-        await expect(preview.getByRole("status")).toContainText("Your selection changed");
+        await expect(preview.getByRole("status")).toContainText("Your basket changed");
       } finally {
         await otherTab.close();
       }
@@ -332,10 +333,10 @@ test("verified buyers can read and reorder their history without exposing foreig
       await expect(replace).toBeEnabled();
       await replace.press("Enter");
       await expect(preview).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Selection 2 blades" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Basket 2 blades" })).toBeVisible();
       await expect.poll(readSelection).toEqual({ [catalogue.available.id]: 2 });
-      await page.getByRole("button", { name: "Selection 2 blades" }).click();
-      const selection = page.getByRole("dialog", { name: "Your selection" });
+      await page.getByRole("button", { name: "Basket 2 blades" }).click();
+      const selection = page.getByRole("dialog", { name: "Your basket" });
       await expect(selection).toContainText("2 × £23.50");
       await expect(selection).toContainText(catalogue.available.sku);
       await expect(selection).not.toContainText(catalogue.soldOut.sku);

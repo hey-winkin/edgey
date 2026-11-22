@@ -23,7 +23,7 @@ async function capture(page: Page, filename: string) {
 
 async function expectUsableMasthead(page: Page, width: number) {
   const controls = await page.locator(".mast .nav-inner").evaluate((row) =>
-    Array.from(row.querySelectorAll<HTMLElement>(".brand, summary, .nav-tools a, .nav-tools button"))
+    Array.from(row.querySelectorAll<HTMLElement>("summary, .mast-leading a, .nav-tools a, .nav-tools button"))
       .filter((control) => control.getClientRects().length > 0)
       .map((control) => control.getBoundingClientRect().toJSON() as DOMRectJSON)
       .sort((a, b) => a.left - b.left),
@@ -42,7 +42,9 @@ type DOMRectJSON = Pick<DOMRect, "width" | "height" | "left" | "right">;
 test("shop menu exposes published brands and main journeys from a buyer page", async ({ page }) => {
   await page.goto("/contact");
   await expect(page.getByRole("link", { name: "Search blades", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Selection 0 blades$/ })).toBeEnabled();
+  await expect(page.getByRole("link", { name: "Edgey home" })).toHaveAttribute("href", "/");
+  await expect(menu(page)).toHaveAccessibleName("Edgey shop menu");
+  await expect(page.getByRole("button", { name: /^Basket 0 blades$/ })).toBeEnabled();
   await expect(shopNav(page)).toBeHidden();
   await menu(page).click();
   await expect(shopNav(page).getByRole("link", { name: "Contact" })).toHaveAttribute("aria-current", "page");
@@ -92,8 +94,11 @@ test("keyboard dismissal keeps focus and navigation does not move the layout", a
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Edgey home" })).toBeFocused();
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Search blades", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(menu(page)).toBeFocused();
   await page.keyboard.press("Enter");
+  await expect(page.locator(".fold")).toHaveAttribute("open", "");
   await page.keyboard.press("Tab");
   await expect(shopNav(page).getByRole("link", { name: "Search by part number" })).toBeFocused();
   expect(await heading.boundingBox()).toEqual(before);
@@ -106,12 +111,68 @@ test("keyboard dismissal keeps focus and navigation does not move the layout", a
   await expect(menu(page)).toBeFocused();
   await page.keyboard.press("Space");
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("link", { name: "Edgey home" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Search blades", exact: true })).toBeFocused();
   await expect(shopNav(page)).toBeHidden();
   await menu(page).click();
   await page.locator(".fold-backdrop").click({ position: { x: 5, y: 550 } });
   await expect(menu(page)).toBeFocused();
   await expect(shopNav(page)).toBeHidden();
+});
+
+test("the wordmark reveals once, reacts to the menu, and the magnifier responds to hover, focus and press", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/contact");
+  const mark = menu(page).locator(".wordmark");
+  await expect(mark).toHaveCSS("animation-name", "trace-mark");
+  await expect(mark).toHaveCSS("animation-iteration-count", "1");
+  await expect(mark).toHaveCSS("animation-duration", "0.36s");
+  await menu(page).click();
+  await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, -2)");
+  await expect(menu(page).locator(".fold-chevron")).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
+  await menu(page).press("Escape");
+  await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "none");
+
+  const search = page.getByRole("link", { name: "Search blades", exact: true });
+  const icon = search.locator("svg");
+  await page.keyboard.press("Shift+Tab");
+  await expect(search).toBeFocused();
+  await expect(icon).not.toHaveCSS("transform", "none");
+  await page.keyboard.press("Shift+Tab");
+  await expect(icon).toHaveCSS("transform", "none");
+  await search.hover();
+  await expect.poll(() => icon.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeGreaterThan(1);
+  await page.mouse.down();
+  await expect.poll(() => icon.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeLessThan(.9);
+  await page.mouse.move(8, 100);
+  await page.mouse.up();
+});
+
+test("the theme switch exposes its state and saves a keyboard toggle on a narrow phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/contact");
+  const toggle = page.getByRole("switch", { name: "Light theme", exact: true });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(toggle).toHaveText("");
+  await toggle.press("Space");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#FAFAF8");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+});
+
+test("the active theme icon remains distinct in forced colours", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await page.goto("/contact");
+  const toggle = page.getByRole("switch", { name: "Light theme", exact: true });
+  await expect(toggle.locator(".moon-symbol")).toHaveCSS("forced-color-adjust", "none");
+  await expect(toggle.locator(".sun-symbol")).not.toHaveCSS("forced-color-adjust", "none");
+  await toggle.press("Space");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(toggle.locator(".moon-symbol")).not.toHaveCSS("forced-color-adjust", "none");
+  await expect(toggle.locator(".sun-symbol")).toHaveCSS("forced-color-adjust", "none");
 });
 
 test.describe("without JavaScript", () => {
@@ -125,6 +186,23 @@ test.describe("without JavaScript", () => {
     await expect(shopNav(page)).toBeHidden();
     await page.getByRole("link", { name: "Search blades", exact: true }).click();
     await expect(page.locator("#finder")).toBeInViewport();
+    await page.getByRole("link", { name: "Edgey home", exact: true }).click();
+    await expect(page).toHaveURL("/");
+  });
+
+  test("the staff mark opens role-appropriate links without JavaScript", async ({ page, baseURL }) => {
+    const account = await createLocalAdminUser("warehouse");
+    try {
+      await setVerifiedStaffSession(page, account, baseURL);
+      await page.goto("/admin");
+      await expect(staffMenu(page)).toHaveAccessibleName("Edgey staff menu");
+      await staffMenu(page).press("Enter");
+      await staffNav(page).getByRole("link", { name: "Delivery settings" }).click();
+      await expect(page.getByRole("heading", { name: "Delivery settings" })).toBeVisible();
+      await expect(staffNav(page)).toBeHidden();
+    } finally {
+      await localAdminClient().auth.admin.deleteUser(account.id);
+    }
   });
 });
 
@@ -137,12 +215,12 @@ test("an unknown shop URL keeps the buyer navigation and returns 404", async ({ 
   await expect(shopNav(page).getByRole("link", { name: "All blades" })).toBeVisible();
 });
 
-test("enlarged text and a populated selection keep masthead controls separate across breakpoints", async ({ page }) => {
+test("enlarged text and a populated basket keep masthead controls separate across breakpoints", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("edgey-storefront-selection-v1", '{"42e5ce02-4d5e-5c39-9f1b-f76c46c8b386":200}');
   });
   await page.goto("/contact");
-  await expect(page.getByRole("button", { name: "Selection 200 blades" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Basket 200 blades" })).toBeEnabled();
   for (const size of ["100%", "125%", "200%"]) {
     await page.locator("html").evaluate((element, value) => { element.style.fontSize = value; }, size);
     for (const width of [320, 491, 740, 741, 800, 920, 921]) {
@@ -154,11 +232,27 @@ test("enlarged text and a populated selection keep masthead controls separate ac
   }
 });
 
+test("a large basket shows a compact count without hiding the exact total from assistive technology", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.addInitScript(() => {
+    localStorage.setItem("edgey-storefront-selection-v1", '{"42e5ce02-4d5e-5c39-9f1b-f76c46c8b386":1234}');
+  });
+  await page.goto("/contact");
+  const basket = page.getByRole("button", { name: "Basket 1,234 blades", exact: true });
+  await expect(basket).toHaveText(/999\+/);
+  await expectUsableMasthead(page, 320);
+});
+
 for (const theme of themes) {
   test(`shop masthead and open sheet fit the three widths in ${theme}`, async ({ page }) => {
     await saveThemeBeforeLoad(page, theme);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/brands/mimaki");
+    await expect(menu(page)).toHaveAttribute("aria-label", "Edgey shop menu");
+    await expect(menu(page).locator(".wordmark")).toHaveCSS("animation-name", "none");
+    await page.getByRole("link", { name: "Search blades" }).hover();
+    await expect(page.locator(".mast-search svg")).toHaveCSS("transform", "none");
+    await page.mouse.move(0, 0);
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await expectUsableMasthead(page, viewport.width);
@@ -167,12 +261,14 @@ for (const theme of themes) {
       await capture(page, `shop-closed-${theme}-${viewport.width}`);
       await menu(page).click();
       await expect(page.locator(".fold-panel")).toHaveCSS("animation-name", "none");
+      await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "none");
       const panel = await page.locator(".fold-panel").boundingBox();
       if (viewport.width < 741) expect(panel!.y + panel!.height).toBeCloseTo(viewport.height, 0);
       await capture(page, `shop-menu-${theme}-${viewport.width}`);
       await scanAccessibility(page, theme);
       await page.keyboard.press("Escape");
       await expect(shopNav(page)).toBeHidden();
+      await menu(page).blur();
     }
   });
 }
@@ -185,6 +281,8 @@ test.describe("staff shell", () => {
       await expect(page.getByRole("banner", { name: "Edgey staff" })).toBeVisible();
       await expect(page.locator(".shop-mast, .site-footer, #selection-trigger")).toHaveCount(0);
       await expect(staffMenu(page)).toHaveCount(0);
+      await expect(page.locator(".mast-brand-static .staff-identity")).toHaveText("Staff");
+      await expect(page.getByRole("link", { name: "Staff desk", exact: true })).toHaveAttribute("href", "/admin");
       await expect(page.getByRole("link", { name: "View shop" })).toHaveAttribute("href", "/");
     }
   });
@@ -240,9 +338,13 @@ test.describe("staff shell", () => {
         await page.emulateMedia({ reducedMotion: "reduce" });
         await page.goto("/admin/delivery");
         await expect(page.locator(".shop-mast, .site-footer, #selection-trigger")).toHaveCount(0);
+        await expect(page.getByRole("link", { name: "Search blades", exact: true })).toHaveCount(0);
+        await expect(staffMenu(page)).toHaveAttribute("aria-label", "Edgey staff menu");
         for (const viewport of viewports) {
           await page.setViewportSize(viewport);
           await expectUsableMasthead(page, viewport.width);
+          const mark = await staffMenu(page).boundingBox();
+          expect(Math.abs(mark!.x + mark!.width / 2 - viewport.width / 2)).toBeLessThan(9);
           await capture(page, `staff-closed-${theme}-${viewport.width}`);
           await staffMenu(page).click();
           await expect(staffNav(page).getByRole("link", { name: "Delivery settings" })).toHaveAttribute("aria-current", "page");
@@ -250,11 +352,23 @@ test.describe("staff shell", () => {
           await scanAccessibility(page, theme);
           await page.keyboard.press("Escape");
           await expect(staffNav(page)).toBeHidden();
+          await staffMenu(page).blur();
           if (viewport.width === 320) {
             for (const size of ["125%", "200%"]) {
               await page.locator("html").evaluate((element, value) => { element.style.fontSize = value; }, size);
               await expectUsableMasthead(page, viewport.width);
             }
+          }
+        }
+        for (const width of [491, 740, 741, 1440]) {
+          await page.setViewportSize({ width, height: 640 });
+          for (const size of ["100%", "200%"]) {
+            await page.locator("html").evaluate((element, value) => { element.style.fontSize = value; }, size);
+            const hitbox = (await staffMenu(page).boundingBox())!;
+            const logo = (await staffMenu(page).locator(".mast-mark").boundingBox())!;
+            expect(logo.y).toBeGreaterThanOrEqual(hitbox.y);
+            expect(logo.y + logo.height).toBeLessThanOrEqual(hitbox.y + hitbox.height);
+            await expectUsableMasthead(page, width);
           }
         }
       } finally {

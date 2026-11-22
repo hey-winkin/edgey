@@ -22,6 +22,6 @@ test("unscoped checkout returns are private, inert and contain no order informat
     await expect(page.getByRole("button", { name: "Check payment status" })).toHaveCount(0);
     await expect(page.getByText("Order reference", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Continue browsing" })).toHaveAttribute("href", "/blades");
-    await expect(page.getByRole("button", { name: "Selection 2 blades" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Basket 2 blades" })).toBeEnabled();
   }
 });

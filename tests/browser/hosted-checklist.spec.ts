@@ -9,12 +9,12 @@ async function delayHydration(page: Page, path: string, edit: () => Promise<void
   });
   try {
     await page.goto(path, { waitUntil: "commit" });
-    await expect(page.getByRole("button", { name: "Selection 0 blades" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Basket 0 blades" })).toBeDisabled();
     await edit();
   } finally {
     scripts.resolve();
   }
-  await expect(page.getByRole("button", { name: "Selection 0 blades" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Basket 0 blades" })).toBeEnabled();
 }
 
 test("keeps pre-hydration enquiry edits through further input, validation and submission", async ({ page }) => {
@@ -101,7 +101,7 @@ test("keeps the compact dialog close and checkout action in view", async ({ page
   await card.click();
   const product = page.getByRole("dialog", { name: /blade/i });
   const close = product.getByRole("button", { name: "Close blade details" });
-  const add = product.getByRole("button", { name: "Add to selection" });
+  const add = product.getByRole("button", { name: "Add to basket" });
   const spec = product.getByRole("link", { name: "Full specification and price breaks" });
   const specs = product.getByRole("region", { name: "Blade specifications and options" });
   await expect(add).toBeEnabled();
@@ -125,10 +125,10 @@ test("keeps the compact dialog close and checkout action in view", async ({ page
   await expect(card).toBeFocused();
   await card.click();
   await add.click();
-  const tray = page.getByRole("dialog", { name: "Your selection" });
+  const tray = page.getByRole("dialog", { name: "Your basket" });
   const checkout = tray.getByRole("link", { name: "Go to checkout" });
-  const details = tray.getByRole("region", { name: "Selection details" });
-  const closeSelection = tray.getByRole("button", { name: "Close selection" });
+  const details = tray.getByRole("region", { name: "Basket details" });
+  const closeSelection = tray.getByRole("button", { name: "Close basket" });
   await expect(checkout).toBeInViewport({ ratio: 1 });
   await expect(closeSelection).toBeFocused();
   await page.keyboard.press("Tab");
@@ -137,7 +137,7 @@ test("keeps the compact dialog close and checkout action in view", async ({ page
   await expect.poll(() => details.evaluate((region) => region.scrollTop)).toBeGreaterThan(0);
   await expect(checkout).toBeInViewport({ ratio: 1 });
   await closeSelection.click();
-  await page.getByRole("button", { name: "Selection 1 blade" }).click();
+  await page.getByRole("button", { name: "Basket 1 blade" }).click();
   await expect.poll(() => details.evaluate((region) => region.scrollTop)).toBe(0);
   await checkout.click();
   await expect(page).toHaveURL(/\/checkout$/);

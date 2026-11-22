@@ -59,8 +59,6 @@ svg, img { display: block; }
 .tray-trigger { margin-left: auto; display: inline-flex; align-items: center; border: 1px solid #b6bab4; min-height: 38px; padding: 0 11px; gap: 9px; font-size: .89rem; }
 .tray-trigger:not(:disabled):hover, .secondary:hover { background: #e9ebe6; }
 .tray-count { border-left: 1px solid var(--line); padding-left: 9px; font: .79rem/1.5 var(--mono); }
-.case-icon { display: inline-block; width: 13px; height: 11px; border: 1.3px solid currentColor; position: relative; }
-.case-icon::before { content: ""; position: absolute; top: -4px; left: 3px; width: 4px; height: 3px; border: 1px solid; border-bottom: 0; }
 .hero { display: grid; grid-template-columns: var(--edgey-hero-columns); gap: var(--edgey-hero-gap); align-items: center; padding-block: clamp(42px,5.3vw,83px); }
 .hero-copy { padding-bottom: 6px; overflow-wrap: anywhere; }
 .kicker, .eyebrow, .plate-kicker, .view-tag, .p-card-code, .match-count { font-family: var(--mono); }
@@ -181,13 +179,8 @@ p.fine { margin-top: 12px; }
 
 /* The same wire drawing is used on the masthead and on printed stock. */
 .wordmark { display: block; width: 100%; height: auto; color: inherit; overflow: visible; }
-.brand { display: block; flex: 0 0 auto; width: var(--edgey-wordmark-header-width); }
 .nav-inner { gap: clamp(22px, 4.2vw, 70px); }
 .nav-tools { display: flex; align-items: center; margin-left: auto; gap: 9px; flex-shrink: 0; }
-.theme-switch { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 10px; font-size: .84rem; border: 1px solid var(--line); }
-.theme-switch svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.theme-switch:hover { background: var(--panel); }
-[data-theme="light"] .sun-symbol, [data-theme="dark"] .moon-symbol { display: none; }
 .proof-options { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; padding: 0 12px 12px; background: var(--edgey-drawing-controls); }
 .proof-option { text-align: left; border: 1px solid var(--line); position: relative; min-width: 0; }
 .proof-option i { display: block; height: clamp(25px,2.7vw,41px); background: var(--proof) center 52% / cover; }
@@ -278,9 +271,6 @@ footer { padding-top: 22px; }
 }
 @media (max-width: 740px) {
   .frame { width: calc(100% - 38px); }
-  .brand { width: 112px; }
-  .theme-label { display: none; }
-  .theme-switch { width: 38px; padding: 0; }
   .hero { grid-template-columns: minmax(0,1fr); gap: 30px; padding-block: 35px; }
   .hero-copy { padding: 0; }
   h1 { font-size: var(--edgey-h1-compact-size); margin: 17px 0 14px; }
@@ -299,7 +289,6 @@ footer { padding-top: 22px; }
   .foot-inner { flex-wrap: wrap; gap: 12px 20px; }
 }
 @media (max-width: 490px) {
-  .brand { width: 88px; }
   .proof-options { grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.25rem), 1fr)); gap: 4px; padding: 0 6px 7px; }
   .proof-option span { font-size: .69rem; padding-inline: 4px 0; }
   .proof-option span::after { width: 6px; height: 6px; right: 3px; top: 3px; bottom: auto; background: var(--ink); box-shadow: 0 0 0 1px var(--paper); }
@@ -325,7 +314,6 @@ footer { padding-top: 22px; }
 }
 @media (max-width: 370px) {
   .frame { width: calc(100% - 28px); }
-  .brand { width: 72px; }
   .tray-trigger { padding-inline: 6px; gap: 6px; }
   .tray-count { padding-left: 6px; }
   .hero-actions .primary { padding-left: 11px; padding-right: 30px; gap: 6px; }
@@ -432,7 +420,6 @@ footer { padding-top: 22px; }
   .search-field { flex: 1 1 100%; }
   .figure-plate { aspect-ratio: 3.1; }
 }
-[data-theme="dark"] .when-light, [data-theme="light"] .when-dark { display: none; }
 .filter-status a { text-decoration: underline; text-underline-offset: 3px; color: #515950; }
 [data-theme="dark"] .filter-status a { color: var(--muted); }
 .product-more h3 { font-size: 1rem; font-weight: 600; margin: 0 0 8px; }

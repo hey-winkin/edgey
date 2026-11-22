@@ -230,7 +230,7 @@ export function ProductDetail({
           if (mode === "dialog") event.currentTarget.closest("dialog")?.close();
           open(mode === "page" ? event.currentTarget : undefined);
         }}>
-        Add to selection
+        Add to basket
       </button>
       <div role="status">
         {(blocked || quote?.status === "error") && (

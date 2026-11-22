@@ -231,7 +231,7 @@ for (const width of [320, 390, 1440]) {
         if (width === 320) {
           await page.evaluate(() => { document.documentElement.style.fontSize = "125%"; });
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-          const menu = page.locator("summary").filter({ hasText: /^Menu$/ });
+          const menu = page.locator('summary[aria-label="Edgey shop menu"]');
           await menu.click();
           await expect(page.getByRole("navigation", { name: "Shop navigation" }).getByRole("link", { name: "Trade accounts" })).toBeVisible();
           await menu.click();

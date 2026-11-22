@@ -1,4 +1,4 @@
-import { openStaffMenu, signOutFromStaffMenu } from "../helpers/navigation";
+import { openStaffMenu, signOutFromStaffMenu, switchTheme } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
@@ -109,7 +109,7 @@ test("warehouse screens keep horizontal scrolling inside tables and show keyboar
   await page.emulateMedia({ reducedMotion: "reduce" });
   await signInStaff(page, await createLocalAdminUser("warehouse"));
   for (const theme of ["dark", "light"] as const) {
-    if (theme === "light") await page.getByRole("button", { name: "Switch to light mode" }).click();
+    if (theme === "light") await switchTheme(page, "light");
     for (const width of [820, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       for (const route of ["/admin/warehouse", "/admin/stock"]) {

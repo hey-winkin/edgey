@@ -1,3 +1,4 @@
+import { switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -11,8 +12,7 @@ async function captureFinance(page: Page, name: string) {
   await mkdir(directory, { recursive: true });
   const original = page.viewportSize();
   for (const theme of ["dark", "light"] as const) {
-    const toggle = page.getByRole("button", { name: `Switch to ${theme} mode`, exact: true });
-    if (await toggle.count()) await toggle.click();
+    await switchTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     for (const width of [1440, 320]) {
       await page.setViewportSize({ width, height: 900 });
@@ -20,7 +20,7 @@ async function captureFinance(page: Page, name: string) {
       await page.screenshot({ path: join(directory, `${name}-${theme}-${width}.png`), fullPage: true, animations: "disabled" });
     }
   }
-  await page.getByRole("button", { name: "Switch to dark mode", exact: true }).click();
+  await switchTheme(page, "dark");
   if (original) await page.setViewportSize(original);
 }
 

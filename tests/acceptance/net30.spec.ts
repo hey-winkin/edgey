@@ -1,4 +1,4 @@
-import { openStaffMenu, signOutFromStaffMenu } from "../helpers/navigation";
+import { openStaffMenu, signOutFromStaffMenu, switchTheme } from "../helpers/navigation";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -61,13 +61,12 @@ async function capture(page: Page, name: string) {
   if (!directory) return;
   await mkdir(directory, { recursive: true });
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  for (const theme of ["dark", "light"]) {
-    const toggle = page.getByRole("button", { name: `Switch to ${theme} mode`, exact: true });
-    if (await toggle.count()) await toggle.click();
+  for (const theme of ["dark", "light"] as const) {
+    await switchTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.screenshot({ path: join(directory, `net30-${name}-${theme}.png`), fullPage: true, animations: "disabled" });
   }
-  await page.getByRole("button", { name: "Switch to dark mode", exact: true }).click();
+  await switchTheme(page, "dark");
 }
 
 test("approves trade terms, dispatches before payment, and shows partial and full settlement in buyer history",
@@ -128,8 +127,8 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await buyerPage.goto("/account");
         await expect(trade.getByRole("heading", { name: "Application pending" })).toBeVisible();
         await buyerPage.goto(`/blades/${slug}`);
-        await buyerPage.getByRole("button", { name: "Add to selection" }).click();
-        await buyerPage.getByRole("dialog", { name: "Your selection" })
+        await buyerPage.getByRole("button", { name: "Add to basket" }).click();
+        await buyerPage.getByRole("dialog", { name: "Your basket" })
           .getByRole("link", { name: "Go to checkout" }).click();
         await expect(method).toBeDisabled();
         await expect(method).toHaveAccessibleDescription("Your trade account isn’t approved for Net 30.");
@@ -331,8 +330,8 @@ test("an agreed Net 30 service survives invoice-send recovery and later payment"
     await signInBuyer(buyerContext, origin, buyer);
     const buyerPage = await buyerContext.newPage();
     await buyerPage.goto(`/blades/${slug}`);
-    await buyerPage.getByRole("button", { name: "Add to selection" }).click();
-    await buyerPage.getByRole("dialog", { name: "Your selection" }).getByRole("link", { name: "Go to checkout" }).click();
+    await buyerPage.getByRole("button", { name: "Add to basket" }).click();
+    await buyerPage.getByRole("dialog", { name: "Your basket" }).getByRole("link", { name: "Go to checkout" }).click();
     await buyerPage.getByLabel("Business name").fill(company);
     await buyerPage.getByLabel("Contact email").fill(buyer.email);
     await buyerPage.getByLabel("I’m buying for work").check();
