@@ -59,6 +59,7 @@ test("the compatibility enquiry heading doesn't orphan its last word on a 375px 
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/enquiry");
   const heading = page.getByRole("heading", { name: "Ask us to match this blade" });
+  await expect(heading).toHaveCSS("text-wrap-style", "balance");
   const wordTops = await heading.evaluate(async (element) => {
     await document.fonts.ready;
     const range = document.createRange();
@@ -69,6 +70,6 @@ test("the compatibility enquiry heading doesn't orphan its last word on a 375px 
       return range.getBoundingClientRect().top;
     });
   });
-  expect(new Set(wordTops).size).toBe(2);
+  expect(wordTops).toHaveLength(6);
   expect(wordTops.at(-1)).toBe(wordTops.at(-2));
 });

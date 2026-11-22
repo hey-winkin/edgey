@@ -1,6 +1,7 @@
 import { switchTheme } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
 import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
+import { resetBrowserQuoteBudget } from "../helpers/quote-budget";
 
 test("restores the theme but resets the material proof and view on reload", async ({ page }) => {
   await page.goto("/preview/original-hero");
@@ -249,6 +250,12 @@ test("malformed searches do not crash and an unknown product returns 404", async
 for (const width of [1440, 390, 320]) {
   for (const theme of ["dark", "light"] as const) {
     test(`quick view shows the same artwork and all price breaks at ${width}px in ${theme}`, async ({ page }) => {
+      const db = await connectAccountDb();
+      try {
+        await resetBrowserQuoteBudget(db);
+      } finally {
+        await db.end();
+      }
       await page.setViewportSize({ width, height: width === 1440 ? 900 : width === 390 ? 844 : 640 });
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.addInitScript((value) => localStorage.setItem("edgey-theme", value), theme);
