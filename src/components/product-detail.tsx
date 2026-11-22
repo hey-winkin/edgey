@@ -143,29 +143,28 @@ export function ProductDetail({
 
       {startingNet !== null && (
         <p className="variant-start-price">
-          From <strong>{formatPence(startingNet)}</strong> ex VAT per blade <span className="fine">({incVatLabel(startingNet)})</span>
+          <span>From <strong>{formatPence(startingNet)}</strong> ex VAT per blade</span>{" "}
+          <span className="fine">{incVatLabel(startingNet)}</span>
         </p>
       )}
       {family.variants.length > 1 && (
         <fieldset className="quantity-set">
           <legend>Variant</legend>
           <div className={variant ? "qty-options" : "qty-options variant-options"}>
-            {family.variants.map((candidate, index) => {
+            {family.variants.map((candidate) => {
               const cue = !variant ? variantChoiceCue(candidate, family.variants) : undefined;
               return (
                 <button
                   key={candidate.sku}
                   type="button"
                   aria-pressed={candidate.sku === sku}
-                  aria-labelledby={id + "-variant-" + index}
-                  aria-describedby={cue ? id + "-cue-" + index : undefined}
                   onClick={() => choose(candidate)}
                 >
-                  <span id={id + "-variant-" + index}>
+                  <span>
                     {variantLabel(candidate)}
                     {candidate.availability === "out_of_stock" && " · Out of stock"}
                   </span>
-                  {cue && <span className="variant-cue" id={id + "-cue-" + index}>{cue}</span>}
+                  {cue && <span className="variant-cue">{cue.replace(/\s*\/\s*/g, " / ")}</span>}
                 </button>
               );
             })}

@@ -53,10 +53,11 @@ test("Exact, ambiguous and unknown searches", async ({ page }) => {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Choose the configuration");
   await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeDisabled();
-  for (const angle of ["45°", "60°"]) {
-    await expect(dialog.getByRole("button", { name: angle, exact: true })).toHaveAttribute("aria-pressed", "false");
-  }
-  await dialog.getByRole("button", { name: "60°", exact: true }).click();
+  const standard = dialog.getByRole("button", { name: "45° Standard vinyl drag blade", exact: true });
+  const thick = dialog.getByRole("button", { name: "60° Thick / reflective / flock drag blade", exact: true });
+  await expect(standard).toHaveAttribute("aria-pressed", "false");
+  await expect(thick).toHaveAttribute("aria-pressed", "false");
+  await thick.click();
   await expect(page).toHaveURL(/variant=EDG-MIM-A60$/);
 
   for (const code of ["NO-PACKET-9348", "5201345"]) {

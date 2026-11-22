@@ -371,6 +371,7 @@ for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 568]]
       ];
       for (const control of pinned) await expect(control).toBeInViewport({ ratio: 1 });
       const details = tray.getByRole("region", { name: "Basket details" });
+      expect(await details.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
       await details.focus();
       await page.keyboard.press("End");
       await expect.poll(() => details.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
@@ -420,6 +421,16 @@ for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 568]]
           const quotedDate = await summary.getByText(label, { exact: true }).locator(nextDate).innerText();
           await expect(date.locator(nextDate)).toHaveText(quotedDate);
         }
+      }
+      if (width === 390 && theme === "dark") {
+        const dates = payment.locator(".checkout-mobile-promise");
+        await expect(dates).toBeVisible();
+        const postcode = page.getByLabel("Postcode");
+        await postcode.fill("HS1 2AA");
+        await expect(dates).toBeHidden();
+        await expect(postcode).toHaveAccessibleDescription("Online delivery isn’t available for this postcode.");
+        await postcode.fill("SW1A 1AA");
+        await expect(dates).toBeVisible();
       }
       expect(await rootWidth()).toBe(width);
       const postcode = page.getByLabel("Postcode");

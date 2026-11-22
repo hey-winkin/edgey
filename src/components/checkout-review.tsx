@@ -82,7 +82,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   const basket = priced?.basket;
   const corrections = priced?.corrections ?? [];
   const paymentQuoteNote = !pending && (corrections.length > 0 || shown?.status === "error");
-  const paymentDates = !pending && !corrections.length && basket && priced?.coverage === "covered" &&
+  const paymentDates = !corrections.length && basket && priced?.coverage === "covered" &&
     (priced.dispatchDate || priced.estimatedDeliveryDate) ? priced : null;
   const errors = response?.status === "invalid" ? response.errors : {};
   const unsupported = !pending && priced?.coverage === "unsupported";
@@ -461,7 +461,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
             </p>
           )}
           {paymentDates && (
-            <div className="checkout-mobile-promise">
+            <div className="checkout-mobile-promise" aria-hidden={pending || undefined}>
               <DispatchEstimate quote={paymentDates} onAccount={method === "net30"} datesOnly />
             </div>
           )}

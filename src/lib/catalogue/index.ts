@@ -95,9 +95,14 @@ export function variantLabel(variant: Variant): string {
 export function variantChoiceCue(variant: Variant, variants: Variant[]): string | undefined {
   const otherVariants = variants.filter(({ sku }) => sku !== variant.sku);
   for (const field of ["Blade type", "Offset"] as const) {
-    const value = variant.specs[field]?.trim();
-    if (value && otherVariants.some((other) => other.specs[field]?.trim() && other.specs[field].trim() !== value)) {
-      return field === "Offset" ? "Offset: " + value : value;
+    const value = variant.specs[field];
+    const cue = typeof value === "string" ? value.trim() : "";
+    if (cue && otherVariants.some((other) => {
+      const otherValue = other.specs[field];
+      const otherCue = typeof otherValue === "string" ? otherValue.trim() : "";
+      return otherCue && otherCue !== cue;
+    })) {
+      return field === "Offset" ? "Offset: " + cue : cue;
     }
   }
   for (const [field, unit] of [["shankMm", "mm shank"], ["diameterMm", "mm diameter"], ["bladeThicknessMm", "mm thick"]] as const) {

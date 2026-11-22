@@ -41,15 +41,17 @@ for (const theme of themes) {
     await expectControlBoundary(page.locator("main form input:not([type=hidden])"));
   });
 
-  test(`short desktop shows both cutting study links in ${theme}`, async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
+  test(`desktop shows both cutting study links at the tested folds in ${theme}`, async ({ page }) => {
     await saveThemeBeforeLoad(page, theme);
-    await page.goto("/");
-    const study = page.getByRole("region", { name: "Corrugated board", exact: true });
-    await expect(study.getByRole("link", { name: "View blade details" })).toBeInViewport({ ratio: 1 });
-    await expect(study.getByRole("link", { name: /See \d+ blades? for Corrugated board/ })).toBeInViewport({ ratio: 1 });
-    await expect(study.getByText("Owner-supplied specifications (unverified).")).toBeInViewport({ ratio: 1 });
-    expect((await page.locator(".search-field").first().boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    for (const [width, height] of [[1280, 800], [1440, 900]] as const) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      const study = page.getByRole("region", { name: "Corrugated board", exact: true });
+      await expect(study.getByRole("link", { name: "View blade details" })).toBeInViewport({ ratio: 1 });
+      await expect(study.getByRole("link", { name: /See \d+ blades? for Corrugated board/ })).toBeInViewport({ ratio: 1 });
+      await expect(study.getByText("Owner-supplied specifications (unverified).")).toBeInViewport({ ratio: 1 });
+      expect((await page.locator(".search-field").first().boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
   });
 }
 
