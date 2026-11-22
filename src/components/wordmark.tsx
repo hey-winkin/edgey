@@ -1,6 +1,10 @@
 // The wire wordmark, from the master in assets/edgey-wire.svg. The sprite is
 // rendered once in the root layout; every placement reuses it through #edgey
 // so the mark inherits the surrounding ink colour.
+const wireWidth = 400;
+const wireHeight = 141;
+const wireProjection = "matrix(1 -.022 -.105 1 16 17)";
+
 export function WordmarkSprite() {
   return (
     <svg aria-hidden="true" focusable="false" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
@@ -10,7 +14,10 @@ export function WordmarkSprite() {
 <g id="rear"><use href="#faces" transform="translate(6 -8)"/><path d="M64 56l6 -8 M19 56l6 -8 M55 62l6 -8 M64 72l6 -8 M19 44l6 -8 M48 44l6 -8 M10 30l6 -8 M57 78l6 -8 M121 0l6 -8 M138 0l6 -8 M138 83l6 -8 M122 83l6 -8 M122 76l6 -8 M121 26l6 -8 M82 29l6 -8 M95 66l6 -8 M116 36l6 -8 M198 20l6 -8 M214 20l6 -8 M153 98l6 -8 M162 87l6 -8 M198 75l6 -8 M198 27l6 -8 M157 31l6 -8 M171 65l6 -8 M193 37l6 -8 M201 104l6 -8 M289 56l6 -8 M244 56l6 -8 M280 62l6 -8 M289 72l6 -8 M244 44l6 -8 M273 44l6 -8 M235 30l6 -8 M282 78l6 -8 M299 20l6 -8 M317 20l6 -8 M334 63l6 -8 M350 20l6 -8 M368 20l6 -8 M306 110l6 -8 M306 95l6 -8 M325 82l6 -8 M340 88l6 -8"/></g>
 <mask id="outside" maskUnits="userSpaceOnUse" x="-12" y="-18" width="420" height="157"><rect x="-12" y="-18" width="420" height="157" fill="white"/><use href="#faces" fill="black"/></mask>
 <mask id="inside" maskUnits="userSpaceOnUse" x="-12" y="-18" width="420" height="157"><use href="#faces" fill="white"/></mask>
-<g id="edgey" transform="matrix(1 -.022 -.105 1 16 17)" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+<mask id="mast-proof-mask" maskContentUnits="objectBoundingBox">
+ <use href="#faces" fill="white" transform={`scale(${1 / wireWidth} ${1 / wireHeight}) ${wireProjection}`}/>
+</mask>
+<g id="edgey" transform={wireProjection} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
  <g mask="url(#outside)"><use href="#rear" strokeWidth="2.7"/></g>
  <g mask="url(#inside)"><use href="#rear" strokeWidth="1.7" strokeDasharray="2.5 4.8" opacity=".80"/></g>
  <use href="#faces" strokeWidth="3.15"/>
@@ -21,7 +28,7 @@ export function WordmarkSprite() {
 
 export function Wordmark() {
   return (
-    <svg className="wordmark" aria-hidden="true" viewBox="0 0 400 141">
+    <svg className="wordmark" aria-hidden="true" viewBox={`0 0 ${wireWidth} ${wireHeight}`}>
       <use href="#edgey" />
     </svg>
   );

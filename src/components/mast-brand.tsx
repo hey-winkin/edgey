@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MastProof } from "./mast-proof";
 import { Wordmark } from "./wordmark";
 
 export function MastHome({ staff = false }: { staff?: boolean }) {
@@ -15,6 +16,7 @@ export function MastHome({ staff = false }: { staff?: boolean }) {
 export function MastMark({ staff = false }: { staff?: boolean }) {
   return (
     <span className="mast-mark" aria-hidden="true">
+      {!staff && <MastProof />}
       <Wordmark />
       {staff && <span className="staff-identity">Staff</span>}
     </span>
