@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { loadEnvFile } from "node:process";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
+import { expectControlBoundary } from "../helpers/contrast";
 
 const storageKey = "edgey-storefront-selection-v1";
 
@@ -340,10 +341,10 @@ test("hands the reviewed order to hosted Checkout and can close the saved attemp
   await expect(page.getByRole("button", { name: "Resume payment" })).toHaveCount(0);
 });
 
-for (const width of [1440, 390, 320]) {
+for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 568]] as const) {
   for (const theme of ["dark", "light"] as const) {
     test(`selection and checkout fit ${width}px in ${theme} with visible keyboard focus`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 1440 ? 1080 : width === 390 ? 844 : 568 });
+      await page.setViewportSize({ width, height });
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.addInitScript((value) => localStorage.setItem("edgey-theme", value), theme);
       await page.goto("/blades/edg-z16");
@@ -357,10 +358,25 @@ for (const width of [1440, 390, 320]) {
       const checkout = tray.getByRole("link", { name: "Go to checkout" });
       await expect(checkout).toBeVisible();
       await expect(tray.getByRole("listitem")).toHaveCount(2);
+      await expectControlBoundary(tray.getByRole("spinbutton"));
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       expect(await tray.evaluate((el) => el.scrollWidth)).toBeLessThanOrEqual(await tray.evaluate((el) => el.clientWidth));
       const rootWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
       expect(await rootWidth()).toBe(width);
+
+      const pinned = [
+        tray.getByRole("button", { name: "Close basket" }),
+        checkout,
+        tray.getByRole("button", { name: "Continue browsing" }),
+      ];
+      for (const control of pinned) await expect(control).toBeInViewport({ ratio: 1 });
+      const details = tray.getByRole("region", { name: "Basket details" });
+      expect(await details.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+      await details.focus();
+      await page.keyboard.press("End");
+      await expect.poll(() => details.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+      expect(await tray.evaluate(el => el.scrollTop)).toBe(0);
+      for (const control of pinned) await expect(control).toBeInViewport({ ratio: 1 });
 
       const renderDir = process.env.EDGEY_CHECKOUT_RENDER_DIR;
       if (renderDir) {
@@ -372,9 +388,17 @@ for (const width of [1440, 390, 320]) {
         }
       }
       await checkout.click();
+      const summary = page.getByRole("region", { name: "Order summary" });
+      const edit = summary.getByRole("button", { name: "Edit basket" });
+      await expect(edit).toHaveCSS("text-decoration-line", "underline");
+      await expect(edit).toHaveCSS("min-height", "44px");
+      const payment = page.locator(".checkout-payment");
+      await expect(payment.getByRole("button", { name: "Continue to payment" })).toHaveAccessibleDescription(
+        "You’ll enter your card details on Stripe’s payment page.",
+      );
+      await expect(payment.getByText("Dispatch", { exact: true })).toHaveCount(0);
       if (width === 390 && theme === "dark") {
         const postcode = page.getByLabel("Postcode");
-        const summary = page.getByRole("region", { name: "Order summary" });
         await expect(summary).toContainText("£153.84");
         const top = () => postcode.evaluate((input) => input.getBoundingClientRect().top + window.scrollY);
         const originalTop = await top();
@@ -386,7 +410,28 @@ for (const width of [1440, 390, 320]) {
         await expect(postcode).toHaveAccessibleDescription("Enter a full UK postcode, for example SW1A 1AA.");
       }
       await fillAddress(page);
-      await expect(page.getByRole("region", { name: "Order summary" })).toContainText("Next working day");
+      await expect(summary).toContainText("Next working day");
+      await expectControlBoundary(page.locator(".checkout-field input:not([type=checkbox])"));
+      for (const label of ["Dispatch", "Estimated delivery"]) {
+        const date = payment.getByText(label, { exact: true });
+        if (width > 740) await expect(date).toBeHidden();
+        else {
+          await expect(date).toBeVisible();
+          const nextDate = "xpath=following-sibling::dd[1]";
+          const quotedDate = await summary.getByText(label, { exact: true }).locator(nextDate).innerText();
+          await expect(date.locator(nextDate)).toHaveText(quotedDate);
+        }
+      }
+      if (width === 390 && theme === "dark") {
+        const dates = payment.locator(".checkout-mobile-promise");
+        await expect(dates).toBeVisible();
+        const postcode = page.getByLabel("Postcode");
+        await postcode.fill("HS1 2AA");
+        await expect(dates).toBeHidden();
+        await expect(postcode).toHaveAccessibleDescription("Online delivery isn’t available for this postcode.");
+        await postcode.fill("SW1A 1AA");
+        await expect(dates).toBeVisible();
+      }
       expect(await rootWidth()).toBe(width);
       const postcode = page.getByLabel("Postcode");
       await postcode.press("Shift+Tab");

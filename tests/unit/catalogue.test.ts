@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildCatalogueView, productHref, queryValue, readFilters, referenceToolFit, type Family, type Variant } from "@/lib/catalogue";
+import { buildCatalogueView, productHref, queryValue, readFilters, referenceToolFit, variantChoiceCue, type Family, type Variant } from "@/lib/catalogue";
 import { unitPricePence, withVatPence } from "@/lib/catalogue/display-prices";
 
 const materials = ["vinyl", "textile"].map((slug, sortOrder) => ({ slug, name: slug, sortOrder, swatch: null }));
@@ -62,6 +62,15 @@ test("verified fit deduplicates heads and adapters, with a fallback to the recor
   expect(referenceToolFit(blade, [reference, { ...reference, code: "SECOND" }]))
     .toEqual(["HF VibraCut", "Adapter: 6 mm"]);
   expect(referenceToolFit(blade)).toEqual(["HF VibraCut (6 mm adapter)"]);
+});
+
+test("variant choice cues use distinguishing catalogue fields and do not infer use from the angle", () => {
+  const a = { ...family.variants[0]!, angleDeg: 45, specs: { "Blade type": "Standard drag", Offset: "0.25 mm" }, diameterMm: 1.5 };
+  const b = { ...family.variants[1]!, angleDeg: 60, specs: { "Blade type": "Wedge drag", Offset: "0.50 mm" }, diameterMm: 2 };
+  expect(variantChoiceCue(a, [a, b])).toBe("Standard drag");
+  expect(variantChoiceCue(a, [a, { ...b, specs: { ...b.specs, "Blade type": "Standard drag" } }])).toBe("Offset: 0.25 mm");
+  expect(variantChoiceCue(a, [a, { ...b, specs: a.specs }])).toBe("1.5 mm diameter");
+  expect(variantChoiceCue(a, [a, { ...b, specs: a.specs, diameterMm: 1.5 }])).toBeUndefined();
 });
 
 test("route inputs keep the first value, strip control characters and cap search length", () => {

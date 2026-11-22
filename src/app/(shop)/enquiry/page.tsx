@@ -38,6 +38,7 @@ export default async function EnquiryPage({ searchParams }: Props) {
     <RequestPage
       overline={delivery ? "Delivery enquiry" : "Compatibility enquiry"}
       title={delivery ? "Ask about delivery" : "Ask us to match this blade"}
+      balanceTitle={!delivery}
       intro={delivery ? "We’ll check which delivery options are available for your postcode and reply by email." : "Send us the details you have and we’ll reply by email to help you check the fit."}
     >
       <RequestForm

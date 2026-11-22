@@ -82,6 +82,8 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   const basket = priced?.basket;
   const corrections = priced?.corrections ?? [];
   const paymentQuoteNote = !pending && (corrections.length > 0 || shown?.status === "error");
+  const paymentDates = !corrections.length && basket && priced?.coverage === "covered" &&
+    (priced.dispatchDate || priced.estimatedDeliveryDate) ? priced : null;
   const errors = response?.status === "invalid" ? response.errors : {};
   const unsupported = !pending && priced?.coverage === "unsupported";
   const available = trade && "availableCreditPence" in trade ? trade.availableCreditPence : undefined;
@@ -453,8 +455,18 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
               </a>
             </p>
           )}
+          {method === "card" && (
+            <p id={id + "-card-handoff"} className="fine checkout-payment-note">
+              You’ll enter your card details on Stripe’s payment page.
+            </p>
+          )}
+          {paymentDates && (
+            <div className="checkout-mobile-promise" aria-hidden={pending || undefined}>
+              <DispatchEstimate quote={paymentDates} onAccount={method === "net30"} datesOnly />
+            </div>
+          )}
           <button type="submit" className="primary full" aria-disabled={submitting || undefined}
-            aria-describedby={paymentQuoteNote ? id + "-payment-quote-note" : undefined}
+            aria-describedby={paymentQuoteNote ? id + "-payment-quote-note" : method === "card" ? id + "-card-handoff" : undefined}
             disabled={!submitting && (pending || !basket || corrections.length > 0 || unsupported || (method === "net30" && !net30Allowed))}>
             {submitting ? "Checking checkout…" : method === "net30" ? "Place order on account" : "Continue to payment"}
           </button>

@@ -2,6 +2,10 @@
   margin-block-end: 1.65rem;
 }
 
+.balancedTitle {
+  text-wrap: balance;
+}
+
 .privacy {
   margin-block-start: 1.25rem;
   font-size: .88rem;
@@ -26,7 +30,7 @@
   min-width: 0;
   min-height: var(--edgey-field-height);
   padding: .5rem .75rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edgey-control-border);
   border-radius: 0;
   background: var(--edgey-field);
   color: inherit;
