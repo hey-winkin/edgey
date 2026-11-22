@@ -5,6 +5,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { requestTrapField } from "../../src/lib/requests/forms";
 import { scanBothThemes } from "../helpers/accessibility";
+import { expectControlBoundary } from "../helpers/contrast";
 
 test.use({ trace: "off" });
 
@@ -174,6 +175,11 @@ test("requires email verification and remembers an application as pending", asyn
       await isolatedContext.close();
     }
     const buyer = page.getByRole("textbox", { name: "Buyer name" });
+    const applicationFields = page.locator("main form input:not([type=hidden], [tabindex='-1'])");
+    await expectControlBoundary(applicationFields);
+    await switchTheme(page, "light");
+    await expectControlBoundary(applicationFields);
+    await switchTheme(page, "dark");
     const submit = page.getByRole("button", { name: "Submit application" });
     await submit.press("Enter");
     await expect(page.getByRole("heading", { name: "Check the form" })).toBeFocused();

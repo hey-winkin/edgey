@@ -5,11 +5,13 @@ import styles from "./request.module.css";
 export function RequestPage({
   overline,
   title,
+  balanceTitle,
   intro,
   children,
 }: {
   overline: string;
   title: string;
+  balanceTitle?: boolean;
   intro: ReactNode;
   children: ReactNode;
 }) {
@@ -21,7 +23,7 @@ export function RequestPage({
           <span className="register" aria-hidden="true" />
           {overline}
         </p>
-        <h1>{title}</h1>
+        <h1 className={balanceTitle ? styles.balancedTitle : undefined}>{title}</h1>
         <p className="muted">{intro}</p>
       </header>
       {availability.enabled ? (

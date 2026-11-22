@@ -1,5 +1,6 @@
 import { switchTheme } from "../helpers/navigation";
 import { expect, test } from "@playwright/test";
+import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
 
 test("restores the theme but resets the material proof and view on reload", async ({ page }) => {
   await page.goto("/preview/original-hero");
@@ -70,11 +71,17 @@ test("presents every ambiguous configuration, and a distinct SKU preselects the 
   await expect(page).toHaveURL(/\/blades\/edg-mim-45$/);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Choose the configuration");
+  const from = dialog.getByText("From £11.95 ex VAT per blade (£14.34 inc VAT (20%))");
+  await expect(from).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "45°", exact: true })).toHaveAccessibleDescription("Standard vinyl drag blade");
+  await expect(dialog.getByRole("button", { name: "60°", exact: true })).toHaveAccessibleDescription("Thick/reflective/flock drag blade");
   await expect(dialog.getByRole("button", { name: "45°", exact: true })).toHaveAttribute("aria-pressed", "false");
   await expect(dialog.getByRole("button", { name: "60°", exact: true })).toHaveAttribute("aria-pressed", "false");
   await dialog.getByRole("button", { name: "60°", exact: true }).click();
   await expect(page).toHaveURL(/variant=EDG-MIM-A60$/);
   await expect(dialog.getByRole("button", { name: "60°", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(from).toHaveCount(0);
   await page.goBack();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("searchbox")).toHaveValue("spb 0030");
@@ -84,6 +91,39 @@ test("presents every ambiguous configuration, and a distinct SKU preselects the 
   await family.click();
   await expect(page).toHaveURL(/variant=EDG-MIM-A45$/);
   await expect(dialog.getByRole("button", { name: "45°", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(from).toHaveCount(0);
+});
+
+test("product detail starts at the cheapest published single blade and doesn't infer an angle's use", async ({ page }) => {
+  const db = await connectAccountDb();
+  let fixture: Awaited<ReturnType<typeof createAccountCatalogue>> | undefined;
+  try {
+    fixture = await createAccountCatalogue(db);
+    await db.query("update public.variants set price_1_4_pence = 2250 where id = $1", [fixture.selected.id]);
+    await db.query("update public.variants set publication_status = 'draft', price_1_4_pence = 2150 where id = $1", [fixture.soldOut.id]);
+    await page.goto("/blades/" + fixture.available.sku.replace(/-45$/, "").toLowerCase());
+    const product = page.getByRole("region", { name: "Fit, availability and price" });
+    const options = product.getByRole("group", { name: "Variant" });
+    await expect(product).toContainText("From £22.50 ex VAT per blade (£27.00 inc VAT (20%))");
+    await expect(options.getByRole("button")).toHaveCount(2);
+    await expect(options.getByRole("button", { name: "45° drag blade" })).toHaveAccessibleDescription("");
+    const cheaper = options.getByRole("button", { name: "30° drag blade" });
+    await expect(cheaper).toHaveAccessibleDescription("");
+    await expect(cheaper).toHaveAttribute("aria-pressed", "false");
+    await cheaper.click();
+    await expect(product).not.toContainText("From £22.50");
+    await expect(product).toContainText("Total for 1 blade");
+  } finally {
+    try {
+      if (fixture) {
+        await db.query("delete from public.stock_movements where variant_id in (select id from public.variants where product_id = $1)", [fixture.productId]);
+        await db.query("delete from public.variants where product_id = $1", [fixture.productId]);
+        await db.query("delete from public.products where id = $1", [fixture.productId]);
+      }
+    } finally {
+      await db.end();
+    }
+  }
 });
 
 test("a search response does not overwrite newer typing", async ({ page }) => {

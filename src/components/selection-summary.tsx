@@ -60,14 +60,14 @@ export function formatDispatchDate(date: string) {
   return dateFormat.format(new Date(date + "T00:00:00Z"));
 }
 
-export function DispatchEstimate({ quote, onAccount = false }: { quote: Quote; onAccount?: boolean }) {
+export function DispatchEstimate({ quote, onAccount = false, datesOnly = false }: { quote: Quote; onAccount?: boolean; datesOnly?: boolean }) {
   const { coverage, dispatchDate, estimatedDeliveryDate } = quote;
   const deliveryDate = coverage === "unchecked" || coverage === "covered" ? estimatedDeliveryDate : null;
   const delivery = deliveryDate ? formatDispatchDate(deliveryDate)
     : coverage === "unsupported" ? "Ask us"
     : coverage === "invalid" ? "Enter a supported postcode"
     : null;
-  const service = coverage === "covered" ? quote.basket?.delivery.quote.serviceName : undefined;
+  const service = coverage === "covered" && !datesOnly ? quote.basket?.delivery.quote.serviceName : undefined;
   if (!dispatchDate && !delivery && !service) return null;
 
   return (

@@ -59,6 +59,7 @@
   padding: 7px 11px;
 }
 .admin textarea { resize: vertical; }
+.admin .staff-sign-in-fields :is(input:not([type=hidden]), select) { border-color: var(--edgey-control-border); }
 .admin-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .admin-muted { color: var(--muted); }
 .admin-table-scroll { overflow-x: auto; border: 1px solid var(--line); }

@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import {
   familySubstrates,
   productHref,
+  variantChoiceCue,
   variantFit,
   variantLabel,
   variantReference,
@@ -13,7 +14,7 @@ import {
   type Media,
   type Variant,
 } from "@/lib/catalogue";
-import { formatPence, PRICE_BREAKS, unitPricePence, VAT_RATE_PERCENT, withVatPence } from "@/lib/catalogue/display-prices";
+import { formatPence, incVatLabel, PRICE_BREAKS, unitPricePence, VAT_RATE_PERCENT, withVatPence } from "@/lib/catalogue/display-prices";
 import { MAX_ORDER_INTEGER } from "@/lib/checkout/validation";
 import { formatGbp } from "@/lib/commerce";
 import { useSelection } from "./selection-provider";
@@ -41,6 +42,9 @@ export function ProductDetail({
   const [sku, setSku] = useState(preselected?.sku ?? null);
   const [quantityInput, setQuantityInput] = useState("1");
   const variant = family.variants.find((candidate) => candidate.sku === sku) ?? null;
+  const startingNet = !variant && family.variants.length > 1
+    ? Math.min(...family.variants.map(({ prices }) => unitPricePence(prices, 1)))
+    : null;
   const media = variant?.media ?? family.media;
   const figureCode = variant?.sku ?? family.familyCode;
   const Heading = mode === "dialog" ? "h2" : "h1";
@@ -137,21 +141,34 @@ export function ProductDetail({
         </>}
       </dl>
 
+      {startingNet !== null && (
+        <p className="variant-start-price">
+          From <strong>{formatPence(startingNet)}</strong> ex VAT per blade <span className="fine">({incVatLabel(startingNet)})</span>
+        </p>
+      )}
       {family.variants.length > 1 && (
         <fieldset className="quantity-set">
           <legend>Variant</legend>
-          <div className="qty-options">
-            {family.variants.map((candidate) => (
-              <button
-                key={candidate.sku}
-                type="button"
-                aria-pressed={candidate.sku === sku}
-                onClick={() => choose(candidate)}
-              >
-                {variantLabel(candidate)}
-                {candidate.availability === "out_of_stock" && " · Out of stock"}
-              </button>
-            ))}
+          <div className={variant ? "qty-options" : "qty-options variant-options"}>
+            {family.variants.map((candidate, index) => {
+              const cue = !variant ? variantChoiceCue(candidate, family.variants) : undefined;
+              return (
+                <button
+                  key={candidate.sku}
+                  type="button"
+                  aria-pressed={candidate.sku === sku}
+                  aria-labelledby={id + "-variant-" + index}
+                  aria-describedby={cue ? id + "-cue-" + index : undefined}
+                  onClick={() => choose(candidate)}
+                >
+                  <span id={id + "-variant-" + index}>
+                    {variantLabel(candidate)}
+                    {candidate.availability === "out_of_stock" && " · Out of stock"}
+                  </span>
+                  {cue && <span className="variant-cue" id={id + "-cue-" + index}>{cue}</span>}
+                </button>
+              );
+            })}
           </div>
           {!variant && (
             <p className="choice-note" role="status">Choose the configuration that matches your holder.</p>

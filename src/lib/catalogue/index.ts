@@ -92,6 +92,22 @@ export function variantLabel(variant: Variant): string {
   return variant.optionLabel ?? variantFit(variant)[0] ?? variant.sku;
 }
 
+export function variantChoiceCue(variant: Variant, variants: Variant[]): string | undefined {
+  const otherVariants = variants.filter(({ sku }) => sku !== variant.sku);
+  for (const field of ["Blade type", "Offset"] as const) {
+    const value = variant.specs[field]?.trim();
+    if (value && otherVariants.some((other) => other.specs[field]?.trim() && other.specs[field].trim() !== value)) {
+      return field === "Offset" ? "Offset: " + value : value;
+    }
+  }
+  for (const [field, unit] of [["shankMm", "mm shank"], ["diameterMm", "mm diameter"], ["bladeThicknessMm", "mm thick"]] as const) {
+    const value = variant[field];
+    if (value !== null && otherVariants.some((other) => other[field] !== null && other[field] !== value)) {
+      return formatNumber(value) + " " + unit;
+    }
+  }
+}
+
 // "Zünd Z10 / 3910301": the approved machine reference for a variant.
 export function variantReference(variant: Variant): string | null {
   if (variant.compatibility.length === 0) return null;

@@ -27,7 +27,7 @@ export default async function StaffSignIn() {
     return (
       <>
         <AdminHeading title="Staff sign-in" description="Verify your authenticator before opening the staff desk." />
-        <div className="admin-panel admin-narrow">
+        <div className="admin-panel admin-narrow staff-sign-in-fields">
           {error || (staff.approvedFactor && !factors.length)
             ? <p role="alert">We couldn’t load your approved authenticator. Contact your Edgey administrator.</p>
             : <StaffAuthenticator factors={factors.map(({ id, friendly_name }) => ({ id, label: friendly_name }))} />}
@@ -39,7 +39,7 @@ export default async function StaffSignIn() {
   return (
     <>
       <AdminHeading title="Staff sign-in" description="Use the account issued to you for Edgey operations." />
-      <div className="admin-panel admin-narrow">
+      <div className="admin-panel admin-narrow staff-sign-in-fields">
         <AdminForm action={signInStaff} submit="Sign in">
           <AdminField label="Work email"><input type="email" name="email" autoComplete="username" maxLength={254} required /></AdminField>
           <AdminField label="Password"><input type="password" name="password" autoComplete="current-password" maxLength={128} required /></AdminField>
