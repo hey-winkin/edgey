@@ -3,6 +3,7 @@ import { brandHref } from "@/lib/catalogue";
 import { getNavigationBrands } from "@/lib/catalogue/navigation-brands";
 import { FoldNavigation } from "./fold-navigation";
 import { MastHome, MastMark } from "./mast-brand";
+import { MastProofControl } from "./mast-proof";
 import { MastSearch } from "./mast-search";
 import { SelectionTrigger } from "./selection-dialog";
 import { ThemeSwitch } from "./theme-switch";
@@ -37,7 +38,9 @@ export async function Masthead() {
             { label: "Account", href: "/account" },
             { label: "Privacy", href: "/privacy" },
           ] },
-        ]} />
+        ]}>
+          <MastProofControl />
+        </FoldNavigation>
         <div className="nav-tools">
           <ThemeSwitch />
           <SelectionTrigger />

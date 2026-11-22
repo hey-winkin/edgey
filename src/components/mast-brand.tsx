@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { MastProof } from "./mast-proof";
-import { Wordmark } from "./wordmark";
+import type { CSSProperties } from "react";
+import { MastProofWash } from "./mast-proof";
+import { Wordmark, mastProofMask } from "./wordmark";
 
 export function MastHome({ staff = false }: { staff?: boolean }) {
   const label = staff ? "Staff desk" : "Edgey home";
@@ -16,7 +17,11 @@ export function MastHome({ staff = false }: { staff?: boolean }) {
 export function MastMark({ staff = false }: { staff?: boolean }) {
   return (
     <span className="mast-mark" aria-hidden="true">
-      {!staff && <MastProof />}
+      {!staff && (
+        <span className="mast-proof" style={{ "--mast-proof-mask": mastProofMask } as CSSProperties}>
+          <MastProofWash />
+        </span>
+      )}
       <Wordmark />
       {staff && <span className="staff-identity">Staff</span>}
     </span>

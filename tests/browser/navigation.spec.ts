@@ -139,7 +139,8 @@ test("the proof drifts slowly while the mark and magnifier stay in place", async
   await expect(mark).toHaveCSS("transform", "none");
   expect(await outline.boundingBox()).toEqual(bounds);
   await expect(menu(page).locator(".fold-chevron")).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
-  await expect(page.locator(".fold-panel")).toHaveCSS("animation-duration", "0.14s");
+  await expect(page.locator(".fold-inner")).toHaveCSS("animation-duration", "0.14s");
+  await expect(page.locator(".fold-panel")).toHaveCSS("opacity", "1");
   await expect(page.locator(".fold-panel")).toHaveCSS("clip-path", "none");
   await menu(page).press("Escape");
   expect(await outline.boundingBox()).toEqual(bounds);
@@ -186,6 +187,30 @@ test("the proof pauses on visibility change and resumes from the same phase", as
   await expect.poll(phase).toBeGreaterThan(paused.phase);
 });
 
+test("the shop menu can pause and resume logo motion across reloads", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/contact");
+  const wash = menu(page).locator(".mast-proof-wash");
+  await expect(wash).toHaveCSS("animation-play-state", "running");
+  await menu(page).press("Enter");
+  const pause = page.getByRole("checkbox", { name: "Pause logo motion" });
+  await expect(pause).not.toBeChecked();
+  await pause.press("Space");
+  await expect(pause).toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await pause.press("Escape");
+  await expect(shopNav(page)).toBeHidden();
+  await expect(menu(page)).toBeFocused();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await page.reload();
+  await menu(page).press("Enter");
+  await expect(pause).toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await pause.press("Space");
+  await expect(pause).not.toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "running");
+});
+
 test("the theme switch exposes its state and saves a keyboard toggle on a narrow phone", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/contact");
@@ -224,6 +249,7 @@ test.describe("without JavaScript", () => {
     await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-play-state", "paused");
     await menu(page).press("Enter");
     await expect(shopNav(page)).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Pause logo motion" })).toBeHidden();
     await shopNav(page).getByRole("link", { name: "Mimaki" }).click();
     await expect(page.getByRole("heading", { name: "Mimaki blade references" })).toBeVisible();
     await expect(shopNav(page)).toBeHidden();
@@ -305,7 +331,8 @@ for (const theme of themes) {
       expect(Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2)).toBeLessThan(9);
       await capture(page, `shop-closed-${theme}-${viewport.width}`);
       await menu(page).click();
-      await expect(page.locator(".fold-panel")).toHaveCSS("animation-name", "none");
+      await expect(page.locator(".fold-inner")).toHaveCSS("animation-name", "none");
+      await expect(page.getByRole("checkbox", { name: "Pause logo motion" })).toBeHidden();
       await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "none");
       const panel = await page.locator(".fold-panel").boundingBox();
       if (viewport.width < 741) expect(panel!.y + panel!.height).toBeCloseTo(viewport.height, 0);

@@ -105,16 +105,35 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   flex: none;
 }
 .mast-mark .wordmark { position: relative; width: 100%; }
-.mast-proof { display: none; }
-@supports (mask-image: url("#mast-proof-mask")) {
+.mast-proof, .mast-proof-control { display: none; }
+@supports (mask-image: none) {
   .mast-proof {
     display: block;
     position: absolute;
     inset: 0;
-    mask-image: url("#mast-proof-mask");
+    mask-image: var(--mast-proof-mask);
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
     overflow: hidden;
     pointer-events: none;
-    opacity: .38;
+    opacity: .42;
+  }
+}
+@supports (mask-image: none) and selector(:has(*)) {
+  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    .mast-proof-control:not([hidden]) {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      margin-block-start: 8px;
+      color: var(--muted);
+      font-size: .89rem;
+      cursor: pointer;
+    }
+    .mast-proof-wash { animation: mast-proof-drift 16s ease-in-out infinite alternate paused; }
+    .mast-proof-wash[data-visible] { animation-play-state: running; }
+    .shop-mast:has(.mast-proof-pause:checked) .mast-proof-wash { animation-play-state: paused; }
   }
 }
 [data-theme="light"] .mast-proof { opacity: .55; }
@@ -180,15 +199,11 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   border-bottom: 1px solid var(--line);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .fold[open] .fold-panel { animation: fold-reveal 140ms ease-out; }
+  .fold[open] .fold-inner { animation: fold-reveal 140ms ease-out; }
   .fold-chevron { transition: transform 140ms ease-out; }
   .mast-search svg { transition: opacity 120ms ease-out; }
 }
-@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  .mast-proof-wash { animation: mast-proof-drift 16s ease-in-out infinite alternate paused; }
-  .mast-proof-wash[data-visible] { animation-play-state: running; }
-}
-@keyframes fold-reveal { from { opacity: .72; } }
+@keyframes fold-reveal { from { opacity: .8; } }
 @keyframes mast-proof-drift {
   from { transform: translateX(-42%); }
   to { transform: translateX(0); }
