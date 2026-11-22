@@ -127,9 +127,10 @@ test("the proof drifts slowly while the mark and magnifier stay in place", async
   const wash = mark.locator(".mast-proof-wash");
   await expect(outline).toHaveCSS("animation-name", "none");
   await expect(outline).toHaveCSS("clip-path", "none");
-  await expect(wash).toHaveCSS("animation-play-state", "running");
-  await expect(wash).toHaveCSS("animation-duration", "16s");
-  await expect(wash).toHaveCSS("animation-direction", "alternate");
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
+  await expect(wash).toHaveCSS("animation-duration", "14s");
+  await expect(wash).toHaveCSS("animation-direction", "normal");
+  await expect(wash).toHaveCSS("animation-iteration-count", "infinite");
   await expect(wash).toHaveCSS("animation-timing-function", "ease-in-out");
   const driftStart = await wash.evaluate(async (node) => (await node.getAnimations()[0]?.ready)?.startTime);
   expect(driftStart).toEqual(expect.any(Number));
@@ -163,52 +164,84 @@ test("the proof drifts slowly while the mark and magnifier stay in place", async
   await page.mouse.up();
 });
 
-test("the proof pauses on visibility change and resumes from the same phase", async ({ page }) => {
+test("proof colour fades at both ends of the 30% window and leaves plain wire in the rest", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/contact");
   const wash = menu(page).locator(".mast-proof-wash");
-  const phase = () => wash.evaluate((node) => Number(node.getAnimations()[0]?.currentTime));
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
+  const samples = await wash.evaluate(async (node) => {
+    const motion = node.getAnimations()[0];
+    if (!motion) throw new Error("Proof animation is missing");
+    motion.pause();
+    await motion.ready;
+    return [0, 2100, 2450, 2800, 4200, 5600, 5950, 6300, 10000, 13999, 14000].map((time) => {
+      motion.currentTime = time;
+      const style = getComputedStyle(node);
+      return { opacity: Number(style.opacity), offset: new DOMMatrix(style.transform).e };
+    });
+  });
+  expect(samples.filter((_, index) => index !== 2 && index !== 6).map(({ opacity }) => opacity))
+    .toEqual([0, 0, 1, 1, 1, 0, 0, 0, 0]);
+  expect(samples[2]!.opacity).toBeCloseTo(.5, 2);
+  expect(samples[6]!.opacity).toBeCloseTo(.5, 2);
+  expect(samples[3]!.offset).toBeLessThan(samples[4]!.offset);
+  expect(samples[4]!.offset).toBeLessThan(samples[5]!.offset);
+  expect(samples[10]).toEqual(samples[0]);
+});
+
+test("hiding the tab clears an active proof pass and returning starts on plain wire", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/contact");
+  const wash = menu(page).locator(".mast-proof-wash");
   const setVisibility = (value: DocumentVisibilityState) => page.evaluate((state) => {
     Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
   }, value);
-  await expect.poll(phase).toBeGreaterThan(50);
-  await setVisibility("hidden");
-  const paused = await wash.evaluate(async (node) => {
-    const motion = await node.getAnimations()[0]?.ready;
-    return { state: motion?.playState, phase: Number(motion?.currentTime) };
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
+  await wash.evaluate((node) => {
+    const motion = node.getAnimations()[0];
+    if (motion) motion.currentTime = 4200;
   });
-  expect(paused.state).toBe("paused");
-  await page.evaluate(() => new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  ));
-  expect(await phase()).toBe(paused.phase);
+  await expect(wash).toHaveCSS("opacity", "1");
+  await setVisibility("hidden");
+  await expect(wash).toHaveCSS("animation-name", "none");
+  await expect(wash).toHaveCSS("opacity", "0");
   await setVisibility("visible");
-  await expect.poll(phase).toBeGreaterThan(paused.phase);
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
+  expect(await wash.evaluate((node) => Number(node.getAnimations()[0]?.currentTime))).toBeLessThan(2100);
+  await expect(wash).toHaveCSS("opacity", "0");
 });
 
 test("the shop menu can pause and resume logo motion across reloads", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/contact");
   const wash = menu(page).locator(".mast-proof-wash");
-  await expect(wash).toHaveCSS("animation-play-state", "running");
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
   await menu(page).press("Enter");
   const pause = page.getByRole("checkbox", { name: "Pause logo motion" });
   await expect(pause).not.toBeChecked();
+  await wash.evaluate((node) => {
+    const motion = node.getAnimations()[0];
+    if (motion) motion.currentTime = 4200;
+  });
+  await expect(wash).toHaveCSS("opacity", "1");
   await pause.press("Space");
   await expect(pause).toBeChecked();
-  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await expect(wash).toHaveCSS("animation-name", "none");
+  await expect(wash).toHaveCSS("opacity", "0");
   await pause.press("Escape");
   await expect(shopNav(page)).toBeHidden();
   await expect(menu(page)).toBeFocused();
-  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await expect(wash).toHaveCSS("opacity", "0");
   await page.reload();
   await menu(page).press("Enter");
   await expect(pause).toBeChecked();
-  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await expect(wash).toHaveCSS("animation-name", "none");
+  await expect(wash).toHaveCSS("opacity", "0");
   await pause.press("Space");
   await expect(pause).not.toBeChecked();
-  await expect(wash).toHaveCSS("animation-play-state", "running");
+  await expect(wash).toHaveCSS("animation-name", "mast-proof-drift");
+  await expect(wash).toHaveCSS("opacity", "0");
 });
 
 test("the theme switch exposes its state and saves a keyboard toggle on a narrow phone", async ({ page }) => {
@@ -231,6 +264,8 @@ test("the active theme icon and wire outline remain distinct in forced colours",
   await page.emulateMedia({ forcedColors: "active" });
   await page.goto("/contact");
   await expect(menu(page).locator(".mast-proof")).toHaveCSS("display", "none");
+  await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-name", "none");
+  await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("opacity", "0");
   await expect(menu(page).locator(".wordmark")).toBeVisible();
   const toggle = page.getByRole("switch", { name: "Light theme", exact: true });
   await expect(toggle.locator(".moon-symbol")).toHaveCSS("forced-color-adjust", "none");
@@ -246,7 +281,8 @@ test.describe("without JavaScript", () => {
   test("native menu and public links remain usable", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/enquiry");
-    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-play-state", "paused");
+    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-name", "none");
+    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("opacity", "0");
     await menu(page).press("Enter");
     await expect(shopNav(page)).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Pause logo motion" })).toBeHidden();
@@ -319,8 +355,8 @@ for (const theme of themes) {
     await page.goto("/brands/mimaki");
     await expect(menu(page)).toHaveAttribute("aria-label", "Edgey shop menu");
     await expect(menu(page).locator(".wordmark")).toHaveCSS("animation-name", "none");
-    await expect(menu(page).locator(".mast-proof")).toBeVisible();
     await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-name", "none");
+    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("opacity", "0");
     await page.getByRole("link", { name: "Search blades" }).hover();
     await expect(page.locator(".mast-search svg")).toHaveCSS("transform", "none");
     await page.mouse.move(0, 0);
