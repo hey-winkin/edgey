@@ -119,32 +119,96 @@ test("keyboard dismissal keeps focus and navigation does not move the layout", a
   await expect(shopNav(page)).toBeHidden();
 });
 
-test("the wordmark reveals once, reacts to the menu, and the magnifier responds to hover, focus and press", async ({ page }) => {
+test("the proof drifts slowly while the mark and magnifier stay in place", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/contact");
-  const mark = menu(page).locator(".wordmark");
-  await expect(mark).toHaveCSS("animation-name", "trace-mark");
-  await expect(mark).toHaveCSS("animation-iteration-count", "1");
-  await expect(mark).toHaveCSS("animation-duration", "0.36s");
+  const mark = menu(page).locator(".mast-mark");
+  const outline = mark.locator(".wordmark");
+  const wash = mark.locator(".mast-proof-wash");
+  await expect(outline).toHaveCSS("animation-name", "none");
+  await expect(outline).toHaveCSS("clip-path", "none");
+  await expect(wash).toHaveCSS("animation-play-state", "running");
+  await expect(wash).toHaveCSS("animation-duration", "16s");
+  await expect(wash).toHaveCSS("animation-direction", "alternate");
+  await expect(wash).toHaveCSS("animation-timing-function", "ease-in-out");
+  const driftStart = await wash.evaluate(async (node) => (await node.getAnimations()[0]?.ready)?.startTime);
+  expect(driftStart).toEqual(expect.any(Number));
+  const bounds = await outline.boundingBox();
   await menu(page).click();
-  await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, -2)");
+  await expect(outline).toHaveCSS("transform", "none");
+  await expect(mark).toHaveCSS("transform", "none");
+  expect(await outline.boundingBox()).toEqual(bounds);
   await expect(menu(page).locator(".fold-chevron")).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
+  await expect(page.locator(".fold-inner")).toHaveCSS("animation-duration", "0.14s");
+  await expect(page.locator(".fold-panel")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".fold-panel")).toHaveCSS("clip-path", "none");
   await menu(page).press("Escape");
-  await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "none");
+  expect(await outline.boundingBox()).toEqual(bounds);
+  expect(await wash.evaluate((node) => node.getAnimations()[0]?.startTime)).toBe(driftStart);
 
   const search = page.getByRole("link", { name: "Search blades", exact: true });
   const icon = search.locator("svg");
   await page.keyboard.press("Shift+Tab");
   await expect(search).toBeFocused();
-  await expect(icon).not.toHaveCSS("transform", "none");
-  await page.keyboard.press("Shift+Tab");
+  await expect(icon).toHaveCSS("opacity", "0.78");
   await expect(icon).toHaveCSS("transform", "none");
+  await page.keyboard.press("Shift+Tab");
+  await expect(icon).toHaveCSS("opacity", "1");
   await search.hover();
-  await expect.poll(() => icon.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeGreaterThan(1);
+  await expect(icon).toHaveCSS("opacity", "0.78");
   await page.mouse.down();
-  await expect.poll(() => icon.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeLessThan(.9);
+  await expect(icon).toHaveCSS("opacity", "0.58");
+  await expect(icon).toHaveCSS("transform", "none");
   await page.mouse.move(8, 100);
   await page.mouse.up();
+});
+
+test("the proof pauses on visibility change and resumes from the same phase", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/contact");
+  const wash = menu(page).locator(".mast-proof-wash");
+  const phase = () => wash.evaluate((node) => Number(node.getAnimations()[0]?.currentTime));
+  const setVisibility = (value: DocumentVisibilityState) => page.evaluate((state) => {
+    Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, value);
+  await expect.poll(phase).toBeGreaterThan(50);
+  await setVisibility("hidden");
+  const paused = await wash.evaluate(async (node) => {
+    const motion = await node.getAnimations()[0]?.ready;
+    return { state: motion?.playState, phase: Number(motion?.currentTime) };
+  });
+  expect(paused.state).toBe("paused");
+  await page.evaluate(() => new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  ));
+  expect(await phase()).toBe(paused.phase);
+  await setVisibility("visible");
+  await expect.poll(phase).toBeGreaterThan(paused.phase);
+});
+
+test("the shop menu can pause and resume logo motion across reloads", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/contact");
+  const wash = menu(page).locator(".mast-proof-wash");
+  await expect(wash).toHaveCSS("animation-play-state", "running");
+  await menu(page).press("Enter");
+  const pause = page.getByRole("checkbox", { name: "Pause logo motion" });
+  await expect(pause).not.toBeChecked();
+  await pause.press("Space");
+  await expect(pause).toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await pause.press("Escape");
+  await expect(shopNav(page)).toBeHidden();
+  await expect(menu(page)).toBeFocused();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await page.reload();
+  await menu(page).press("Enter");
+  await expect(pause).toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "paused");
+  await pause.press("Space");
+  await expect(pause).not.toBeChecked();
+  await expect(wash).toHaveCSS("animation-play-state", "running");
 });
 
 test("the theme switch exposes its state and saves a keyboard toggle on a narrow phone", async ({ page }) => {
@@ -163,9 +227,11 @@ test("the theme switch exposes its state and saves a keyboard toggle on a narrow
   await expect(toggle).toHaveAttribute("aria-checked", "false");
 });
 
-test("the active theme icon remains distinct in forced colours", async ({ page }) => {
+test("the active theme icon and wire outline remain distinct in forced colours", async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active" });
   await page.goto("/contact");
+  await expect(menu(page).locator(".mast-proof")).toHaveCSS("display", "none");
+  await expect(menu(page).locator(".wordmark")).toBeVisible();
   const toggle = page.getByRole("switch", { name: "Light theme", exact: true });
   await expect(toggle.locator(".moon-symbol")).toHaveCSS("forced-color-adjust", "none");
   await expect(toggle.locator(".sun-symbol")).not.toHaveCSS("forced-color-adjust", "none");
@@ -178,9 +244,12 @@ test("the active theme icon remains distinct in forced colours", async ({ page }
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
   test("native menu and public links remain usable", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/enquiry");
+    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-play-state", "paused");
     await menu(page).press("Enter");
     await expect(shopNav(page)).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Pause logo motion" })).toBeHidden();
     await shopNav(page).getByRole("link", { name: "Mimaki" }).click();
     await expect(page.getByRole("heading", { name: "Mimaki blade references" })).toBeVisible();
     await expect(shopNav(page)).toBeHidden();
@@ -250,6 +319,8 @@ for (const theme of themes) {
     await page.goto("/brands/mimaki");
     await expect(menu(page)).toHaveAttribute("aria-label", "Edgey shop menu");
     await expect(menu(page).locator(".wordmark")).toHaveCSS("animation-name", "none");
+    await expect(menu(page).locator(".mast-proof")).toBeVisible();
+    await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("animation-name", "none");
     await page.getByRole("link", { name: "Search blades" }).hover();
     await expect(page.locator(".mast-search svg")).toHaveCSS("transform", "none");
     await page.mouse.move(0, 0);
@@ -260,7 +331,8 @@ for (const theme of themes) {
       expect(Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2)).toBeLessThan(9);
       await capture(page, `shop-closed-${theme}-${viewport.width}`);
       await menu(page).click();
-      await expect(page.locator(".fold-panel")).toHaveCSS("animation-name", "none");
+      await expect(page.locator(".fold-inner")).toHaveCSS("animation-name", "none");
+      await expect(page.getByRole("checkbox", { name: "Pause logo motion" })).toBeHidden();
       await expect(menu(page).locator(".mast-mark")).toHaveCSS("transform", "none");
       const panel = await page.locator(".fold-panel").boundingBox();
       if (viewport.width < 741) expect(panel!.y + panel!.height).toBeCloseTo(viewport.height, 0);
@@ -282,6 +354,7 @@ test.describe("staff shell", () => {
       await expect(page.locator(".shop-mast, .site-footer, #selection-trigger")).toHaveCount(0);
       await expect(staffMenu(page)).toHaveCount(0);
       await expect(page.locator(".mast-brand-static .staff-identity")).toHaveText("Staff");
+      await expect(page.locator(".mast-proof")).toHaveCount(0);
       await expect(page.getByRole("link", { name: "Staff desk", exact: true })).toHaveAttribute("href", "/admin");
       await expect(page.getByRole("link", { name: "View shop" })).toHaveAttribute("href", "/");
     }

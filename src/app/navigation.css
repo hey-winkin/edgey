@@ -57,11 +57,11 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   stroke-linejoin: round;
   flex-shrink: 0;
 }
-.mast-search:focus-visible svg { transform: rotate(-14deg) scale(1.13); }
+.mast-search:focus-visible svg { opacity: .78; }
 @media (hover: hover) {
-  .mast-search:hover svg { transform: rotate(-14deg) scale(1.13); }
+  .mast-search:hover svg { opacity: .78; }
 }
-.mast-search:active svg { transform: rotate(-14deg) scale(.87); }
+.mast-search:active svg { opacity: .58; }
 .theme-track {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -97,13 +97,56 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   }
 }
 .mast-mark {
+  position: relative;
   display: grid;
   justify-items: center;
   width: var(--edgey-wordmark-header-width);
   max-width: 100%;
   flex: none;
 }
-.mast-mark .wordmark { width: 100%; }
+.mast-mark .wordmark { position: relative; width: 100%; }
+.mast-proof, .mast-proof-control { display: none; }
+@supports (mask-image: none) {
+  .mast-proof {
+    display: block;
+    position: absolute;
+    inset: 0;
+    mask-image: var(--mast-proof-mask);
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: .42;
+  }
+}
+@supports (mask-image: none) and selector(:has(*)) {
+  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    .mast-proof-control:not([hidden]) {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      margin-block-start: 8px;
+      color: var(--muted);
+      font-size: .89rem;
+      cursor: pointer;
+    }
+    .mast-proof-wash { animation: mast-proof-drift 16s ease-in-out infinite alternate paused; }
+    .mast-proof-wash[data-visible] { animation-play-state: running; }
+    .shop-mast:has(.mast-proof-pause:checked) .mast-proof-wash { animation-play-state: paused; }
+  }
+}
+[data-theme="light"] .mast-proof { opacity: .55; }
+.mast-proof-wash {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 175%;
+  background: linear-gradient(105deg, #91cbf0 12%, #abd7f1 32%, #d1cf17 52%, #f7ba8f 73%, #ffb08c 88%);
+  transform: translateX(-21%);
+}
+@media (forced-colors: active) {
+  .mast-proof { display: none; }
+}
 .staff-identity {
   color: var(--muted);
   font: 600 .72rem/1.4 var(--mono);
@@ -137,7 +180,6 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   stroke-linejoin: round;
 }
 .fold[open] .fold-chevron { transform: rotate(180deg); }
-.fold[open] .mast-mark { transform: translateY(-2px); }
 .fold[open] .fold-toggle, .fold-toggle:hover { border-color: var(--line); background: var(--panel); }
 .fold:not([open]) > :not(summary) { display: none; }
 .fold-backdrop, .fold-panel { position: fixed; inset: var(--mast-height) 0 auto; }
@@ -157,14 +199,14 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   border-bottom: 1px solid var(--line);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .fold[open] .fold-panel { animation: fold-reveal 180ms cubic-bezier(.2, .7, .3, 1) both; }
-  .mast-mark .wordmark { animation: trace-mark 360ms cubic-bezier(.22, .62, .32, 1) backwards; }
-  .fold-chevron, .fold-toggle .mast-mark, .mast-search svg { transition: transform 145ms ease-out; }
+  .fold[open] .fold-inner { animation: fold-reveal 140ms ease-out; }
+  .fold-chevron { transition: transform 140ms ease-out; }
+  .mast-search svg { transition: opacity 120ms ease-out; }
 }
-@keyframes fold-reveal { from { clip-path: inset(0 0 100%); } to { clip-path: inset(0); } }
-@keyframes trace-mark { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
-@media (prefers-reduced-motion: reduce) {
-  .fold[open] .mast-mark, .mast-search svg, .mast-search:is(:hover, :focus-visible, :active) svg { transform: none; }
+@keyframes fold-reveal { from { opacity: .8; } }
+@keyframes mast-proof-drift {
+  from { transform: translateX(-42%); }
+  to { transform: translateX(0); }
 }
 .fold-inner { padding-block: 18px 26px; }
 .fold-index { color: var(--muted); padding-bottom: 14px; }
