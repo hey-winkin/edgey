@@ -101,7 +101,7 @@ describe("selection quote", () => {
     }
   });
 
-  it.each([[14999, 695, "£0.01 more ex VAT for free delivery"], [15000, 0, "Your selection qualifies for free delivery."]])(
+  it.each([[14999, 695, "£0.01 more ex VAT for free delivery"], [15000, 0, "Your basket qualifies for free delivery."]])(
     "quotes standard delivery at %i pence goods net", async (pence, delivery, message) => {
       const variant = { ...z10, tierPrices: { oneToFour: pence, fiveToNine: pence, tenPlus: pence } };
       const quote = ok(await quoteSelectionWith([line(1)], undefined, dependencies([variant])));
@@ -128,8 +128,8 @@ describe("selection quote", () => {
     expect(quote.lines).toEqual([line(4)]);
     expect(quote.corrections).toEqual([
       "EDG-Z10: limited stock. We’ve suggested a smaller quantity for you to review.",
-      "An unavailable item was removed from your selection.",
-      "EDG-SECOND is out of stock and was removed from your selection.",
+      "An unavailable item was removed from your basket.",
+      "EDG-SECOND is out of stock and was removed from your basket.",
     ]);
     expect(quote.basket?.lines).toMatchObject([{ quantity: 4, unitNetPence: 2250, savingPrompt: null }]);
     expect(quote.photos).toEqual({ [z10Id]: "drag.webp" });

@@ -41,7 +41,7 @@ export async function quoteSelectionAndTermsWith(
 ): Promise<Extract<QuoteResult, { status: "error" }> |
   { quote: Extract<QuoteResult, { status: "ok" }>; terms: DeliveryTerms | null }> {
   const requested = normaliseLines(input);
-  if (!requested) return { status: "error", message: "Check that your selection contains valid items and whole quantities." };
+  if (!requested) return { status: "error", message: "Check that your basket contains valid items and whole quantities." };
 
   let coverage: Extract<QuoteResult, { status: "ok" }>["coverage"] = "unchecked";
   let postcode: string | undefined;
@@ -84,13 +84,13 @@ export async function quoteSelectionAndTermsWith(
   for (const line of requested) {
     const variant = variants.get(line.variantId);
     if (!variant) {
-      corrections.push("An unavailable item was removed from your selection.");
+      corrections.push("An unavailable item was removed from your basket.");
       continue;
     }
 
     const quantity = Math.min(line.quantity, variant.availableQuantity);
     if (quantity === 0) {
-      corrections.push(`${variant.sku} is out of stock and was removed from your selection.`);
+      corrections.push(`${variant.sku} is out of stock and was removed from your basket.`);
       continue;
     }
     if (quantity < line.quantity) {
@@ -110,14 +110,14 @@ export async function quoteSelectionAndTermsWith(
     if (!calculated.ok) return { status: "error", message: quoteUnavailable };
     basket = calculated.value;
     if (basket.totalGrossPence > MAX_ORDER_INTEGER) {
-      return { status: "error", message: "This selection exceeds the checkout limit. Reduce the quantities and try again." };
+      return { status: "error", message: "Your basket exceeds the checkout limit. Reduce the quantities and try again." };
     }
 
     const progress = basket.delivery.freeDeliveryProgress;
     if ((coverage === "covered" || coverage === "unchecked") && progress) {
       freeDeliveryMessage = progress.remainingPence > 0
         ? `${formatGbp(progress.remainingPence)} more ex VAT for free delivery`
-        : "Your selection qualifies for free delivery.";
+        : "Your basket qualifies for free delivery.";
     }
 
     const instant = now();

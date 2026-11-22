@@ -163,7 +163,7 @@ async function openReservedPayment(order: Order, items: Awaited<ReturnType<typeo
   if (!session && !order.stripe_checkout_started_at && !order.checkout_session_id) {
     const closed = await closeUnboundCheckout(order, undefined, true);
     if (closed.fulfilment_status === "cancelled" && !closed.paid_pence) {
-      throw new CheckoutUnavailableError("This payment attempt has closed. Review your selection and try again.", true);
+      throw new CheckoutUnavailableError("This payment attempt has closed. Review your basket and try again.", true);
     }
   }
   if (!session) throw new CheckoutUnavailableError("Payment could not be resumed. Please try again shortly.");

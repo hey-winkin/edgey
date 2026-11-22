@@ -174,7 +174,7 @@ for (const theme of themes) {
       await expect(priceBreaks).toHaveAttribute("tabindex", "0");
       await expect(references).toHaveAttribute("tabindex", "0");
       if (width === 320) {
-        const add = page.getByRole("button", { name: "Add to selection" });
+        const add = page.getByRole("button", { name: "Add to basket" });
         await expect(add).toBeEnabled();
         await add.focus();
         await page.keyboard.press("Tab");
@@ -203,12 +203,12 @@ for (const theme of themes) {
       if (width === 320) {
         await test.step("Compact product and selection dialogs and checkout at 200%", async () => {
           await page.locator("html").evaluate((html) => { html.style.fontSize = "200%"; });
-          const add = dialog.getByRole("button", { name: "Add to selection" });
+          const add = dialog.getByRole("button", { name: "Add to basket" });
           await expect(add).toBeEnabled();
           expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
           await scanAccessibility(page, theme);
           await add.click();
-          const selection = page.getByRole("dialog", { name: "Your selection" });
+          const selection = page.getByRole("dialog", { name: "Your basket" });
           await expect(selection.getByRole("button", { name: "Remove EDG-Z10" })).toBeVisible();
           expect(await selection.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
           await scanAccessibility(page, theme);
@@ -229,7 +229,7 @@ test("proof names and the populated masthead fit at 320px with enlarged text", a
     localStorage.setItem("edgey-storefront-selection-v1", '{"42e5ce02-4d5e-5c39-9f1b-f76c46c8b386":200}');
   });
   await page.goto("/preview/original-hero");
-  const selection = page.getByRole("button", { name: "Selection 200 blades" });
+  const selection = page.getByRole("button", { name: "Basket 200 blades" });
   await expect(selection).toBeVisible();
   const names = page.locator(".proof-option span");
   await expect(names).toHaveText(["Prism", "Coral", "Glacier", "Citron", "Violet"]);

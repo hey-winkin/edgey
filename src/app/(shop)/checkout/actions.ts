@@ -7,7 +7,7 @@ import { allowSelectionQuote } from "@/lib/requests/rate-limit";
 
 export async function quoteSelection(lines: unknown, postcode?: unknown, includeProductNames?: boolean): Promise<QuoteResult> {
   const selection = normaliseLines(lines);
-  if (!selection) return { status: "error", message: "Check your quantities and keep your selection to 100 lines or fewer." };
+  if (!selection) return { status: "error", message: "Check your quantities and keep your basket to 100 lines or fewer." };
   if (selection.length) {
     try {
       if (!await allowSelectionQuote()) {

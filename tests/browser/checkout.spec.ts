@@ -7,13 +7,13 @@ import { Client } from "pg";
 const storageKey = "edgey-storefront-selection-v1";
 
 function selection(page: Page) {
-  return page.getByRole("dialog", { name: "Your selection" });
+  return page.getByRole("dialog", { name: "Your basket" });
 }
 
 async function addZ10(page: Page, quantity: "1" | "5" | "10" = "5") {
   await page.goto("/blades/edg-z10");
   await page.getByRole("button", { name: quantity, exact: true }).click();
-  await page.getByRole("button", { name: "Add to selection" }).click();
+  await page.getByRole("button", { name: "Add to basket" }).click();
   await expect(selection(page).getByRole("button", { name: "Remove EDG-Z10" })).toBeVisible();
 }
 
@@ -35,7 +35,7 @@ test("a keyboard add opens the selection, which reprices, persists and can be em
   const product = page.getByRole("dialog", { name: "Flat-stock drag blade" });
   await product.getByRole("button", { name: "5", exact: true }).press("Enter");
   await expect(product).toContainText("£119.70 inc VAT (20%)");
-  await product.getByRole("button", { name: "Add to selection" }).press("Enter");
+  await product.getByRole("button", { name: "Add to basket" }).press("Enter");
   const tray = selection(page);
   await expect(tray).toBeVisible();
   await expect(product).not.toBeVisible();
@@ -60,7 +60,7 @@ test("a keyboard add opens the selection, which reprices, persists and can be em
   await expect(tray).toContainText("10 × £17.50 = £175.00");
 
   await page.keyboard.press("Escape");
-  const trigger = page.getByRole("button", { name: "Selection 10 blades" });
+  const trigger = page.getByRole("button", { name: "Basket 10 blades" });
   await expect(trigger).toBeFocused();
   await page.reload();
   await trigger.click();
@@ -68,10 +68,10 @@ test("a keyboard add opens the selection, which reprices, persists and can be em
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), storageKey);
   expect(Object.entries(stored)).toEqual([[expect.stringMatching(/^[\da-f-]{36}$/), 10]]);
   await tray.getByRole("button", { name: "Remove EDG-Z10" }).click();
-  await expect(tray).toContainText("Your selection is empty.");
+  await expect(tray).toContainText("Your basket is empty.");
   await expect(tray.getByRole("button", { name: "Continue browsing" })).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Selection 0 blades" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Basket 0 blades" })).toBeFocused();
 });
 
 test("blocked storage leaves the in-memory selection usable across navigation", async ({ page }) => {
@@ -81,7 +81,7 @@ test("blocked storage leaves the in-memory selection usable across navigation", 
   await addZ10(page, "1");
   await selection(page).getByRole("link", { name: "Go to checkout" }).click();
   await expect(page).toHaveURL("/checkout");
-  await expect(page.getByRole("button", { name: "Selection 1 blade" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Basket 1 blade" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Order summary" })).toContainText("1 × £22.50 = £22.50");
 });
 
@@ -110,9 +110,9 @@ test("selection changes in another tab update the masthead and preserve both add
   await selection(page).getByRole("button", { name: "Continue browsing" }).click();
   const other = await context.newPage();
   await addZ10(other, "1");
-  await expect(page.getByRole("button", { name: "Selection 6 blades" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Basket 6 blades" })).toBeVisible();
   await page.getByRole("button", { name: "1", exact: true }).click();
-  await page.getByRole("button", { name: "Add to selection" }).click();
+  await page.getByRole("button", { name: "Add to basket" }).click();
   await expect(selection(other)).toContainText("7 × £19.95 = £139.65");
 });
 
@@ -132,7 +132,7 @@ test("stale selections identify unavailable lines and require acceptance before 
   }
   await page.addInitScript(({ key, items }) => localStorage.setItem(key, JSON.stringify(items)), { key: storageKey, items: stored });
   await page.goto("/blades");
-  await page.getByRole("button", { name: "Selection 43 blades" }).click();
+  await page.getByRole("button", { name: "Basket 43 blades" }).click();
   const tray = selection(page);
   await expect(tray.getByRole("status")).toContainText(/EDG-Z10: limited stock.*smaller quantity/);
   await expect(tray.getByRole("status")).not.toContainText(/40/);
@@ -142,7 +142,7 @@ test("stale selections identify unavailable lines and require acceptance before 
   await tray.getByRole("button", { name: "Accept changes" }).click();
   await tray.getByRole("link", { name: "Go to checkout" }).click();
   await expect(page.getByRole("region", { name: "Order summary" })).toContainText("10 × £17.50 = £175.00");
-  await expect(page.getByRole("button", { name: "Selection 10 blades" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Basket 10 blades" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/checkout");
@@ -212,14 +212,14 @@ test("checkout validates before payment and retains the same attempt until a mat
   expect(tokens).toHaveLength(3);
   expect(tokens[2]).not.toEqual(tokens[0]);
 
-  await summary.getByRole("button", { name: "Edit selection" }).click();
+  await summary.getByRole("button", { name: "Edit basket" }).click();
   const tray = selection(page);
   const qty = tray.getByRole("spinbutton", { name: "Quantity for EDG-Z10" });
   await qty.fill("10");
   await qty.press("Enter");
   await expect(tray).toContainText("10 × £17.50 = £175.00");
   await tray.getByRole("button", { name: "Return to checkout" }).click();
-  await expect(summary.getByRole("button", { name: "Edit selection" })).toBeFocused();
+  await expect(summary.getByRole("button", { name: "Edit basket" })).toBeFocused();
   await expect(amount).toContainText("£210.00");
   await expect(page.getByLabel("Address line 1")).toHaveValue("12 Sample Street");
   await pay.click();
@@ -248,7 +248,7 @@ test("a new price must be reviewed and uses a new attempt token", async ({ page 
   let price: number | undefined;
   try {
     await page.goto("/blades/edg-sum-tan?variant=" + sku);
-    await page.getByRole("button", { name: "Add to selection" }).click();
+    await page.getByRole("button", { name: "Add to basket" }).click();
     await selection(page).getByRole("link", { name: "Go to checkout" }).click();
     await fillAddress(page);
     await expect(page.getByRole("region", { name: "Order summary" })).toContainText("Next working day");
@@ -347,12 +347,12 @@ for (const width of [1440, 390, 320]) {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.addInitScript((value) => localStorage.setItem("edgey-theme", value), theme);
       await page.goto("/blades/edg-z16");
-      await page.getByRole("button", { name: "Add to selection" }).click();
+      await page.getByRole("button", { name: "Add to basket" }).click();
       await selection(page).getByRole("button", { name: "Continue browsing" }).click();
       await page.goto("/blades?q=3910301");
       await page.getByRole("link", { name: "EDG-Z10 Flat-stock drag blade" }).click();
       await page.getByRole("button", { name: "5", exact: true }).click();
-      await page.getByRole("button", { name: "Add to selection" }).click();
+      await page.getByRole("button", { name: "Add to basket" }).click();
       const tray = selection(page);
       const checkout = tray.getByRole("link", { name: "Go to checkout" });
       await expect(checkout).toBeVisible();

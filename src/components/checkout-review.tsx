@@ -268,7 +268,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
     }
     if (closed) {
       retry();
-      setResult({ lines, value: { status: "error", message: "The account checkout is closed. Review your selection to start again." } });
+      setResult({ lines, value: { status: "error", message: "The account checkout is closed. Review your basket to start again." } });
     } else if (value.status === "trade-unavailable") {
       if (action === "submit") {
         setMethod("card");
@@ -355,7 +355,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
         attempt.current = null;
         forgetCheckoutAttempt();
         retry();
-        setResult({ lines, value: { status: "error", message: "The previous checkout is closed. Review your selection to start again." } });
+        setResult({ lines, value: { status: "error", message: "The previous checkout is closed. Review your basket to start again." } });
       } else {
         setResult({ lines, value });
       }
@@ -367,7 +367,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
     }
   }
 
-  if (!hydrated || activeNet30 === undefined) return <p role="status">Loading your selection…</p>;
+  if (!hydrated || activeNet30 === undefined) return <p role="status">Loading your basket…</p>;
   if (activeNet30) {
     return (
       <section className={`checkout-panel ${styles.recovery}`} aria-labelledby={id + "-account-recovery"}>
@@ -386,7 +386,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   if (!lines.length) {
     return (
       <section className="checkout-panel checkout-empty">
-        <h2>Your selection is empty</h2>
+        <h2>Your basket is empty</h2>
         <p className="fine">Choose a blade from the catalogue to start an order.</p>
         <Link className="primary tray-action" href="/blades">Browse blades</Link>
       </section>
@@ -470,7 +470,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
         <div className="checkout-section-head">
           <h2 id={id + "-summary"} ref={summaryTitle} tabIndex={-1}>Order summary</h2>
           <button type="button" className="textlink" aria-haspopup="dialog" disabled={submitting} onClick={(event) => open(event.currentTarget)}>
-            Edit selection
+            Edit basket
           </button>
         </div>
         <div role="status">
@@ -479,7 +479,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
           {response?.status === "review" && <p className="fine">{response.message}</p>}
           {!pending && corrections.length > 0 && (
             <div className="selection-notice">
-              <p>Review the changes to your selection before continuing.</p>
+              <p>Review the changes to your basket before continuing.</p>
               <ul>{corrections.map((message, index) => <li key={index}>{message}</li>)}</ul>
             </div>
           )}

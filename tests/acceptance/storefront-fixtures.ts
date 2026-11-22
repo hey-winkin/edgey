@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import { createLocalAdminUser } from "../../scripts/seed-admin";
 import { signInStaff } from "../browser/admin-fixtures";
 
-export const selection = (page: Page) => page.getByRole("dialog", { name: "Your selection" });
+export const selection = (page: Page) => page.getByRole("dialog", { name: "Your basket" });
 export const summary = (page: Page) => page.getByRole("region", { name: "Order summary" });
 export const paymentButton = (page: Page) => page.getByRole("button", { name: "Continue to payment" });
 export const sessionPath = "/api/checkout/session";
@@ -48,7 +48,7 @@ export async function chooseBlade(page: Page, path: string, quantity = 1) {
 export async function addBlade(page: Page, quantity = 1) {
   const quantityField = page.getByRole("spinbutton", { name: "Quantity", exact: true });
   await quantityField.fill(String(quantity));
-  await page.getByRole("button", { name: "Add to selection" }).click();
+  await page.getByRole("button", { name: "Add to basket" }).click();
   await expect(selection(page).getByRole("link", { name: "Go to checkout" })).toBeVisible();
 }
 

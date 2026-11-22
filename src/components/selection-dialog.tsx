@@ -17,14 +17,16 @@ export function SelectionTrigger() {
       type="button"
       id="selection-trigger"
       className="tray-trigger"
-      aria-label={`Selection ${count.toLocaleString("en-GB")} ${count === 1 ? "blade" : "blades"}`}
+      aria-label={`Basket ${count.toLocaleString("en-GB")} ${count === 1 ? "blade" : "blades"}`}
       aria-haspopup="dialog"
       disabled={!hydrated}
       onClick={(event) => open(event.currentTarget)}
     >
-      <span className="case-icon" aria-hidden="true" />
-      <span className="tray-label">Selection</span>{" "}
-      <span className="tray-count" aria-hidden="true">{count.toLocaleString("en-GB")}</span>
+      <svg className="basket-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 9h18l-2.5 11h-13L3 9Zm4 0 3-5m7 5-3-5M9 13l.5 3m5.5-3-.5 3" />
+      </svg>
+      <span className="tray-label">Basket</span>{" "}
+      <span className="tray-count" aria-hidden="true">{count > 999 ? "999+" : count}</span>
     </button>
   );
 }
@@ -146,18 +148,18 @@ export function SelectionDialog() {
     >
       <div className="dialog-wrap">
         <div className="dialog-heading">
-          <button type="button" className="x-close" aria-label="Close selection" onClick={() => dialog.current?.close()}>×</button>
-          <h2 id="selection-title">Your selection</h2>
+          <button type="button" className="x-close" aria-label="Close basket" onClick={() => dialog.current?.close()}>×</button>
+          <h2 id="selection-title">Your basket</h2>
         </div>
-        <div ref={content} className="dialog-scroll" role="region" aria-label="Selection details" tabIndex={0}>
-          {!lines.length && <p className="tray-empty">Your selection is empty. Choose a blade from the catalogue to compare quantities and prices.</p>}
+        <div ref={content} className="dialog-scroll" role="region" aria-label="Basket details" tabIndex={0}>
+          {!lines.length && <p className="tray-empty">Your basket is empty. Choose a blade from the catalogue to compare quantities and prices.</p>}
           <div role="status">
             {pending && <p className="fine">Checking current prices and availability…</p>}
             {hasDraft && <p className="fine">Use Update to apply quantity changes before continuing.</p>}
             {quote?.status === "error" && <p className="fine">{quote.message}</p>}
             {corrections.length > 0 && (
               <div className="selection-notice">
-                <p>Review the changes to your selection before continuing.</p>
+                <p>Review the changes to your basket before continuing.</p>
                 <ul>{corrections.map((message, index) => <li key={index}>{message}</li>)}</ul>
               </div>
             )}
@@ -168,7 +170,7 @@ export function SelectionDialog() {
               <button type="button" className="textlink" onClick={() => {
                 browsing.current?.focus();
                 replace([]);
-              }}>Clear selection</button>
+              }}>Clear basket</button>
             </div>
           )}
           {priced && basket && (

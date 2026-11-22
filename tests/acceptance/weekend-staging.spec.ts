@@ -44,7 +44,7 @@ test("Exact, ambiguous and unknown searches", async ({ page }) => {
     await results.first().click();
     const dialog = page.getByRole("dialog", { name: "Flat-stock drag blade" });
     await expect(dialog).toContainText("3910301");
-    await expect(dialog.getByRole("button", { name: "Add to selection" })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeEnabled();
   }
   await page.goto("/blades?q=spb%200030");
   const family = page.getByRole("link", { name: /EDG-MIM-45/ });
@@ -52,7 +52,7 @@ test("Exact, ambiguous and unknown searches", async ({ page }) => {
   await family.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Choose the configuration");
-  await expect(dialog.getByRole("button", { name: "Add to selection" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Add to basket" })).toBeDisabled();
   for (const angle of ["45°", "60°"]) {
     await expect(dialog.getByRole("button", { name: angle, exact: true })).toHaveAttribute("aria-pressed", "false");
   }
@@ -78,7 +78,7 @@ test("Variant isolation", async ({ page, db }) => {
     const sessionCount = (await providerSessions()).sessions.length;
     await db.query("update public.variants set stock_on_hand = 0 where sku = 'EDG-MIM-A60'");
     await paymentButton(page).click();
-    await expect(summary(page)).toContainText("EDG-MIM-A60 is out of stock and was removed from your selection.");
+    await expect(summary(page)).toContainText("EDG-MIM-A60 is out of stock and was removed from your basket.");
     await expect(summary(page)).toContainText("EDG-MIM-A45");
     await expect(paymentButton(page)).toBeDisabled();
     await summary(page).getByRole("button", { name: "Accept changes" }).click();
@@ -89,12 +89,12 @@ test("Variant isolation", async ({ page, db }) => {
     const sold = page.getByRole("button", { name: /60°.*Out of stock/i });
     await expect(sold).toBeEnabled();
     await expect(sold).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("button", { name: "Add to selection" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Add to basket" })).toBeDisabled();
     await expect(page.getByRole("table", { name: "Price breaks per blade for EDG-MIM-A60" })).toContainText("£11.95");
-    await expect(page.getByText(/removed from your selection/i)).toHaveCount(0);
+    await expect(page.getByText(/removed from your basket/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "45°", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "45°", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Add to selection" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Add to basket" })).toBeEnabled();
     const orderCount = await db.query("select count(*)::int as count from public.orders where email = $1", [recipient]);
     expect(orderCount.rows[0].count).toBe(0);
   } finally {

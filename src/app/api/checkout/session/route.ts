@@ -118,11 +118,11 @@ export async function POST(request: Request) {
     }, 409);
     const reason = (error as { message?: string })?.message;
     if (reason === "checkout_attempt_closed") {
-      return reply({ status: "error", message: "This payment attempt has closed. Review your selection and try again.", attemptClosed: true }, 409);
+      return reply({ status: "error", message: "This payment attempt has closed. Review your basket and try again.", attemptClosed: true }, 409);
     }
     if (["insufficient_stock", "variant_not_published", "stale_unit_price", "delivery_terms_changed"].includes(reason ?? "")) {
       const quote = await currentQuote(body).catch(() => ({ status: "error" as const, message: "We couldn’t get an updated quote. Try again." }));
-      return reply({ status: "review", quote, message: "Your quote has changed. Review the selection before continuing." }, 409);
+      return reply({ status: "review", quote, message: "Your quote has changed. Review the basket before continuing." }, 409);
     }
     console.error("Stripe checkout could not verify provider or database state.");
     return reply({ status: "error", message: "We couldn’t open payment right now. Try again from this checkout.", attemptPending: true }, 502);
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 }
 
 function invalidAttempt() {
-  return reply({ status: "error", message: "This checkout attempt is invalid. Review your selection and try again." }, 400);
+  return reply({ status: "error", message: "This checkout attempt is invalid. Review your basket and try again." }, 400);
 }
 
 async function currentQuote(body: Record<string, unknown>) {

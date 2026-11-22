@@ -1,4 +1,4 @@
-import { signOutFromStaffMenu } from "../helpers/navigation";
+import { signOutFromStaffMenu, switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -24,7 +24,7 @@ async function inspectAtWidths(page: Page, name: string) {
       await page.getByRole("heading", { level: 1 }).click();
       if (directory) await page.screenshot({ path: join(directory, `${name}-${theme}-${width}.png`), fullPage: true });
     }
-    await page.getByRole("button", { name: `Switch to ${nextMode} mode` }).click();
+    await switchTheme(page, nextMode);
   }
   await page.setViewportSize({ width: 1280, height: 900 });
 }

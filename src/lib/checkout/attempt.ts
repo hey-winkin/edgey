@@ -66,9 +66,9 @@ export async function prepareCheckoutAttempt(input: unknown, deps: QuoteDependen
   if (!("quote" in result)) return result;
   const { quote, terms } = result;
   if (quote.corrections.length > 0) {
-    return { status: "review", quote, message: "Stock has changed. Review your updated selection before continuing." };
+    return { status: "review", quote, message: "Stock has changed. Review your updated basket before continuing." };
   }
-  if (!quote.basket) return { status: "error", message: "Add an item to your selection before continuing." };
+  if (!quote.basket) return { status: "error", message: "Add an item to your basket before continuing." };
   if (quote.coverage !== "covered" || !terms) {
     const message = "We can’t confirm delivery to this postcode. Ask us about delivery before ordering.";
     return { status: "invalid", errors: { postcode: message }, message };
