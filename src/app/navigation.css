@@ -35,17 +35,43 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   min-height: 44px;
   min-width: 44px;
 }
-.mast-tool, .theme-switch, .fold-toggle {
+.mast-tool, .theme-switch, .fold-toggle, .mast .tray-trigger {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  border: 1px solid var(--line);
   padding-inline: 11px;
   color: var(--ink);
   font-size: .89rem;
   white-space: nowrap;
 }
-.mast-tool:hover, .theme-switch:hover, .fold-toggle:hover { background: var(--panel); }
+.mast-tool, .fold-toggle { border: 1px solid var(--line); }
+.fold-tools .mast-tool:hover, .fold-toggle:hover { background: var(--panel); }
+.mast :is(.mast-leading, .nav-tools) > :is(.mast-tool, .theme-switch, .tray-trigger) {
+  border: 0;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background: var(--panel);
+      background: color-mix(in srgb, var(--paper), var(--ink) 8%);
+    }
+  }
+
+  &:not(:disabled):active {
+    background: var(--line);
+    background: color-mix(in srgb, var(--paper), var(--ink) 17%);
+  }
+
+  @media (forced-colors: active) {
+    @media (hover: hover) {
+      &:not(:disabled, :focus-visible):hover { outline: 1px solid ButtonText; outline-offset: -2px; }
+    }
+    &:not(:disabled, :focus-visible):active { outline: 2px solid ButtonText; outline-offset: -2px; }
+  }
+}
+.staff-mast .nav-tools .mast-tool { padding-inline: 12px; }
+.mast .tray-trigger { gap: 8px; padding-inline: 12px; }
+.mast .tray-trigger:disabled { cursor: default; }
+.tray-count { font: 600 .79rem/1.5 var(--mono); }
 .mast-home, .mast-search, .theme-switch { width: 44px; padding: 0; }
 .mast-home svg, .mast-search svg, .basket-icon {
   width: 19px;
@@ -61,40 +87,39 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
 @media (hover: hover) {
   .mast-search:hover svg { opacity: .78; }
 }
-.mast-search:active svg { opacity: .58; }
+.mast-search:active svg { opacity: .7; }
 .theme-track {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 18px 2px;
+  row-gap: 2px;
   align-items: center;
   justify-items: center;
   width: 36px;
-  height: 22px;
-  border: 1px solid var(--line);
-  background: var(--paper);
   color: var(--muted);
 }
 .theme-track svg {
   width: 17px;
-  height: 20px;
-  padding: 2px;
+  height: 18px;
+  padding: 1px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.theme-track::after {
+  content: "";
+  grid-column: 1;
+  grid-row: 2;
+  width: 8px;
+  border-block-end: 2px solid currentColor;
+  color: var(--ink);
+}
+[data-theme="light"] .theme-track::after { grid-column: 2; }
 [data-theme="dark"] .theme-track .moon-symbol,
 [data-theme="light"] .theme-track .sun-symbol {
-  background: var(--edgey-primary-fill);
-  color: var(--edgey-primary-text);
-}
-@media (forced-colors: active) {
-  [data-theme="dark"] .theme-track .moon-symbol,
-  [data-theme="light"] .theme-track .sun-symbol {
-    forced-color-adjust: none;
-    background: Highlight;
-    color: HighlightText;
-  }
+  color: var(--ink);
 }
 .mast-mark {
   position: relative;
@@ -261,7 +286,7 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   :root { --mast-height: max(63px, 2.55rem); }
   .mast-leading, .mast .nav-tools { gap: 4px; }
   .mast .tray-label { display: none; }
-  .mast .tray-trigger { justify-content: center; min-width: 48px; }
+  .mast .tray-trigger { min-width: 48px; gap: 6px; padding-inline: 8px; }
   .mast .mast-mark { width: 112px; }
   .staff-mast .mast-mark { width: 92px; }
   .mast :is(.mast-tool, .theme-switch, .tray-trigger, .fold-toggle):focus-visible { outline-offset: -2px; }
@@ -275,7 +300,7 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   .mast .mast-mark { width: 88px; }
   .staff-shop-prefix { display: none; }
   .staff-identity { font-size: clamp(.56rem, 2.5vw, .68rem); }
-  .staff-mast .nav-tools .mast-tool { padding-inline: 5px; }
+  .staff-mast .nav-tools .mast-tool { padding-inline: 6px; }
   .staff-mast .nav-tools a { text-transform: capitalize; }
   .fold-groups, .staff-mast .fold-groups { gap: 10px 14px; }
 }
@@ -284,6 +309,5 @@ html:has(.mast) { scroll-padding-top: calc(var(--mast-height) + 16px); }
   .fold-toggle { padding-inline: 11px; }
   .mast .mast-mark { width: 72px; }
   .mast .basket-icon { width: 15px; height: 15px; }
-  .mast .tray-trigger { min-width: 44px; padding-inline: 4px; gap: 3px; }
-  .mast .tray-count { border: 0; padding-inline-start: 0; }
+  .mast .tray-trigger { min-width: 44px; padding-inline: 4px; gap: 4px; }
 }

@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { saveThemeBeforeLoad, scanAccessibility, themes } from "../helpers/accessibility";
 import { setVerifiedStaffSession } from "./admin-fixtures";
@@ -12,6 +12,20 @@ const shopNav = (page: Page) => page.getByRole("navigation", { name: "Shop navig
 const staffMenu = (page: Page) => page.locator(".staff-mast summary");
 const staffNav = (page: Page) => page.getByRole("navigation", { name: "Staff areas" });
 const viewports = [{ width: 1440, height: 940 }, { width: 390, height: 844 }, { width: 320, height: 640 }];
+
+const themeMarker = (page: Page) => page.locator(".mast .theme-track").evaluate((node) => {
+  const style = getComputedStyle(node, "::after");
+  return { column: style.gridColumnStart, width: style.borderBottomWidth, line: style.borderBottomStyle };
+});
+
+async function releaseWithoutClick(page: Page, control: Locator) {
+  await control.evaluate((node) => node.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, { capture: true, once: true }));
+  await page.mouse.up();
+  await page.mouse.move(0, 200);
+}
 
 async function capture(page: Page, filename: string) {
   const directory = process.env.EDGEY_NAV_RENDERS;
@@ -25,15 +39,19 @@ async function expectUsableMasthead(page: Page, width: number) {
   const controls = await page.locator(".mast .nav-inner").evaluate((row) =>
     Array.from(row.querySelectorAll<HTMLElement>("summary, .mast-leading a, .nav-tools a, .nav-tools button"))
       .filter((control) => control.getClientRects().length > 0)
-      .map((control) => control.getBoundingClientRect().toJSON() as DOMRectJSON)
-      .sort((a, b) => a.left - b.left),
+      .map((control) => ({
+        rect: control.getBoundingClientRect().toJSON() as DOMRectJSON,
+        border: control.matches("summary") ? null : getComputedStyle(control).borderWidth,
+      }))
+      .sort((a, b) => a.rect.left - b.rect.left),
   );
-  for (const [i, rect] of controls.entries()) {
+  for (const [i, { rect, border }] of controls.entries()) {
+    if (border !== null) expect(border).toBe("0px");
     expect(rect.width).toBeGreaterThanOrEqual(44);
     expect(rect.height).toBeGreaterThanOrEqual(44);
     expect(rect.left).toBeGreaterThanOrEqual(0);
     expect(rect.right).toBeLessThanOrEqual(width);
-    if (i) expect(rect.left).toBeGreaterThanOrEqual(controls[i - 1]!.right);
+    if (i) expect(rect.left).toBeGreaterThanOrEqual(controls[i - 1]!.rect.right);
   }
 }
 
@@ -158,7 +176,7 @@ test("the proof drifts slowly while the mark and magnifier stay in place", async
   await search.hover();
   await expect(icon).toHaveCSS("opacity", "0.78");
   await page.mouse.down();
-  await expect(icon).toHaveCSS("opacity", "0.58");
+  await expect(icon).toHaveCSS("opacity", "0.7");
   await expect(icon).toHaveCSS("transform", "none");
   await page.mouse.move(8, 100);
   await page.mouse.up();
@@ -268,12 +286,25 @@ test("the active theme icon and wire outline remain distinct in forced colours",
   await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("opacity", "0");
   await expect(menu(page).locator(".wordmark")).toBeVisible();
   const toggle = page.getByRole("switch", { name: "Light theme", exact: true });
-  await expect(toggle.locator(".moon-symbol")).toHaveCSS("forced-color-adjust", "none");
-  await expect(toggle.locator(".sun-symbol")).not.toHaveCSS("forced-color-adjust", "none");
+  await expect.poll(() => themeMarker(page)).toEqual({ column: "1", width: "2px", line: "solid" });
+  if (await page.evaluate(() => matchMedia("(hover: hover)").matches)) {
+    await toggle.hover();
+    await expect(toggle).toHaveCSS("outline-width", "1px");
+    await page.mouse.down();
+    try {
+      await expect(toggle).toHaveCSS("outline-width", "2px");
+    } finally {
+      await releaseWithoutClick(page, toggle);
+    }
+  }
+  await toggle.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(toggle).toBeFocused();
+  await expect(toggle).toHaveCSS("outline-style", "solid");
+  await expect(toggle).toHaveCSS("outline-width", "2px");
   await toggle.press("Space");
   await expect(toggle).toHaveAttribute("aria-checked", "true");
-  await expect(toggle.locator(".moon-symbol")).not.toHaveCSS("forced-color-adjust", "none");
-  await expect(toggle.locator(".sun-symbol")).toHaveCSS("forced-color-adjust", "none");
+  await expect.poll(() => themeMarker(page)).toEqual({ column: "2", width: "2px", line: "solid" });
 });
 
 test.describe("without JavaScript", () => {
@@ -345,10 +376,66 @@ test("a large basket shows a compact count without hiding the exact total from a
   await page.goto("/contact");
   const basket = page.getByRole("button", { name: "Basket 1,234 blades", exact: true });
   await expect(basket).toHaveText(/999\+/);
+  const icon = await basket.locator(".basket-icon").boundingBox();
+  const count = await basket.locator(".tray-count").boundingBox();
+  expect(count!.x - (icon!.x + icon!.width)).toBeLessThanOrEqual(6);
   await expectUsableMasthead(page, 320);
+  const mark = await menu(page).locator(".mast-mark").boundingBox();
+  expect(Math.abs(mark!.x + mark!.width / 2 - 160)).toBeLessThan(9);
+  await page.setViewportSize(viewports[0]!);
+  const label = await basket.locator(".tray-label").boundingBox();
+  const desktopCount = await basket.locator(".tray-count").boundingBox();
+  expect(desktopCount!.x - (label!.x + label!.width)).toBeLessThanOrEqual(10);
 });
 
 for (const theme of themes) {
+  test(`borderless utilities retain hover, press and keyboard focus in ${theme}`, async ({ page }) => {
+    await saveThemeBeforeLoad(page, theme);
+    const ring = theme === "dark" ? "rgb(155, 227, 249)" : "rgb(33, 93, 173)";
+    const idle = "rgba(0, 0, 0, 0)";
+    for (const route of ["/contact", "/admin/sign-in"]) {
+      await page.setViewportSize(viewports[0]!);
+      await page.goto(route);
+      const nav = page.locator(".mast .nav-inner");
+      const order = nav.locator(".mast-leading a, summary, .nav-tools :is(button, a)");
+      const utilities = nav.locator(".mast-leading a, .nav-tools :is(button, a)");
+      await expect(utilities).toHaveCount(route === "/contact" ? 4 : 3);
+      const canHover = await page.evaluate(() => matchMedia("(hover: hover)").matches);
+      for (const control of await utilities.all()) {
+        await expect(control).toBeEnabled();
+        await expect(control).toHaveCSS("background-color", idle);
+        await expect(control).toHaveCSS("outline-style", "none");
+        await expect(control).toHaveCSS("box-shadow", "none");
+        if (!canHover) continue;
+        await control.hover();
+        await expect(control).not.toHaveCSS("background-color", idle);
+        const hover = await control.evaluate((element) => getComputedStyle(element).backgroundColor);
+        await page.mouse.down();
+        try {
+          await expect(control).not.toHaveCSS("background-color", hover);
+          await expect(control).not.toHaveCSS("background-color", idle);
+        } finally {
+          await releaseWithoutClick(page, control);
+        }
+      }
+      for (const viewport of viewports) {
+        await page.setViewportSize(viewport);
+        await page.reload();
+        await expect.poll(() => themeMarker(page)).toEqual({ column: theme === "dark" ? "1" : "2", width: "2px", line: "solid" });
+        await page.keyboard.press("Tab");
+        await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
+        for (const control of await order.all()) {
+          await page.keyboard.press("Tab");
+          await expect(control).toBeFocused();
+          await expect(control).toHaveCSS("outline-style", "solid");
+          await expect(control).toHaveCSS("outline-width", "2px");
+          await expect(control).toHaveCSS("outline-color", ring);
+          await expect(control).toHaveCSS("outline-offset", viewport.width < 741 ? "-2px" : "4px");
+        }
+      }
+    }
+  });
+
   test(`shop masthead and open sheet fit the three widths in ${theme}`, async ({ page }) => {
     await saveThemeBeforeLoad(page, theme);
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -359,9 +446,9 @@ for (const theme of themes) {
     await expect(menu(page).locator(".mast-proof-wash")).toHaveCSS("opacity", "0");
     await page.getByRole("link", { name: "Search blades" }).hover();
     await expect(page.locator(".mast-search svg")).toHaveCSS("transform", "none");
-    await page.mouse.move(0, 0);
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
+      await page.mouse.move(0, 200);
       await expectUsableMasthead(page, viewport.width);
       const bounds = await menu(page).boundingBox();
       expect(Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2)).toBeLessThan(9);
@@ -451,12 +538,14 @@ test.describe("staff shell", () => {
         await expect(staffMenu(page)).toHaveAttribute("aria-label", "Edgey staff menu");
         for (const viewport of viewports) {
           await page.setViewportSize(viewport);
+          await page.mouse.move(0, 200);
           await expectUsableMasthead(page, viewport.width);
           const mark = await staffMenu(page).boundingBox();
           expect(Math.abs(mark!.x + mark!.width / 2 - viewport.width / 2)).toBeLessThan(9);
           await capture(page, `staff-closed-${theme}-${viewport.width}`);
           await staffMenu(page).click();
           await expect(staffNav(page).getByRole("link", { name: "Delivery settings" })).toHaveAttribute("aria-current", "page");
+          await expect(page.getByRole("button", { name: "Sign out" })).toHaveCSS("border-top-width", "1px");
           await capture(page, `staff-menu-${theme}-${viewport.width}`);
           await scanAccessibility(page, theme);
           await page.keyboard.press("Escape");
