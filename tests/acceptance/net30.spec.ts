@@ -134,7 +134,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await expect(method).toHaveAccessibleDescription("Your trade account isn’t approved for Net 30.");
 
         await signInStaff(financePage, finance);
-        await (await openStaffMenu(financePage)).getByRole("link", { name: "Requests" }).click();
+        await (await openStaffMenu(financePage)).getByRole("link", { name: "Customer requests", exact: true }).click();
         await financePage.getByRole("table", { name: "Trade applications" }).getByRole("row")
           .filter({ hasText: buyer.email }).getByRole("link", { name: company }).click();
         await expect(financePage).toHaveURL(`/admin/requests/trade/${application}`);

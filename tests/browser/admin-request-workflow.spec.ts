@@ -56,7 +56,7 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await expect(page.getByRole("status")).toContainText("No delivery has been arranged");
 
   await signInStaff(page, catalogue);
-  await page.getByRole("main").getByRole("link", { name: "Requests", exact: true }).last().click();
+  await page.getByRole("main").getByRole("link", { name: /customer requests?/i }).click();
   await page.getByRole("table", { name: "Trial requests", exact: true }).getByRole("link", { name: company, exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Trial request" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Trial email status" }).getByRole("row", { name: /Customer receipt/ }))
@@ -95,9 +95,10 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await signOutFromStaffMenu(page);
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
   await signInStaff(page, warehouse);
-  const count = page.getByText("Trials linked to a first purchase:", { exact: false });
-  const initial = Number(await count.locator("span").textContent());
-  expect(Number.isNaN(initial)).toBe(false);
+  await page.goto("/admin/commercial");
+  const trialMeasures = page.getByText("Dispatched trials linked to a first purchase", { exact: true }).locator("+ dd");
+  const initial = Number.parseInt((await trialMeasures.textContent()) ?? "", 10);
+  const initialLinked = Number.isNaN(initial) ? 0 : initial;
   await page.goto(trialPath);
   await expect(page.getByRole("button", { name: "Record dispatch" })).toHaveCount(0);
   await inspectAtWidths(page, "trial-approval");
@@ -145,8 +146,8 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await inspectAtWidths(page, "trial-linked");
   await linked.click();
   await expect(page.getByRole("link", { name: "View trial request" })).toHaveAttribute("href", trialPath);
-  await page.goto("/admin");
-  await expect(count.locator("span")).toHaveText(String(initial + 1));
+  await page.goto("/admin/commercial");
+  await expect(trialMeasures).toContainText(`${initialLinked + 1} of `);
   await page.goto(trialPath);
   await page.locator("summary").filter({ hasText: "Remove order link" }).click();
   await page.getByLabel("I confirm this trial and order should no longer be linked.").check();
@@ -154,8 +155,8 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await expect(page.getByRole("heading", { name: "Link a subsequent order" })).toBeVisible();
   await page.goto(`/admin/warehouse/${order.id}`);
   await expect(page.getByRole("link", { name: "View trial request" })).toHaveCount(0);
-  await page.goto("/admin");
-  await expect(count.locator("span")).toHaveText(String(initial));
+  await page.goto("/admin/commercial");
+  await expect(trialMeasures).toContainText(`${initialLinked} of `);
 
   await signOutFromStaffMenu(page);
   await expect(page).toHaveURL(/\/admin\/sign-in$/);

@@ -37,7 +37,7 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
   await expect(page.getByText("Selling data saved.", { exact: true })).toBeVisible();
   expect((await db.from("variants").select("price_1_4_pence").eq("id", id).single()).data?.price_1_4_pence).toBe(2085);
 
-  await (await openStaffMenu(page)).getByRole("link", { name: "Stock", exact: true }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock and adjustments", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
   await page.getByLabel("Received quantity").fill("8");
   await page.getByText("Add receipt costs (optional)").click();
@@ -88,9 +88,11 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
 });
 
 test("finance can correct an estimate; warehouse-only staff cannot see cost fields or receipt costs", async ({ page, browser, baseURL }) => {
-  const { id } = await createStockVariant();
+  const { id, sku } = await createStockVariant();
   await setVerifiedStaffSession(page, await createLocalAdminUser("finance"), baseURL);
   await page.goto(`/admin/catalogue/${id}`);
+  await expect(page.locator(".admin-location")).toHaveText("Admin");
+  await expect(page.getByText(sku, { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Selling prices" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save selling data" })).toHaveCount(0);
   await page.getByLabel("Supplier unit price", { exact: true }).fill("6.10");

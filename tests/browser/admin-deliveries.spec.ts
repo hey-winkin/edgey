@@ -563,6 +563,11 @@ for (const theme of themes) {
     await checkEverySize("review");
     await page.getByRole("button", { name: "Receive stock", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: reference })).toBeVisible();
+    await expect(page.locator(".admin-location")).toHaveText("Purchases");
+    const menu = await openStaffMenu(page);
+    await expect(menu.locator("[aria-current]")).toHaveCount(1);
+    await expect(menu.getByRole("link", { name: "Delivery history" })).toHaveAttribute("aria-current", "location");
+    await page.keyboard.press("Escape");
     await checkEverySize("record");
     await page.getByRole("link", { name: "Delivery history", exact: true }).click();
     await expect(page.getByRole("link", { name: reference })).toBeVisible();

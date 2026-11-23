@@ -64,11 +64,17 @@ test("every App Router page is accounted for in the accessibility suite", () => 
   ]);
 });
 
-async function scanRoutes(page: Page, theme: Theme, routes: readonly (readonly [string, string | RegExp])[]) {
-  for (const [url, heading] of routes) {
+async function scanRoutes(
+  page: Page, theme: Theme, routes: readonly (readonly [string, string | RegExp, ("Orders" | "Purchases" | "Admin")?])[],
+) {
+  for (const [url, heading, group] of routes) {
     await test.step(url, async () => {
       await page.goto(url);
       await expect(page.getByRole("heading", { level: 1, name: heading, exact: typeof heading === "string" })).toBeVisible();
+      if (group) {
+        await expect(page.locator(".admin-location")).toHaveText(group);
+        await expect(page.locator(".admin-heading > [data-area-eyebrow]")).toBeHidden();
+      }
       await scanAccessibility(page, theme);
     });
   }
@@ -221,24 +227,27 @@ for (const theme of themes) {
             ["/admin", "Staff desk"],
             ["/admin/delivery", "Delivery settings"],
             ["/admin/commercial", "Commercial measures"],
-            ["/admin/catalogue/new", "Add draft variant"],
+            ["/admin/catalogue/new", "Add draft variant", "Admin"],
             ["/admin/warehouse", "Pick and dispatch"],
             ["/admin/warehouse?view=history", "Dispatch and cancellation history"],
             ["/admin/warehouse?view=blocked", "Payment blocks"],
-            [`/admin/warehouse/${order.id}`, "Warehouse order"],
+            [`/admin/warehouse/${order.id}`, "Warehouse order", "Orders"],
             [missing, noPage],
             ["/admin/stock", "Stock"],
-            [`/admin/stock/${variantId}`, sku],
+            ["/admin/stock?view=out-of-stock", "Out of stock", "Purchases"],
+            ["/admin/stock/receive", "Receive delivery", "Purchases"],
+            ["/admin/stock/deliveries", "Delivery history", "Purchases"],
+            [`/admin/stock/${variantId}`, sku, "Purchases"],
             ["/admin/catalogue", "Catalogue"],
             ["/admin/catalogue?q=EDG-Z10&status=published", "Catalogue"],
-            [`/admin/catalogue/${ids["EDG-Z10"]}`, product],
-            [`/admin/catalogue/${ids["EDG-Z11"]}`, /blade/i],
+            [`/admin/catalogue/${ids["EDG-Z10"]}`, product, "Admin"],
+            [`/admin/catalogue/${ids["EDG-Z11"]}`, /blade/i, "Admin"],
             ["/admin/finance", "Finance"],
             ["/admin/sales", "Sales"],
             ["/admin/requests", "Requests"],
-            [`/admin/requests/enquiries/${enquiry}`, "Compatibility enquiry"],
-            [`/admin/requests/trials/${trial}`, "Trial request"],
-            [`/admin/requests/trade/${application}`, company],
+            [`/admin/requests/enquiries/${enquiry}`, "Compatibility enquiry", "Orders"],
+            [`/admin/requests/trials/${trial}`, "Trial request", "Orders"],
+            [`/admin/requests/trade/${application}`, company, "Orders"],
           ]);
           await page.goto(`/admin/requests/enquiries/${enquiry}`);
           await page.locator("summary").filter({ hasText: /^Close enquiry$/ }).click();
@@ -250,7 +259,7 @@ for (const theme of themes) {
             "select id from public.approve_trade_account($1,$2,200000,$3)",
             [application, staff.id, `cus_${randomUUID().replaceAll("-", "")}`],
           );
-          await scanRoutes(page, theme, [[`/admin/finance/accounts/${account!.id}`, company]]);
+          await scanRoutes(page, theme, [[`/admin/finance/accounts/${account!.id}`, company, "Admin"]]);
           await page.locator("summary").filter({ hasText: /^Suspend Net 30$/ }).click();
           await expect(page.getByRole("button", { name: "Confirm suspend Net 30" })).toBeVisible();
           await scanAccessibility(page, theme);
@@ -272,11 +281,16 @@ for (const theme of themes) {
           await scanAccessibility(page, theme);
           await page.goto(`/admin/warehouse/${order.id}/print`);
           await expect(page.getByRole("heading", { name: "Pick list" })).toBeVisible();
+          await expect(page.locator(".admin-location")).toHaveText("Orders");
           await scanAccessibility(page, theme);
           await page.emulateMedia({ media: "print" });
           await expect(page.locator("html")).toHaveCSS("background-color", "rgb(255, 255, 255)");
           await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
           await expect(page.getByRole("banner")).toBeHidden();
+          await expect(page.locator(".admin-location")).toBeHidden();
+          const printEyebrow = page.locator(".warehouse-pick-list .eyebrow");
+          await expect(printEyebrow).toHaveText("Warehouse");
+          await expect(printEyebrow).toBeVisible();
           await expect(page.getByRole("heading", { name: "Pick list" })).toBeVisible();
           await page.emulateMedia({ media: "screen" });
           const cancellation = await admin.rpc("cancel_order", {

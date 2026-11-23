@@ -32,7 +32,6 @@ type RequestDatabase = {
         p_trial_request_id: string; p_actor_id: string; p_decision: string; p_reason: string;
         p_variant_ids: string[]; p_expected_updated_at: string;
       }>;
-      count_admin_trial_first_purchases: Rpc<{ p_actor_id: string }, number>;
       unlink_trial_order: Rpc<{ p_trial_request_id: string; p_order_id: string; p_actor_id: string }>;
       handle_admin_enquiry: Rpc<{
         p_enquiry_id: string; p_actor_id: string; p_action: string; p_expected_updated_at: string;
