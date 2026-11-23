@@ -31,6 +31,8 @@ export type DispatchInput = Readonly<{
 
 export type DispatchPromise = { dispatchDate: string; estimatedDeliveryDate: string | null };
 
+export type DispatchTiming = { checkedAt: number; cutoffAt: number | null; validUntil: number };
+
 export type DispatchError =
   | { code: "invalid_authorised_at" }
   | { code: "invalid_delivery_quote" }
@@ -48,6 +50,32 @@ const londonDateTime = new Intl.DateTimeFormat("en-GB", {
   hourCycle: "h23",
 });
 const dayMilliseconds = 86_400_000;
+const minuteMilliseconds = 60_000;
+
+function londonWallMinute(timestamp: number): number {
+  const { year, month, day, hour, minute } = Object.fromEntries(
+    londonDateTime.formatToParts(timestamp).map(({ type, value }) => [type, value]),
+  );
+  if (!year || !month || !day || !hour || !minute) return NaN;
+  return Date.parse(`${year.padStart(4, "0")}-${month}-${day}T${hour}:${minute}:00Z`);
+}
+
+function londonInstant(wallMinute: number): number {
+  const before = wallMinute - dayMilliseconds;
+  const after = wallMinute + dayMilliseconds;
+  const first = wallMinute - (londonWallMinute(before) - before);
+  const second = wallMinute - (londonWallMinute(after) - after);
+  let earlier = Math.min(first, second);
+  let later = Math.max(first, second);
+  if (earlier === later || londonWallMinute(earlier) === wallMinute) return earlier;
+  if (londonWallMinute(later) === wallMinute) return later;
+  while (later - earlier > minuteMilliseconds) {
+    const mid = earlier + Math.floor((later - earlier) / (2 * minuteMilliseconds)) * minuteMilliseconds;
+    if (londonWallMinute(mid) < wallMinute) earlier = mid;
+    else later = mid;
+  }
+  return later;
+}
 
 function isCalendarDate(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date.startsWith("0000")) return false;
@@ -91,13 +119,13 @@ function findWorkingDate(
   return { ok: false, error: { code: "calendar_out_of_range", calendar: calendarName } };
 }
 
-export function calculateDispatchPromise({
+export function calculateDispatchDetails({
   authorisedAt,
   deliveryQuote,
   warehouseCalendar = ENGLAND_WALES_BANK_HOLIDAY_CALENDAR_2026_2027,
   deliveryCalendar = ENGLAND_WALES_BANK_HOLIDAY_CALENDAR_2026_2027,
   cutoffMinutes = 15 * 60 + 30,
-}: DispatchInput): CommerceResult<DispatchPromise, DispatchError> {
+}: DispatchInput): CommerceResult<DispatchPromise & { dispatchTiming: DispatchTiming }, DispatchError> {
   if (typeof authorisedAt !== "string") return { ok: false, error: { code: "invalid_authorised_at" } };
   const instantParts = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(authorisedAt);
   const instant = new Date(authorisedAt);
@@ -115,18 +143,27 @@ export function calculateDispatchPromise({
     return { ok: false, error: { code: "invalid_calendar", calendar: "warehouse" } };
   }
 
-  const { year, month, day, hour, minute } = Object.fromEntries(
-    londonDateTime.formatToParts(instant).map(({ type, value }) => [type, value]),
-  );
-  if (!year || !month || !day || !hour || !minute) return { ok: false, error: { code: "invalid_authorised_at" } };
-  const londonDate = `${year.padStart(4, "0")}-${month}-${day}`;
-  const minutes = Number(hour) * 60 + Number(minute);
-  const dispatch = findWorkingDate(londonDate, minutes >= cutoffMinutes ? 1 : 0, warehouseCalendar, "warehouse");
+  const checkedAt = instant.getTime();
+  const wallMinute = londonWallMinute(checkedAt);
+  if (!Number.isFinite(wallMinute)) return { ok: false, error: { code: "invalid_authorised_at" } };
+  const midnight = Math.floor(wallMinute / dayMilliseconds) * dayMilliseconds;
+  const londonDate = new Date(midnight).toISOString().slice(0, 10);
+  const cutoff = londonInstant(midnight + cutoffMinutes * minuteMilliseconds);
+  const dispatch = findWorkingDate(londonDate, checkedAt >= cutoff ? 1 : 0, warehouseCalendar, "warehouse");
   if (!dispatch.ok) return dispatch;
 
-  if (!deliveryQuote) return { ok: true, value: { dispatchDate: dispatch.value, estimatedDeliveryDate: null } };
+  const cutoffAt = dispatch.value === londonDate ? cutoff : null;
+  const dispatchTiming = { checkedAt, cutoffAt, validUntil: cutoffAt ?? londonInstant(midnight + dayMilliseconds) };
+  if (!deliveryQuote) return { ok: true, value: { dispatchDate: dispatch.value, estimatedDeliveryDate: null, dispatchTiming } };
   const delivery = findWorkingDate(dispatch.value, deliveryQuote.workingDays, deliveryCalendar, "delivery");
   if (!delivery.ok) return delivery;
 
-  return { ok: true, value: { dispatchDate: dispatch.value, estimatedDeliveryDate: delivery.value } };
+  return { ok: true, value: { dispatchDate: dispatch.value, estimatedDeliveryDate: delivery.value, dispatchTiming } };
+}
+
+export function calculateDispatchPromise(input: DispatchInput): CommerceResult<DispatchPromise, DispatchError> {
+  const result = calculateDispatchDetails(input);
+  if (!result.ok) return result;
+  const { dispatchDate, estimatedDeliveryDate } = result.value;
+  return { ok: true, value: { dispatchDate, estimatedDeliveryDate } };
 }

@@ -5,6 +5,7 @@ import {
   STANDARD_DELIVERY_QUOTE,
   type WorkingDayCalendar,
 } from "./index";
+import { calculateDispatchDetails } from "./dispatch";
 
 function promiseAt(authorisedAt: string) {
   return calculateDispatchPromise({ authorisedAt, deliveryQuote: STANDARD_DELIVERY_QUOTE });
@@ -91,6 +92,50 @@ describe("working-day dispatch in Europe/London", () => {
     }
     expect(promiseAt("2026-10-26T15:30:00Z")).toEqual({
       ok: true, value: { dispatchDate: "2026-10-27", estimatedDeliveryDate: "2026-10-28" },
+    });
+  });
+
+  it.each([
+    ["2026-03-27T13:20:00Z", "2026-03-27T15:30:00Z"],
+    ["2026-03-30T12:20:00Z", "2026-03-30T14:30:00Z"],
+    ["2026-10-23T12:20:00Z", "2026-10-23T14:30:00Z"],
+    ["2026-10-26T13:20:00Z", "2026-10-26T15:30:00Z"],
+  ])("exposes the same dispatch cutoff at %s", (authorisedAt, cutoff) => {
+    const cutoffAt = Date.parse(cutoff);
+    expect(calculateDispatchDetails({ authorisedAt })).toEqual({
+      ok: true,
+      value: {
+        dispatchDate: authorisedAt.slice(0, 10),
+        estimatedDeliveryDate: null,
+        dispatchTiming: { checkedAt: Date.parse(authorisedAt), cutoffAt, validUntil: cutoffAt },
+      },
+    });
+  });
+
+  it.each([
+    ["2026-03-29T00:59:59.999Z", "2026-03-29T01:00:00Z", "2026-03-29T01:00:00Z", "2026-03-30"],
+    ["2026-10-25T00:29:59.999Z", "2026-10-25T00:30:00Z", "2026-10-25T01:15:00Z", "2026-10-26"],
+  ])("has a single cutoff on a working clock-change Sunday starting at %s", (before, cutoff, after, nextDay) => {
+    const warehouseCalendar: WorkingDayCalendar = {
+      ...ENGLAND_WALES_BANK_HOLIDAY_CALENDAR_2026_2027, workingWeekdays: [0, 1, 2, 3, 4, 5, 6],
+    };
+    const input = { warehouseCalendar, cutoffMinutes: 90 };
+    expect(calculateDispatchDetails({ ...input, authorisedAt: before })).toMatchObject({
+      ok: true, value: { dispatchTiming: { cutoffAt: Date.parse(cutoff), validUntil: Date.parse(cutoff) } },
+    });
+    for (const authorisedAt of [cutoff, after]) {
+      expect(calculateDispatchDetails({ ...input, authorisedAt })).toMatchObject({
+        ok: true, value: { dispatchDate: nextDay, dispatchTiming: { cutoffAt: null } },
+      });
+    }
+  });
+
+  it("expires the next-date message at London midnight, not UTC midnight", () => {
+    expect(calculateDispatchDetails({ authorisedAt: "2026-08-31T12:00:00Z" })).toMatchObject({
+      ok: true, value: {
+        dispatchDate: "2026-09-01",
+        dispatchTiming: { cutoffAt: null, validUntil: Date.parse("2026-08-31T23:00:00Z") },
+      },
     });
   });
 

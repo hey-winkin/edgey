@@ -56,29 +56,26 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
   weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
 });
 
-export function formatDispatchDate(date: string) {
+function formatDate(date: string) {
   return dateFormat.format(new Date(date + "T00:00:00Z"));
 }
 
-export function DispatchEstimate({ quote, onAccount = false, datesOnly = false }: { quote: Quote; onAccount?: boolean; datesOnly?: boolean }) {
-  const { coverage, dispatchDate, estimatedDeliveryDate } = quote;
-  const deliveryDate = coverage === "unchecked" || coverage === "covered" ? estimatedDeliveryDate : null;
-  const delivery = deliveryDate ? formatDispatchDate(deliveryDate)
+export function DeliveryEstimate({ quote, current, onAccount = false, datesOnly = false }: {
+  quote: Quote; current: boolean; onAccount?: boolean; datesOnly?: boolean;
+}) {
+  const { coverage, estimatedDeliveryDate } = quote;
+  const deliveryDate = current && (coverage === "unchecked" || coverage === "covered") ? estimatedDeliveryDate : null;
+  const delivery = deliveryDate ? formatDate(deliveryDate)
     : coverage === "unsupported" ? "Ask us"
     : coverage === "invalid" ? "Enter a supported postcode"
     : null;
   const service = coverage === "covered" && !datesOnly ? quote.basket?.delivery.quote.serviceName : undefined;
-  if (!dispatchDate && !delivery && !service) return null;
+  const provisional = (current && quote.dispatchDate) || deliveryDate;
+  if (!provisional && !delivery && !service) return null;
 
   return (
     <>
-      <dl className="specs checkout-promise">
-        {dispatchDate && (
-          <>
-            <dt>Dispatch</dt>
-            <dd>{formatDispatchDate(dispatchDate)}</dd>
-          </>
-        )}
+      {(delivery || service) && <dl className="specs checkout-promise">
         {delivery && (
           <>
             <dt>Estimated delivery</dt>
@@ -91,8 +88,8 @@ export function DispatchEstimate({ quote, onAccount = false, datesOnly = false }
             <dd>{service}</dd>
           </>
         )}
-      </dl>
-      {(dispatchDate || deliveryDate) && (
+      </dl>}
+      {provisional && (
         <p className="fine">{onAccount ? "Dates are provisional until your invoice is issued." : "Dates are provisional until payment."}</p>
       )}
     </>

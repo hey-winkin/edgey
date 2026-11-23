@@ -18,7 +18,7 @@ import { formatPence, incVatLabel, PRICE_BREAKS, unitPricePence, VAT_RATE_PERCEN
 import { MAX_ORDER_INTEGER } from "@/lib/checkout/validation";
 import { formatGbp } from "@/lib/commerce";
 import { useSelection } from "./selection-provider";
-import { formatDispatchDate } from "./selection-summary";
+import { DispatchNotice, useDispatchNotice } from "./dispatch-notice";
 import { useSelectionQuote } from "./use-selection-quote";
 
 const availabilityWords = { in_stock: "In stock", out_of_stock: "Out of stock" } as const;
@@ -61,7 +61,8 @@ export function ProductDetail({
   const validQuantity = Number.isInteger(quantity) && quantity >= 1 && quantity <= MAX_ORDER_INTEGER;
   const outOfStock = variant?.availability === "out_of_stock";
   const lines = variant && validQuantity && !outOfStock ? [{ variantId: variant.id, quantity }] : [];
-  const { quote, pending, retry } = useSelectionQuote(lines, lines.length > 0, { includeProductNames: false });
+  const { quote, clock, pending, retry } = useSelectionQuote(lines, lines.length > 0, { includeProductNames: false });
+  const dispatch = useDispatchNotice(quote, clock, retry);
   const priced = quote?.status === "ok" ? quote : null;
   const quotedLine = priced?.basket?.lines[0];
   const line = priced?.corrections.length ? undefined : quotedLine;
@@ -135,11 +136,9 @@ export function ProductDetail({
         <dd>{materials.join(", ") || "Ask us"}</dd>
         <dt>Availability</dt>
         <dd>{availability}</dd>
-        {priced?.dispatchDate && line && <>
-          <dt>Dispatch</dt>
-          <dd>{formatDispatchDate(priced.dispatchDate)} · provisional</dd>
-        </>}
       </dl>
+      <DispatchNotice copy={line ? dispatch : null} />
+      {line && dispatch && <p className="fine">Dispatch is provisional until payment or authorisation on account.</p>}
 
       {startingNet !== null && (
         <p className="variant-start-price">

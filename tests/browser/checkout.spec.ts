@@ -6,6 +6,7 @@ import { Client } from "pg";
 import { expectControlBoundary } from "../helpers/contrast";
 
 const storageKey = "edgey-storefront-selection-v1";
+const dispatchCopy = /^(?:Order within .+ for dispatch today|Less than 1 min to order for dispatch today|Dispatches .+)$/;
 
 function selection(page: Page) {
   return page.getByRole("dialog", { name: "Your basket" });
@@ -41,7 +42,7 @@ test("a keyboard add opens the selection, which reprices, persists and can be em
   await expect(tray).toBeVisible();
   await expect(product).not.toBeVisible();
   await expect(tray.getByText("Flat-stock drag blade", { exact: true })).toBeVisible();
-  await expect(tray.getByText("Dispatch", { exact: true })).toBeVisible();
+  await expect(tray.locator("time").filter({ hasText: dispatchCopy })).toBeVisible();
   await expect(tray.getByText("Estimated delivery", { exact: true })).toHaveCount(0);
   await expect(tray).toContainText("5 × £19.95 = £99.75");
   await expect(tray).toContainText("£50.25 more ex VAT for free delivery");
@@ -93,7 +94,7 @@ for (const width of [1440, 390]) {
     await selection(page).getByRole("link", { name: "Go to checkout" }).click();
     const summary = page.getByRole("region", { name: "Order summary" });
     await expect(summary.getByText("Flat-stock drag blade", { exact: true })).toBeVisible();
-    await expect(summary.getByText("Dispatch", { exact: true })).toBeVisible();
+    await expect(summary.locator("time").filter({ hasText: dispatchCopy })).toBeVisible();
     await expect(summary.getByText("Estimated delivery", { exact: true })).toHaveCount(0);
     await expect(summary).toContainText("Delivery and the total are estimates until you enter your postcode.");
     const grid = page.locator(".checkout-grid");
@@ -135,10 +136,12 @@ test("stale selections identify unavailable lines and require acceptance before 
   await page.goto("/blades");
   await page.getByRole("button", { name: "Basket 43 blades" }).click();
   const tray = selection(page);
-  await expect(tray.getByRole("status")).toContainText(/EDG-Z10: limited stock.*smaller quantity/);
-  await expect(tray.getByRole("status")).not.toContainText(/40/);
-  await expect(tray.getByRole("status")).toContainText(/EDG-SUM-DRG-60.*out of stock/i);
-  await expect(tray.getByRole("status")).toContainText(/unavailable item/i);
+  const stockUpdates = tray.getByRole("status").filter({ hasText: "Review the changes to your basket" });
+  await expect(stockUpdates).toContainText(/EDG-Z10: limited stock.*smaller quantity/);
+  await expect(stockUpdates).not.toContainText(/\b40\b/);
+  await expect(stockUpdates).toContainText(/EDG-SUM-DRG-60.*out of stock/i);
+  await expect(stockUpdates).toContainText(/unavailable item/i);
+  await expect(tray.locator("time").filter({ hasText: dispatchCopy })).toHaveCount(0);
   await expect(tray.getByRole("link", { name: "Go to checkout" })).toHaveCount(0);
   await tray.getByRole("button", { name: "Accept changes" }).click();
   await tray.getByRole("link", { name: "Go to checkout" }).click();
@@ -396,7 +399,7 @@ for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 568]]
       await expect(payment.getByRole("button", { name: "Continue to payment" })).toHaveAccessibleDescription(
         "You’ll enter your card details on Stripe’s payment page.",
       );
-      await expect(payment.getByText("Dispatch", { exact: true })).toHaveCount(0);
+      await expect(payment.locator("time").filter({ hasText: dispatchCopy })).toHaveCount(0);
       if (width === 390 && theme === "dark") {
         const postcode = page.getByLabel("Postcode");
         await expect(summary).toContainText("£153.84");
@@ -412,15 +415,18 @@ for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 568]]
       await fillAddress(page);
       await expect(summary).toContainText("Next working day");
       await expectControlBoundary(page.locator(".checkout-field input:not([type=checkbox])"));
-      for (const label of ["Dispatch", "Estimated delivery"]) {
-        const date = payment.getByText(label, { exact: true });
-        if (width > 740) await expect(date).toBeHidden();
-        else {
-          await expect(date).toBeVisible();
-          const nextDate = "xpath=following-sibling::dd[1]";
-          const quotedDate = await summary.getByText(label, { exact: true }).locator(nextDate).innerText();
-          await expect(date.locator(nextDate)).toHaveText(quotedDate);
-        }
+      const mobileDispatch = payment.locator("time").filter({ hasText: dispatchCopy });
+      const deliveryDate = payment.getByText("Estimated delivery", { exact: true });
+      if (width > 740) {
+        await expect(mobileDispatch).toBeHidden();
+        await expect(deliveryDate).toBeHidden();
+      } else {
+        await expect(mobileDispatch).toBeVisible();
+        await expect(mobileDispatch).toHaveText(await summary.locator("time").filter({ hasText: dispatchCopy }).innerText());
+        await expect(deliveryDate).toBeVisible();
+        const nextDate = "xpath=following-sibling::dd[1]";
+        const quotedDate = await summary.getByText("Estimated delivery", { exact: true }).locator(nextDate).innerText();
+        await expect(deliveryDate.locator(nextDate)).toHaveText(quotedDate);
       }
       if (width === 390 && theme === "dark") {
         const dates = payment.locator(".checkout-mobile-promise");

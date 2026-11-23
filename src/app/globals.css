@@ -545,7 +545,6 @@ footer { padding-top: 22px; }
 @media (max-width: 740px) {
   .checkout-grid { grid-template-columns: minmax(0,1fr); }
   .checkout-mobile-promise { display: block; margin-bottom: 12px; }
-  .checkout-mobile-promise[aria-hidden="true"] { visibility: hidden; }
   .checkout-mobile-promise .checkout-promise { margin-top: 0; }
 }
 @media (max-width: 490px) {

@@ -58,7 +58,7 @@ test("warehouse settings quote an agreed card service and capture uses the reser
     const checkout = summary(buyer);
     await expect(checkout).toContainText(service);
     await expect(checkout).toContainText("£12.95");
-    await expect(checkout).toContainText("Friday 10 July");
+    await expect(checkout.locator('time[datetime="2026-07-10"]')).toContainText("for dispatch today");
     await expect(checkout).toContainText("Thursday 16 July");
     const session = await payByCard(buyer);
     expect(session.amount_total).toBe(4254);

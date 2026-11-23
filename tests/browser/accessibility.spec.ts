@@ -125,7 +125,6 @@ for (const theme of themes) {
         ["/blades?q=no-such-reference", "Blade catalogue"],
         ["/blades?machine=zund&head=uct&depth=5", "Blade catalogue"],
         ["/reference-guide", "Blade cross-reference guide"],
-        ["/blades/edg-z10", product],
         ["/blades/edg-mim-45", /Mimaki|drag blade/i],
         ["/brands/mimaki", "Mimaki blade references"],
         ["/brands/graphtec", noPage],
@@ -160,8 +159,14 @@ for (const theme of themes) {
       await scanAccessibility(page, theme);
     });
 
-    test("product and selection dialogs, populated checkout and validation", async ({ page }) => {
+    test("product and selection dispatch states, populated checkout and validation", async ({ page }) => {
       const tray = page.getByRole("dialog", { name: "Your basket" });
+      const dispatch = /(?:for dispatch today, |^Dispatches )/;
+      await page.goto("/blades/edg-z10");
+      await expect(page.getByRole("heading", { name: product, level: 1 })).toBeVisible();
+      await expect(page.getByRole("main").getByRole("status").filter({ hasText: dispatch })).toHaveCount(1);
+      await scanAccessibility(page, theme);
+
       await page.goto("/blades");
       await page.getByRole("button", { name: "Basket 0 blades" }).click();
       await expect(tray).toContainText("Your basket is empty");
@@ -175,14 +180,17 @@ for (const theme of themes) {
       await page.keyboard.press("Escape");
       await page.getByRole("link", { name: /EDG-Z10 Flat-stock drag blade/ }).click();
       await expect(dialog).toContainText(product);
+      await expect(dialog.getByRole("status").filter({ hasText: dispatch })).toHaveCount(1);
       await scanAccessibility(page, theme);
       await dialog.getByRole("button", { name: "Add to basket" }).click();
       await expect(tray.getByRole("button", { name: "Remove EDG-Z10" })).toBeVisible();
+      await expect(tray.getByRole("status").filter({ hasText: dispatch })).toHaveCount(1);
       await scanAccessibility(page, theme);
 
       await tray.getByRole("link", { name: "Go to checkout" }).click();
       await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Order summary" })).toContainText("EDG-Z10");
+      await expect(page.getByRole("region", { name: "Order summary" }).getByRole("status").filter({ hasText: dispatch })).toHaveCount(1);
       await scanAccessibility(page, theme);
       await page.getByRole("button", { name: "Continue to payment" }).click();
       await expect(page.getByLabel("Business name")).toHaveAttribute("aria-invalid", "true");
