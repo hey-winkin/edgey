@@ -8,6 +8,7 @@ import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin
 import { photoByteLimit, photoEdgeLimit } from "../../src/lib/requests/photo-limits";
 import { saveThemeBeforeLoad, scanAccessibility, themes } from "../helpers/accessibility";
 import { connectAccountDb } from "../helpers/account-fixture";
+import { expectControlBoundary } from "../helpers/contrast";
 import { switchTheme } from "../helpers/navigation";
 import { setVerifiedStaffSession } from "./admin-fixtures";
 import { enquiryPhotoFixture, maxSizeEnquiryJpeg } from "./fixtures/enquiry-photo";
@@ -51,6 +52,8 @@ test("previews selected photos and fits the enquiry in both themes at trade-buye
       for (const theme of themes) {
         if (theme === "light") await switchTheme(page, theme);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+        await expectControlBoundary(picker.locator(".."));
+        if (mobile) await expectControlBoundary(page.getByLabel("Take photo").locator(".."));
         await scanAccessibility(page, theme);
         await render(page, `buyer-${theme}-${viewport.width}`);
       }
