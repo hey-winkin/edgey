@@ -51,6 +51,7 @@ export async function decideTradeApplication(
       if (creditLimit === null) return { ok: false, message: "Enter a GBP amount from 0 to 21474836.47, with up to two decimal places." };
       await approveTradeApplication(applicationId, userId, creditLimit);
     } else {
+      if (form.get("confirm") !== "yes") return { ok: false, message: "Confirm that you want to reject this application." };
       const reason = reasonFrom(form);
       if (!reason) return { ok: false, message: financeErrors.trade_rejection_reason_required };
       await financeCreditRpc("review_admin_trade_application", {
@@ -82,6 +83,9 @@ export async function updateTradeCredit(
       if (creditLimit === null) return { ok: false, message: "Enter a GBP amount from 0 to 21474836.47, with up to two decimal places." };
       await financeCreditRpc("set_credit_limit", { ...args, p_credit_limit_pence: creditLimit });
     } else {
+      if (action === "suspend" && form.get("confirm") !== "yes") {
+        return { ok: false, message: "Confirm that you want to suspend Net 30 for this account." };
+      }
       const reason = reasonFrom(form);
       if (!reason) return { ok: false, message: "Enter an internal reason of up to 500 characters." };
       await financeCreditRpc(action === "suspend" ? "suspend_trade_account" : "reinstate_trade_account", {

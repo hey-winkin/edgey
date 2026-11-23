@@ -1,0 +1,63 @@
+.catalogue-list-heading, .catalogue-list-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 16px;
+}
+
+.catalogue-list-heading { align-items: center; }
+
+.catalogue-list-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(8rem, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.admin .catalogue-list-filters :is(input[type=search], select) {
+  border-color: var(--edgey-control-border);
+  min-height: 44px;
+}
+
+.catalogue-list-filters .primary { min-height: 44px; }
+.catalogue-list-summary { font-size: .88rem; margin-block: 12px; row-gap: 6px; }
+.catalogue-list-summary p { margin: 0; }
+.catalogue-list .admin-table th { min-width: 0; }
+.catalogue-list .admin-table tbody th { font: inherit; background: transparent; }
+.catalogue-list .admin-table tbody tr:last-child th { border-bottom: 0; }
+.catalogue-list :is(th, td):nth-child(n+3) { text-align: right; }
+.catalogue-list .admin-table :is(th, td):nth-child(3),
+.catalogue-list .admin-table td:last-child .admin-mono { white-space: nowrap; }
+.catalogue-list .admin-pagination { flex-wrap: wrap; }
+
+.catalogue-list-name, .catalogue-list-detail {
+  display: block;
+}
+
+.catalogue-list-name { margin-top: 3px; overflow-wrap: anywhere; }
+.catalogue-list-detail { margin-top: 4px; font-size: .8rem; }
+.catalogue-list tbody th .catalogue-list-detail { overflow-wrap: anywhere; }
+.catalogue-list-detail[data-cost-status="missing"] { color: var(--ink); font-weight: 600; }
+
+.catalogue-list-status {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--edgey-control-border);
+  font: .78rem/1.5 var(--mono);
+}
+
+.catalogue-list-status[data-status="published"] {
+  background: var(--edgey-primary-fill);
+  color: var(--edgey-primary-text);
+  border-color: var(--edgey-primary-fill);
+}
+
+@media (max-width: 740px) {
+  .catalogue-list-heading { margin-bottom: 16px; }
+  .catalogue-list-heading .admin-heading { margin-bottom: 8px; }
+  .catalogue-list-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalogue-list-filters > :first-child { grid-column: 1 / -1; }
+  .catalogue-list-filters .primary { grid-column: 1 / -1; justify-self: start; }
+  .catalogue-list .admin-table :is(th, td) { padding-inline: 6px; }
+}

@@ -1,10 +1,12 @@
-import { AdminForm, AdminNotice, AdminSection } from "@/app/admin/ui";
+import { AdminNotice } from "@/app/admin/ui";
 import { CostFields } from "@/app/admin/cost-fields";
 import { displayTimestamp } from "@/lib/admin/format";
 import { formatSupplierCost } from "@/lib/admin/stock-cost";
 import type { getCurrentStaffCost } from "@/lib/admin/stock-cost-data";
 import { formatGbp } from "@/lib/commerce/money";
 import { saveVariantCost } from "./cost-actions";
+import { EditorForm } from "./editor-form";
+import styles from "./editor.module.css";
 
 export function VariantCost({ id, result }: { id: string; result: Awaited<ReturnType<typeof getCurrentStaffCost>> }) {
   const { available, cost } = result;
@@ -12,15 +14,17 @@ export function VariantCost({ id, result }: { id: string; result: Awaited<Return
     ? { movementId: cost.stock_movement_id, recordedAt: cost.recorded_at }
     : null;
   const form = (
-    <AdminForm action={saveVariantCost.bind(null, id, receipt)} submit={receipt ? "Save receipt cost correction" : "Save cost estimate"}>
+    <EditorForm id="variant-supplier-cost" action={saveVariantCost.bind(null, id, receipt)}
+      submit={receipt ? "Save receipt cost correction" : "Save cost estimate"} receiptCorrection={Boolean(receipt)}>
       <p className="admin-muted">{receipt
         ? "This records a correction to the latest receipt’s costs. It does not change stock or erase the original entry."
         : "Margins use this estimate until you record a costed receipt."}</p>
-      <CostFields key={cost?.recorded_at ?? "new-estimate"} cost={cost} />
-    </AdminForm>
+      <CostFields cost={cost} />
+    </EditorForm>
   );
   return (
-    <AdminSection title="Supplier cost">
+    <section className={styles.costPanel} aria-labelledby="supplier-cost">
+      <h3 id="supplier-cost">Supplier cost</h3>
       {!available ? <AdminNotice>Supplier costs will be available after the database update.</AdminNotice> : (
         <>
           {cost?.landed_unit_pence == null || cost.supplier_unit_minor == null || !cost.currency
@@ -38,15 +42,12 @@ export function VariantCost({ id, result }: { id: string; result: Awaited<Return
                 {cost.note && <><dt>Cost note</dt><dd>{cost.note}</dd></>}
               </dl>
             )}
-          {receipt ? <>
+          {receipt && (
             <p className="admin-muted">Margins use this receipt’s landed cost. A receipt without a cost does not replace it.</p>
-            <details className="admin-panel">
-              <summary>Correct latest receipt cost</summary>
-              {form}
-            </details>
-          </> : form}
+          )}
+          {form}
         </>
       )}
-    </AdminSection>
+    </section>
   );
 }

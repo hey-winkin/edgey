@@ -18,7 +18,7 @@ export async function verifyNewStaffAuthenticator(page: Page) {
   await page.getByRole("button", { name: "Set up authenticator" }).click();
   const key = await page.locator(".admin-panel code").textContent();
   if (!key) throw new Error("No local authenticator setup key.");
-  await page.getByLabel("Authenticator code").fill(authenticatorCode(key.trim()));
+  await page.getByLabel("Enter the 6-digit code from your authenticator app").fill(authenticatorCode(key.trim()));
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByText("Your authenticator is verified, but not approved for staff access.")).toBeVisible();
   const factorId = await page.locator(".admin-panel code").textContent();
@@ -37,7 +37,7 @@ export async function signInStaff(page: Page, credentials: StaffCredentials) {
   await enterStaffPassword(page, credentials);
   const key = fixtureFactors.get(credentials.id);
   if (key) {
-    await page.getByLabel("Authenticator code").fill(authenticatorCode(key));
+    await page.getByLabel("Enter the 6-digit code from your authenticator app").fill(authenticatorCode(key));
     await page.getByRole("button", { name: "Verify code" }).click();
   } else {
     const factor = await verifyNewStaffAuthenticator(page);

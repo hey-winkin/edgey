@@ -59,11 +59,13 @@ export default async function TradeAccountPage({ params, searchParams }: {
           </div>
           {(!suspended || account.buyer_id) && <div className="admin-panel">
             <h3>{suspended ? "Reinstate Net 30" : "Suspend Net 30"}</h3>
-            <p className="admin-muted">{suspended
-              ? "Allow new Net 30 orders within the current limit. Existing balances still count."
-              : "Block new Net 30 orders. Existing orders and balances aren’t changed."}</p>
+            {suspended && <p className="admin-muted">Allow new Net 30 orders within the current limit. Existing balances still count.</p>}
             <AdminForm action={updateTradeCredit.bind(null, id, randomUUID(), suspended ? "reinstate" : "suspend")}
-              submit={suspended ? "Reinstate Net 30" : "Suspend Net 30"}>
+              submit={suspended ? "Reinstate Net 30" : "Suspend Net 30"}
+              confirmation={suspended ? undefined : {
+                description: "This blocks new Net 30 orders. Existing orders and balances aren’t changed.",
+                label: "I confirm this account should not place new Net 30 orders.",
+              }}>
               <CreditReasonField label="Internal reason" />
             </AdminForm>
           </div>}

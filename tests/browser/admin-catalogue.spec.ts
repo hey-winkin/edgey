@@ -92,14 +92,26 @@ test("a catalogue operator approves and publishes a draft for public search", as
   await expect(mapping.getByRole("status")).toHaveText("Approval recorded.");
 
   await page.getByRole("button", { name: "Publish variant", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Unpublish variant" })).toBeVisible();
+  await expect(page.locator("summary").filter({ hasText: /^Unpublish variant$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Confirm unpublish variant" })).not.toBeVisible();
   expect((await db.from("variants").select("publication_status").eq("sku", "EDG-Z11").single()).data?.publication_status).toBe("published");
 
   await page.goto("/blades?q=3910309");
   await expect(page.getByRole("link", { name: /EDG-Z11 Tight-corner drag blade/ }))
     .toHaveAccessibleDescription(/Exact match · 3910309/);
   await page.goto(variantPath);
-  await page.getByRole("button", { name: "Unpublish variant" }).click();
+  await page.locator("summary").filter({ hasText: /^Unpublish variant$/ }).click();
+  const unpublish = page.getByRole("button", { name: "Confirm unpublish variant" });
+  const confirm = page.getByRole("checkbox", { name: "I confirm this SKU should return to draft" });
+  await unpublish.click();
+  await expect(confirm).toBeFocused();
+  await confirm.evaluate((checkbox) => checkbox.removeAttribute("required"));
+  await unpublish.click();
+  await expect(page.locator("form").filter({ has: unpublish }).getByRole("alert"))
+    .toHaveText("Confirm that this SKU should return to draft.");
+  expect((await db.from("variants").select("publication_status").eq("sku", "EDG-Z11").single()).data?.publication_status).toBe("published");
+  await confirm.check();
+  await unpublish.click();
   await expect(page.getByRole("button", { name: "Publish variant", exact: true })).toBeVisible();
   await page.goto("/blades?q=3910309");
   await expect(page.getByRole("link", { name: "Ask us to match this blade" })).toBeVisible();

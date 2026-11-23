@@ -80,7 +80,8 @@ test("shop menu exposes published brands and main journeys from a buyer page", a
   }
   const finderGroup = shopNav(page).locator(".fold-group").filter({ has: page.getByRole("heading", { name: "Find a blade", exact: true }) });
   await expect(finderGroup.getByRole("link", { name: "Cross-reference guide" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Footer" }).getByRole("link")).toHaveText(["Contact", "Privacy", "Back to top"]);
+  await expect(page.getByRole("navigation", { name: "Footer" }).getByRole("link")).toHaveText(["Contact", "Privacy", "Staff", "Back to top"]);
+  await expect(shopNav(page).locator('a[href^="/admin"]')).toHaveCount(0);
   await shopNav(page).getByRole("link", { name: "Mimaki" }).click();
   await expect(page.getByRole("heading", { name: "Mimaki blade references" })).toBeVisible();
   await expect(shopNav(page)).toBeHidden();
@@ -108,6 +109,21 @@ test("shop menu exposes published brands and main journeys from a buyer page", a
   await shopNav(page).getByRole("link", { name: "Cross-reference guide" }).click();
   await expect(page.getByRole("heading", { name: "Blade cross-reference guide", level: 1 })).toBeVisible();
   await expect(shopNav(page)).toBeHidden();
+});
+
+test("the shop footer opens staff sign-in or the desk for verified staff", async ({ page, baseURL }) => {
+  const footerStaff = page.getByRole("navigation", { name: "Footer" }).getByRole("link", { name: "Staff", exact: true });
+  await page.goto("/contact");
+  await expect(footerStaff).toHaveAttribute("href", "/admin/sign-in");
+  await footerStaff.click();
+  await expect(page).toHaveURL(/\/admin\/sign-in$/);
+  await expect(page.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();
+
+  await setVerifiedStaffSession(page, await createLocalAdminUser("catalogue"), baseURL);
+  await page.goto("/contact");
+  await footerStaff.click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: "Staff desk" })).toBeVisible();
 });
 
 test("keyboard dismissal keeps focus and navigation does not move the layout", async ({ page }) => {

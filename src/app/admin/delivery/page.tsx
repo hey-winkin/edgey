@@ -81,10 +81,12 @@ export default async function DeliverySettings({ searchParams }: {
         </div>
         <p className="admin-muted">Standard next-working-day delivery is £6.95 ex VAT, free from £150 ex VAT. Price and transit fields apply only to an agreed service.</p>
       </AdminForm>
-      {rule && <AdminForm action={removeDeliveryRule.bind(null, rule.scope, rule.code)} submit="Remove rule">
-        <label className="admin-check"><input type="checkbox" name="confirm" value="yes" required />
-          Remove this rule and allow any broader area rule to apply.</label>
-      </AdminForm>}
+      {rule && <AdminForm action={removeDeliveryRule.bind(null, rule.scope, rule.code)} submit="Remove rule"
+        confirmation={{
+          description: "New delivery quotes will use a broader area rule if one exists. Otherwise these postcodes become enquiry only.",
+          label: `I confirm the delivery rule for ${rule.code} should be removed.`,
+          submit: "Remove delivery rule",
+        }} />}
     </AdminSection>
     <AdminSection title="Configured rules">
       {rules.data.length ? (["district", "area"] as const).map((scope) => {

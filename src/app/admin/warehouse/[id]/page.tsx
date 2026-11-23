@@ -81,14 +81,14 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
       {undispatched && (
         <AdminSection title={blocked ? "Release blocked allocation" : "Cancel before dispatch"}>
           <AdminForm action={runWarehouseAction.bind(null, { kind: "cancel", orderId: order.id, key: randomUUID() })}
-            submit={blocked ? "Cancel and release allocation" : "Cancel order"}>
-            <p>{blocked ? "Cancelling fulfilment releases the reserved units. It does not change the recorded payment outcome."
-              : "Cancellation releases the allocation. It does not issue a refund."}</p>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="confirmCancel" value="yes" required />
-              {blocked ? "I confirm the order has not left the warehouse" : "Confirm cancellation"}
-            </label>
-          </AdminForm>
+            submit={blocked ? "Cancel and release allocation" : "Cancel order"}
+            confirmation={{
+              description: blocked ? "Cancelling fulfilment releases the reserved units. It does not change the recorded payment outcome."
+                : "Cancellation releases the allocation. It does not issue a refund.",
+              label: blocked ? "I confirm the order has not left the warehouse."
+                : "I confirm this order should be cancelled and its allocation released.",
+              name: "confirmCancel",
+            }} />
         </AdminSection>
       )}
       {status === "dispatched" && (

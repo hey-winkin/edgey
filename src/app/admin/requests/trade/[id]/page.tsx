@@ -49,8 +49,11 @@ export default async function TradeApplicationPage({ params }: { params: Promise
           </div>}
           {canReject && <div className="admin-panel">
             <h3>Reject application</h3>
-            <p className="admin-muted">We’ll notify the buyer. The reason is recorded for finance and isn’t sent to the buyer.</p>
-            <AdminForm action={decideTradeApplication.bind(null, id, "rejected")} submit="Reject application">
+            <AdminForm action={decideTradeApplication.bind(null, id, "rejected")} submit="Reject application"
+              confirmation={{
+                description: "This rejects the Net 30 application and queues a notice to the buyer. The reason stays with finance.",
+                label: "I confirm this buyer’s Net 30 application should be rejected.",
+              }}>
               <CreditReasonField label="Internal rejection reason" />
             </AdminForm>
           </div>}

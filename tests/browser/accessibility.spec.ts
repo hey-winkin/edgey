@@ -230,6 +230,7 @@ for (const theme of themes) {
             ["/admin/stock", "Stock"],
             [`/admin/stock/${variantId}`, sku],
             ["/admin/catalogue", "Catalogue"],
+            ["/admin/catalogue?q=EDG-Z10&status=published", "Catalogue"],
             [`/admin/catalogue/${ids["EDG-Z10"]}`, product],
             [`/admin/catalogue/${ids["EDG-Z11"]}`, /blade/i],
             ["/admin/finance", "Finance"],
@@ -239,6 +240,21 @@ for (const theme of themes) {
             [`/admin/requests/trials/${trial}`, "Trial request"],
             [`/admin/requests/trade/${application}`, company],
           ]);
+          await page.goto(`/admin/requests/enquiries/${enquiry}`);
+          await page.locator("summary").filter({ hasText: /^Close enquiry$/ }).click();
+          await expect(page.getByRole("button", { name: "Confirm close enquiry" })).toBeVisible();
+          await scanAccessibility(page, theme);
+
+          await db.query("select public.review_trade_application($1,$2,'approved')", [application, staff.id]);
+          const { rows: [account] } = await db.query<{ id: string }>(
+            "select id from public.approve_trade_account($1,$2,200000,$3)",
+            [application, staff.id, `cus_${randomUUID().replaceAll("-", "")}`],
+          );
+          await scanRoutes(page, theme, [[`/admin/finance/accounts/${account!.id}`, company]]);
+          await page.locator("summary").filter({ hasText: /^Suspend Net 30$/ }).click();
+          await expect(page.getByRole("button", { name: "Confirm suspend Net 30" })).toBeVisible();
+          await scanAccessibility(page, theme);
+
           await page.setViewportSize({ width: 320, height: 800 });
           await page.goto(`/admin/catalogue/${ids["EDG-Z10"]}`);
           await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
@@ -268,9 +284,12 @@ for (const theme of themes) {
           });
           if (cancellation.error) throw cancellation.error;
           await page.goto("/admin/finance");
-          const confirmRefund = page.getByRole("row").filter({ hasText: order.reference })
-            .getByRole("checkbox", { name: "Confirm full remaining refund" });
+          const refundRow = page.getByRole("table", { name: "Outstanding captures" })
+            .getByRole("row").filter({ hasText: order.reference });
+          await refundRow.locator("summary").filter({ hasText: /^Verify or refund remaining capture$/ }).click();
+          const confirmRefund = refundRow.getByRole("checkbox", { name: /remaining capture can be refunded/i });
           await expect(confirmRefund).toBeVisible();
+          await expect(confirmRefund).toHaveAccessibleDescription(/this issues a refund for the full remaining capture/i);
           await expect(confirmRefund).toHaveCSS("width", "24px");
           await expect(confirmRefund).toHaveCSS("height", "24px");
           await scanAccessibility(page, theme);

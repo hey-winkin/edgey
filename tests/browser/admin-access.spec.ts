@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { expect, test, type Page } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
-import { activateStaffFactor, enterStaffPassword, signInStaff, verifyNewStaffAuthenticator } from "./admin-fixtures";
+import { activateStaffFactor, enterStaffPassword, setVerifiedStaffSession, signInStaff, verifyNewStaffAuthenticator } from "./admin-fixtures";
 
 const privatePaths = [
   "/admin", "/admin/warehouse", "/admin/warehouse/8028e331-bde6-4d32-97c4-7fcf1bed9190",
@@ -60,6 +60,7 @@ test("staff need an independently approved authenticator and private pages prohi
   const staff = await createLocalAdminUser("warehouse");
   await enterStaffPassword(page, staff);
   await expect(page.getByRole("button", { name: "Set up authenticator" })).toBeVisible();
+  await expect(page.getByText(/the app generates the code; no email is sent/i)).toBeVisible();
   const response = await page.goto("/admin/stock");
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
   await expect(page.getByRole("navigation", { name: "Staff areas" })).toHaveCount(0);
@@ -67,7 +68,7 @@ test("staff need an independently approved authenticator and private pages prohi
   expect(stockRedirect?.headers()).toMatchObject({
     "x-frame-options": "DENY",
     "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    "referrer-policy": "same-origin",
     "permissions-policy": expect.stringContaining("microphone=()"),
     "content-security-policy": expect.stringContaining("frame-ancestors 'none'"),
     "cache-control": expect.stringContaining("no-store"),
@@ -83,6 +84,26 @@ test("staff need an independently approved authenticator and private pages prohi
   await activateStaffFactor(staff, factorId);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Staff desk" })).toBeVisible();
+});
+
+test("staff sign-in explains where the code comes from and how to recover access", async ({ page, baseURL }) => {
+  const staff = await createLocalAdminUser("warehouse");
+  try {
+    await setVerifiedStaffSession(page, staff, baseURL);
+    await page.context().clearCookies();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/admin/sign-in");
+    await expect(page.getByText(/next you’ll use an authenticator app, or set one up/i)).toBeVisible();
+    await enterStaffPassword(page, staff);
+    const code = page.getByLabel("Enter the 6-digit code from your authenticator app");
+    await expect(code).toBeVisible();
+    await expect(code).toHaveAccessibleDescription(/no email is sent/i);
+    await expect(page.getByText(/ask the shop owner in person to reset it/i)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  } finally {
+    const { error } = await localAdminClient().auth.admin.deleteUser(staff.id);
+    if (error) throw error;
+  }
 });
 
 test("a stale finance replay form cannot act after switching to a warehouse session", async ({ browser, page, baseURL }) => {

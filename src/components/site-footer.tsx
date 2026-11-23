@@ -14,6 +14,7 @@ export function SiteFooter() {
         <nav aria-label="Footer">
           <Link className="textlink" href="/contact">Contact</Link>
           <Link className="textlink" href="/privacy">Privacy</Link>
+          <Link className="textlink" href="/admin/sign-in" prefetch={false}>Staff</Link>
           <Link className="textlink" href="#top">Back to top</Link>
         </nav>
       </div>
