@@ -13,6 +13,7 @@ import {
 import { formatGbp } from "@/lib/commerce/money";
 import { lookupDeliveryCodes } from "./actions";
 import { runDeliveryEditor, submitDeliveryEditor } from "./editor-action";
+import { restoreEarlyDeliveryText } from "./early-text";
 import styles from "./delivery-editor.module.css";
 
 const quantityMax = DELIVERY_QUANTITY_MAX.toLocaleString("en-GB");
@@ -33,6 +34,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
   const [liveChecks, setLiveChecks] = useState<ReturnType<typeof groupDeliveryMatches>>(() => new Map());
   const [busy, setBusy] = useState<string | null>(null);
   const operation = useRef(false);
+  const focusedState = useRef<EditorState>(undefined);
   const pending = useRef(new Set<string>());
   const importing = useRef<HTMLDetailsElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
@@ -53,6 +55,10 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
   const lineClass = `${styles.line} ${showCosts ? styles.withCost : ""}`;
 
   useEffect(() => {
+    if (focusedState.current === state) return;
+    const firstMount = focusedState.current === undefined;
+    focusedState.current = state;
+    if (firstMount && document.activeElement?.closest("#receipt-editor")) return;
     if (state.errorAt) document.getElementById(state.errorAt)?.focus();
   }, [state]);
 
@@ -82,7 +88,9 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
   }, []);
 
   const attachForm = useCallback((form: HTMLFormElement | null) => {
-    if (!form || state.review) return;
+    if (!form) return;
+    restoreEarlyDeliveryText(form);
+    if (state.review) return;
     const current = readDeliveryDraft(new FormData(form), showCosts);
     setLive({ state, draft: current });
     const renderedCodes = new Map(state.draft.rows.map(({ id, code }) => [id, code.trim()]));

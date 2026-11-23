@@ -6,6 +6,7 @@ import { makeDeliveryEditorState } from "@/lib/admin/delivery-editor-state";
 import { deliveryToday } from "@/lib/admin/deliveries";
 import { canManageCosts, stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { DeliveryEditor } from "./delivery-editor";
+import { captureEarlyDeliveryText } from "./early-text";
 import styles from "./delivery-editor.module.css";
 
 export const metadata: Metadata = { title: "Receive delivery" };
@@ -31,7 +32,10 @@ export default async function ReceiveDeliveryPage() {
       </div>
       {error
         ? <AdminNotice>Delivery receiving is not available yet. Use Stock balances to receive individual blades.</AdminNotice>
-        : <DeliveryEditor initial={makeDeliveryEditorState(randomUUID(), today)} showCosts={canManageCosts(roles)} today={today} />}
+        : <>
+            <script dangerouslySetInnerHTML={{ __html: captureEarlyDeliveryText }} />
+            <DeliveryEditor initial={makeDeliveryEditorState(randomUUID(), today)} showCosts={canManageCosts(roles)} today={today} />
+          </>}
     </>
   );
 }

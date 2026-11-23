@@ -177,6 +177,30 @@ test("review can submit natively while Next scripts are blocked", async ({ page,
   await expectStoredReceipt(page, { reference, note, lines: [{ sku: first.sku, quantity: 6, costPence: 120 }] });
 });
 
+test("an edit to a prefilled note survives hydration after a native check", async ({ page, baseURL }) => {
+  const { blades: [first], reference } = await deliveryFixture();
+  await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
+  const note = "Fictional parcel";
+  const updated = `${note} with an extra carton`;
+  const noteField = page.getByLabel("Delivery note (optional)");
+  await enterBeforeHydration(page, async () => {
+    await page.getByLabel("Delivery reference").fill(reference);
+    await noteField.fill(note);
+    await page.getByLabel("Blade code for line 1").fill(first.sku);
+    await page.getByLabel("Quantity for line 1").fill("3");
+    await page.getByRole("button", { name: "Check blade codes" }).click();
+    await expect(page.getByText(first.name, { exact: true })).toBeVisible();
+    await expect(noteField).toHaveValue(note);
+    await noteField.press("End");
+    await noteField.pressSequentially(" with an extra carton");
+    await expect(noteField).toHaveValue(updated);
+  });
+  await expectEnhancedKeyboardNavigation(page);
+  await expect(noteField).toHaveValue(updated);
+  await page.getByRole("button", { name: "Review delivery" }).click();
+  await expect(page.getByText(updated, { exact: true })).toBeVisible();
+});
+
 for (const method of ["spreadsheet rows", "CSV upload"] as const) {
   test(`${method} entered before hydration can be imported and received`, async ({ page, baseURL }) => {
     const { blades: [first], reference } = await deliveryFixture();
