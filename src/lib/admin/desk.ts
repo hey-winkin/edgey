@@ -26,11 +26,13 @@ export async function staffDeskCounts(db: SupabaseClient<Database>, roles: reado
     : catalogue ? trials.eq("status", "pending")
     : warehouse ? trials.eq("status", "in_review").eq("eligibility", "eligible") : null;
   const signal = AbortSignal.timeout(5_000);
-  const [orders, enquiries, trialCount, trade, outOfStock] = await Promise.all([
+  const [orders, enquiries, trialCount, trialFollowUps, trade, outOfStock] = await Promise.all([
     warehouse ? readCount("orders", countWarehousePicking(db).abortSignal(signal)) : 0,
     warehouse || catalogue ? readCount("enquiries", db.from("enquiries").select("id", countOnly)
       .in("status", awaitingReview).abortSignal(signal)) : 0,
     trialQuery ? readCount("trials", trialQuery.abortSignal(signal)) : 0,
+    warehouse || catalogue ? readCount("trial follow-ups", requestsDb(db)
+      .rpc("admin_trial_follow_up_status", {}, countOnly).abortSignal(signal)) : 0,
     canReviewTrade ? readCount("trade applications", db.from("trade_applications").select("id", countOnly)
       .eq("status", "pending").abortSignal(signal)) : 0,
     warehouse ? readCount("out of stock", countPublishedOutOfStock(db).abortSignal(signal)) : 0,
@@ -39,6 +41,7 @@ export async function staffDeskCounts(db: SupabaseClient<Database>, roles: reado
   return {
     orders,
     requests: enquiries === null || trialCount === null || trade === null ? null : enquiries + trialCount + trade,
+    trialFollowUps,
     outOfStock,
   } satisfies Record<StaffTask, number | null>;
 }

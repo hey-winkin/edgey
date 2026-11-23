@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serviceClient } from "@/lib/supabase/service";
 import type { Database } from "@/lib/supabase/database.types";
+import type { TrialFollowUpOutcome, TrialFollowUpStatus } from "./trial-follow-ups";
 
 type Public = Database["public"];
 type Tables = Public["Tables"];
@@ -19,8 +20,20 @@ type RequestDatabase = {
         reviewed_at: string | null;
       }>;
       order_outbox: WithFields<"order_outbox", { message_subject: string | null; message_body: string | null }>;
+      trial_follow_ups: {
+        Row: { id: number; trial_request_id: string; followed_on: string; outcome: TrialFollowUpOutcome;
+          next_on: string | null; note: string | null; recorded_by: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Functions: Public["Functions"] & {
+      admin_trial_follow_up_status: Rpc<{ p_trial_request_id?: string }, TrialFollowUpStatus[]>;
+      record_trial_follow_up: Rpc<{
+        p_trial_request_id: string; p_followed_on: string; p_outcome: TrialFollowUpOutcome;
+        p_note: string | null; p_next_on: string | null; p_expected_id: number | null;
+      }, number>;
       admin_trial_duplicate_evidence: Rpc<{ p_trial_request_id: string }, {
         id: string; company: string; created_at: string;
         same_email: boolean; same_company: boolean; same_postcode: boolean;

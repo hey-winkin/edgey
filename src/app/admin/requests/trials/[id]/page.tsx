@@ -12,6 +12,7 @@ import { handleTrial } from "../../actions";
 import { AddressInput } from "../../address-input";
 import { RequestTextarea } from "../../request-textarea";
 import { VariantSelect } from "../../variant-select";
+import { SalesFollowUp } from "./sales-follow-up";
 import { TrialMailStatus } from "./trial-mail-status";
 
 export const metadata = { title: "Trial request" };
@@ -35,7 +36,7 @@ export default async function TrialPage({ params, searchParams }: {
   const reviewable = trial.status === "pending" || trial.status === "in_review";
   const reviewedIds = trial.reviewed_variant_ids ?? [];
   const canApprove = warehouse && reviewable && trial.eligibility === "eligible" && reviewedIds.length === 2;
-  const [{ data: duplicateRows, error: duplicateError }, { data: allocations, error: allocationError }, delivery, options, coverage, deliveryChoices] =
+  const [{ data: duplicateRows, error: duplicateError }, { data: allocations, error: allocationError }, delivery, options, coverage, deliveryChoices, followUp] =
     await Promise.all([
       requestDb.rpc("admin_trial_duplicate_evidence", { p_trial_request_id: id }),
       db.from("trial_allocations").select("variant_id,quantity").eq("trial_request_id", id).order("variant_id"),
@@ -45,8 +46,9 @@ export default async function TrialPage({ params, searchParams }: {
       catalogue && reviewable ? publishedRequestVariants() : [],
       deliveryCoverageForPostcode(trial.postcode),
       canApprove ? readStaffDeliveryChoices(db) : [],
+      requestDb.rpc("admin_trial_follow_up_status", { p_trial_request_id: id }).maybeSingle(),
     ]);
-  if (duplicateError || allocationError || delivery?.error) throw new Error("Could not load the trial checks.");
+  if (duplicateError || allocationError || delivery?.error || followUp.error) throw new Error("Could not load the trial checks.");
   const fulfilment = delivery?.data;
   const labels = await requestVariantLabels([...new Set([...reviewedIds, ...allocations.map((row) => row.variant_id)])]);
   const linking = Boolean(fulfilment?.state === "dispatched" && fulfilment.dispatched_at && !fulfilment.subsequent_order_id);
@@ -61,7 +63,8 @@ export default async function TrialPage({ params, searchParams }: {
   const path = `/admin/requests/trials/${id}`;
 
   return <>
-    <AdminHeading title="Trial request" eyebrow="Requests" description={trialStatus(trial.status, fulfilment?.state)} />
+    <AdminHeading title="Trial request" eyebrow="Requests" description={followUp.data?.converted
+      ? "Dispatched · Converted" : trialStatus(trial.status, followUp.data ? "dispatched" : fulfilment?.state)} />
     <AdminLink href="/admin/requests">{staffDestinationLabels.customerEnquiries}</AdminLink>
     <TrialMailStatus db={db} id={id} />
     <div className="admin-grid">
@@ -146,6 +149,7 @@ export default async function TrialPage({ params, searchParams }: {
           <label className="admin-check"><input type="checkbox" name="verified" value="yes" required /> I verified that this carrier service can deliver to the full address.</label>
         </AdminForm> : <AdminNotice>Catalogue staff must record an eligible decision and select two units before warehouse can approve.</AdminNotice>}
     </AdminSection>}
+    {followUp.data && <SalesFollowUp db={requestDb} trial={followUp.data} />}
     {fulfilment && <AdminSection title="Delivery record">
       <dl className="admin-spec">
         <div><dt>Recipient</dt><dd>{fulfilment.recipient_name}</dd></div>

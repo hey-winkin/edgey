@@ -75,14 +75,11 @@ export async function saveDeliveryCalendar(
   const { db } = await requireStaff("warehouse");
   const from = field(form, "from");
   const through = field(form, "through");
-  const holidayInput = field(form, "bankHolidays");
   const closureInput = field(form, "closures");
-  if (holidayInput.length > 44_000 || closureInput.length > 44_000) {
-    return { ok: false, message: "Too many holiday or closure dates." };
+  if (closureInput.length > 44_000) {
+    return { ok: false, message: "Too many closure dates." };
   }
-  const dates = (value: string) => datesSchema.safeParse(value ? [...new Set(value.split(/[\s,]+/))].sort() : []);
-  const holidays = dates(holidayInput);
-  const closures = dates(closureInput);
+  const closures = datesSchema.safeParse(closureInput ? [...new Set(closureInput.split(/[\s,]+/))].sort() : []);
   const weekdays = Array.from({ length: 7 }, (_, day) => day).filter((day) => form.getAll("weekday").includes(String(day)));
   const cutoff = field(form, "cutoff");
   if (!z.iso.date().safeParse(from).success || !z.iso.date().safeParse(through).success || from.startsWith("0000") ||
@@ -90,12 +87,12 @@ export async function saveDeliveryCalendar(
     !weekdays.length || (calendar === "warehouse" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoff))) {
     return { ok: false, message: "Set a date range of up to ten years, at least one working day, and a London cut-off for the warehouse." };
   }
-  if (!holidays.success || !closures.success || [...holidays.data, ...closures.data].some((date) => date < from || date > through)) {
-    return { ok: false, message: "Enter holiday and closure dates as YYYY-MM-DD within the active range." };
+  if (!closures.success || closures.data.some((date) => date < from || date > through)) {
+    return { ok: false, message: "Enter closure dates as YYYY-MM-DD within the active range." };
   }
   const { error } = await db.from("delivery_calendars").upsert({
     calendar, active_from: from, active_through: through, working_weekdays: weekdays,
-    bank_holidays: holidays.data, closures: closures.data,
+    bank_holidays: [], closures: closures.data,
     cutoff_minutes: calendar === "warehouse" ? Number(cutoff.slice(0, 2)) * 60 + Number(cutoff.slice(3)) : null,
   });
   return error ? { ok: false, message: "Couldn’t save the calendar." } : saved("Delivery calendar saved.");

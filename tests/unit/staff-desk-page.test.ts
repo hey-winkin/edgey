@@ -11,7 +11,7 @@ test.each([
   [0, "No new sales orders"],
   [null, "New sales orders"],
 ] as const)("keeps the sales queue available when its count is %s", async (orders, label) => {
-  staffDeskCounts.mockResolvedValue({ orders, requests: 0, outOfStock: 0 });
+  staffDeskCounts.mockResolvedValue({ orders, requests: 0, trialFollowUps: 0, outOfStock: 0 });
   const html = renderToStaticMarkup(await AdminPage());
   expect(html).toMatch(new RegExp(`<a[^>]*class="primary"[^>]*href="/admin/warehouse"[^>]*>${label}</a>`));
   if (orders === null) {
@@ -21,4 +21,11 @@ test.each([
   } else {
     expect(html).not.toContain('aria-describedby="staff-sales-count-status"');
   }
+});
+
+test("adds a due trial reminder to Sales orders", async () => {
+  staffDeskCounts.mockResolvedValue({ orders: 0, requests: 0, trialFollowUps: 2, outOfStock: 0 });
+  const html = renderToStaticMarkup(await AdminPage());
+  expect(html).toMatch(/id="staff-desk-sales-orders"[^]*href="\/admin\/requests\/trial-follow-ups"[^]*>2<\/span> <span>trial follow-ups due<\/span>/);
+  expect(html).not.toContain("caught up");
 });

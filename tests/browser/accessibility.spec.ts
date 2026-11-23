@@ -60,6 +60,7 @@ test("every App Router page is accounted for in the accessibility suite", () => 
     "admin/requests/enquiries/[id]/page.tsx",
     "admin/requests/page.tsx",
     "admin/requests/trade/[id]/page.tsx",
+    "admin/requests/trial-follow-ups/page.tsx",
     "admin/requests/trials/[id]/page.tsx",
     "admin/sales/page.tsx",
     "admin/sign-in/page.tsx",

@@ -1836,11 +1836,11 @@ export type Database = {
         Returns: boolean;
       };
       checkout_delivery_terms: {
-        Args: { p_postcode: string };
+        Args: { p_postcode: string; p_official_bank_holidays?: string[] };
         Returns: Json;
       };
       checkout_warehouse_calendar: {
-        Args: never;
+        Args: { p_official_bank_holidays?: string[] };
         Returns: Json;
       };
       reserve_order_with_delivery: {
@@ -1848,6 +1848,7 @@ export type Database = {
           p_delivery_terms: Json;
           p_payment_method: Database["public"]["Enums"]["order_payment_method"];
           p_po_number?: string;
+          p_official_bank_holidays?: string[];
         };
         Returns: Database["public"]["Tables"]["orders"]["Row"];
         SetofOptions: { from: "*"; to: "orders"; isOneToOne: true; isSetofReturn: false };

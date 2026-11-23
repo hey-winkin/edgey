@@ -162,6 +162,8 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await page.getByRole("button", { name: "Link order" }).click();
   const linked = page.getByRole("link", { name: reference });
   await expect(linked).toHaveAttribute("href", `/admin/warehouse/${order.id}`);
+  await expect(page.getByText("Dispatched · Converted", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Record follow-up" })).toHaveCount(0);
   await inspectAtWidths(page, "trial-linked");
   await linked.click();
   await expect(page.getByRole("link", { name: "View trial request" })).toHaveAttribute("href", trialPath);
