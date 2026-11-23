@@ -9,6 +9,18 @@ const materials = [
   { name: "Textile", slug: "textile", sku: "EDG-Z50", href: "/blades/edg-z50", count: 1, fit: "DRT, PRT" },
 ] as const;
 
+const additional = [
+  ["Banner", "banner", "EDG-Z10", "/blades/edg-z10", "UCT, SCT"],
+  ["Flock", "flock", "EDG-SUM-DRG-60", "/blades/edg-sum-drg?variant=EDG-SUM-DRG-60", "D-Series Drag; F-Series Drag Module"],
+  ["Foam board", "foam-board", "EDG-Z16", "/blades/edg-z16", "EOT, POT, UCT"],
+  ["Honeycomb board", "honeycomb-board", "EDG-Z71", "/blades/edg-z71", "VCT V-Cut Tool"],
+  ["Laminate", "laminate", "EDG-SUM-DRG-60", "/blades/edg-sum-drg?variant=EDG-SUM-DRG-60", "D-Series Drag; F-Series Drag Module"],
+  ["PVC", "pvc", "EDG-Z10", "/blades/edg-z10", "UCT, SCT"],
+  ["Re-board", "re-board", "EDG-Z71", "/blades/edg-z71", "VCT V-Cut Tool"],
+  ["Reflective film", "reflective-film", "EDG-MIM-A60", "/blades/edg-mim-45?variant=EDG-MIM-A60", "CG-SRIII"],
+  ["Soft signage", "soft-signage", "EDG-Z50", "/blades/edg-z50", "DRT, PRT"],
+] as const;
+
 const stagedFamilyCodes = /^EDG-(?:Z10|Z16|SR6223|Z50|Z71|Z1|SUM-DRG|SUM-TAN|MIM-45)\s/;
 
 test("the homepage showcases corrugated by default without filtering the first catalogue view", async ({ page }) => {
@@ -105,9 +117,9 @@ test("the finder exposes active filters and can retry the same search across the
   await expect(page.locator("#catalogue .cards")).toContainText("Exact match · 3910306");
 });
 
-test("other and unknown material links don't select an unrelated study", async ({ page }) => {
+test("draft-only and unknown material links don't select an unrelated study", async ({ page }) => {
   for (const [slug, emptyCopy, count] of [
-    ["pvc", "No cutting study for PVC.", 1],
+    ["display-board", "No cutting study for this material.", 0],
     ["not-a-substrate", "No cutting study for this material.", 0],
   ] as const) {
     await page.goto("/?material=" + slug);
@@ -115,6 +127,44 @@ test("other and unknown material links don't select an unrelated study", async (
     await expect(page.getByRole("navigation", { name: "Browse by material" }).locator("[aria-current]")).toHaveCount(0);
     await expect(page.locator("#catalogue .cards .p-card")).toHaveCount(count);
   }
+});
+
+test("the compact disclosure exposes every additional published study without adding a wall of tiles", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/");
+  const chooser = page.getByRole("navigation", { name: "Browse by material" });
+  const more = chooser.locator("summary");
+  await expect(more).toHaveText("More studies (9)");
+  await expect(chooser.getByRole("link")).toHaveCount(6);
+  await more.focus();
+  await more.press("Space");
+  await expect(chooser.locator("details[open]").getByRole("link")).toHaveText(additional.map(([name]) => name));
+  for (const [name, slug, sku, href, fit] of additional) {
+    const link = chooser.getByRole("link", { name, exact: true });
+    await link.focus();
+    await link.press("Enter");
+    await expect(page).toHaveURL("/?material=" + slug);
+    await expect(link).toBeFocused();
+    await expect(link).toHaveAttribute("aria-current", "true");
+    const study = page.getByRole("region", { name, exact: true });
+    await expect(study).toContainText(sku);
+    await expect(study).toContainText(fit);
+    await expect(study.locator("figure svg")).toHaveCount(1);
+    await expect(study.getByRole("link", { name: "View blade details" })).toHaveAttribute("href", href);
+    await expect(study.getByRole("link", { name: /See [1-9]/ })).toHaveAttribute("href", "/?material=" + slug + "#catalogue");
+    await expect(page.getByText(`Searching within: ${name}.`)).toBeVisible();
+    await expect(page.locator(`#catalogue .p-card a[href="${href.split("?")[0]}"]`)).toBeVisible();
+    if (slug === "reflective-film") {
+      await expect(study.getByText("Cutting depth", { exact: true })).toHaveCount(0);
+      await expect(study.getByText("Tool heads", { exact: true })).toHaveCount(0);
+      await expect(study).toContainText("Shared OEM reference: Mimaki SPB-0030.");
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  }
+  await page.reload();
+  await expect(more).toContainText("Soft signage");
+  await expect(more).toHaveAccessibleName("More studies (9) Soft signage");
+  await expect(page.getByRole("region", { name: "Soft signage" })).toContainText("Bore diameter");
 });
 
 test("jumping to the same material's results keeps its search scope", async ({ page }) => {
@@ -188,15 +238,19 @@ test("the search form and material selection remain usable without JavaScript", 
     await page.getByRole("link", { name: "Vinyl", exact: true }).click();
     await expect(page.getByRole("region", { name: "Vinyl" })).toContainText("EDG-MIM-A45");
     await expect(page.locator("#catalogue .cards .p-card")).toHaveCount(5);
+    await page.locator("summary").filter({ hasText: "More studies" }).click();
+    await page.getByRole("link", { name: "Foam board", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Foam board" })).toContainText("EDG-Z16");
+    await expect(page.locator("#catalogue .cards .p-card")).toHaveCount(1);
   } finally {
     await context.close();
   }
 });
 
 for (const theme of themes) {
-  for (const width of [1440, 390, 320]) {
+  for (const width of [1440, 1280, 390, 320]) {
     test(`${theme} at ${width}px shows search, machines, material tabs and legible study callouts`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
+      await page.setViewportSize({ width, height: width === 1280 ? 800 : 900 });
       await saveThemeBeforeLoad(page, theme);
       await page.goto("/");
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -207,11 +261,11 @@ for (const theme of themes) {
       const plate = await study.boundingBox();
       expect(search!.y + search!.height).toBeLessThan(machines!.y);
       expect(machines!.y + machines!.height).toBeLessThan(tabs!.y);
-      if (width === 1440) expect(plate!.x).toBeGreaterThan(tabs!.x + tabs!.width);
+      if (width >= 1280) expect(plate!.x).toBeGreaterThan(tabs!.x + tabs!.width);
       else expect(plate!.y).toBeGreaterThan(tabs!.y + tabs!.height);
       await expect(study.locator("dt").filter({ hasText: "Blade length" })).toBeVisible();
-      await expect(study.locator("dt span").first()).toHaveCSS("display", width === 1440 ? "none" : "inline-grid");
-      await expect(study.locator("figure svg text").filter({ hasText: width === 1440 ? /^Blade length/ : /^A$/ })).toBeVisible();
+      await expect(study.locator("dt span").first()).toHaveCSS("display", width >= 1280 ? "none" : "inline-grid");
+      await expect(study.locator("figure svg text").filter({ hasText: width >= 1280 ? /^Blade length/ : /^A$/ })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     });
   }

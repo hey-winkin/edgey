@@ -135,6 +135,15 @@ for (const theme of themes) {
       ]);
     });
 
+    test("additional cutting studies with the chooser closed and open", async ({ page }) => {
+      await scanRoutes(page, theme, [["/?material=reflective-film", "Find a blade."]]);
+      await page.goto("/?material=soft-signage");
+      const chooser = page.getByRole("navigation", { name: "Browse by material" });
+      await chooser.locator("summary").click();
+      await expect(chooser.getByRole("link", { name: "Soft signage" })).toHaveAttribute("aria-current", "true");
+      await scanAccessibility(page, theme);
+    });
+
     test("request forms, sign-ins and public checkout returns", async ({ page }) => {
       await scanRoutes(page, theme, [
         ["/enquiry", "Ask us to match this blade"],

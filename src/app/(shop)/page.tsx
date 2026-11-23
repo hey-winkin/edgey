@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { HomeContent } from "@/components/home-content";
 import { SearchHomeHero } from "@/components/material-hero/search-home-hero";
 import { readFilters, type RouteQuery } from "@/lib/catalogue";
-import { buildCoreStudies } from "@/lib/catalogue/material-hero";
+import { buildAdditionalStudies, buildCoreStudies } from "@/lib/catalogue/material-hero";
 import { listFamilies, loadCatalogue } from "@/lib/catalogue/server";
 import { siteUrl } from "@/lib/catalogue/site-url";
 import { siteDescription, siteTitle, socialMetadata } from "@/lib/catalogue/social";
@@ -25,7 +25,7 @@ export default async function HomePage({ searchParams }: Props) {
   const [view, families] = await Promise.all([loadCatalogue(filters), listFamilies()]);
   return (
     <HomeContent
-      hero={<SearchHomeHero view={view} filters={filters} studies={buildCoreStudies(families)} />}
+      hero={<SearchHomeHero view={view} filters={filters} coreStudies={buildCoreStudies(families)} moreStudies={buildAdditionalStudies(families)} />}
       view={view}
       filters={filters}
       heroSearch

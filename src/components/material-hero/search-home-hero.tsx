@@ -4,19 +4,24 @@ import { CatalogueControls } from "@/components/catalogue-controls";
 import { bladeCount, brandHref, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
 import { corrugatedSlug, type CuttingStudy } from "@/lib/catalogue/material-hero";
 import { CoreMaterialDrawing, CoreMaterialSwatch } from "./core-material-art";
+import { AdditionalMaterialDrawing, additionalIllustration } from "./extended-material-art";
 import { annotationTags, CorrugatedDrawing, CorrugatedSwatch } from "./material-art";
 import { HomeBrowseLink } from "./home-browse-link";
 import styles from "./search-home-hero.module.css";
 
-export function SearchHomeHero({ view, filters, studies, qualityFacts }: {
+export function SearchHomeHero({ view, filters, coreStudies, moreStudies, qualityFacts }: {
   view: CatalogueView;
   filters: CatalogueFilters;
-  studies: CuttingStudy[];
+  coreStudies: CuttingStudy[];
+  moreStudies: CuttingStudy[];
   qualityFacts?: ReactNode;
 }) {
+  const studies = [...coreStudies, ...moreStudies];
   const selected = filters.material
     ? studies.find(({ material }) => material.slug === filters.material)
     : studies[0];
+  const selectedMore = selected && moreStudies.includes(selected) ? selected : undefined;
+  const moreLabel = coreStudies.length > 0 ? "More studies" : "Cutting studies";
   const matchingCount = view.materials.find(({ slug }) => slug === selected?.material.slug)?.count;
   const searchScope = [
     view.activeMaterial?.name,
@@ -63,9 +68,9 @@ export function SearchHomeHero({ view, filters, studies, qualityFacts }: {
             <h2 id="home-material-title" className={styles.label}>Browse by material</h2>
             <Link className="textlink" href="/blades#materials">All materials <span aria-hidden="true">↗</span></Link>
           </div>
-          {studies.length > 0 && (
+          {coreStudies.length > 0 && (
             <ul className={styles.materials} role="list">
-              {studies.map(({ material }) => (
+              {coreStudies.map(({ material }) => (
                 <li key={material.slug}>
                   <HomeBrowseLink href={"/?material=" + encodeURIComponent(material.slug)} current={selected?.material.slug === material.slug} className={styles.tile}>
                     <span className={styles.swatch}>
@@ -76,6 +81,23 @@ export function SearchHomeHero({ view, filters, studies, qualityFacts }: {
                 </li>
               ))}
             </ul>
+          )}
+          {moreStudies.length > 0 && (
+            <details className={styles.more}>
+              <summary>
+                <span>{moreLabel} <span className={styles.moreCount}>({moreStudies.length})</span></span>
+                {selectedMore && <>{" "}<span className={styles.moreCurrent}>{selectedMore.material.name}</span></>}
+              </summary>
+              <ul role="list">
+                {moreStudies.map(({ material }) => (
+                  <li key={material.slug}>
+                    <HomeBrowseLink href={`/?material=${encodeURIComponent(material.slug)}`} current={selectedMore?.material.slug === material.slug}>
+                      {material.name}
+                    </HomeBrowseLink>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </nav>
         {qualityFacts && <div className={styles.group}>{qualityFacts}</div>}
@@ -95,6 +117,7 @@ export function SearchHomeHero({ view, filters, studies, qualityFacts }: {
 function CuttingStudyPanel({ study, count }: { study: CuttingStudy; count: number }) {
   const { material } = study;
   const annotations = Object.fromEntries(study.annotations.map(({ key, label, value }) => [key, label + " · " + value]));
+  const illustration = additionalIllustration(material.slug);
 
   return (
     <section className={styles.plate} aria-labelledby="home-study-title">
@@ -107,7 +130,9 @@ function CuttingStudyPanel({ study, count }: { study: CuttingStudy; count: numbe
       </div>
       <figure>
         <div className={styles.canvas}>
-          {material.slug === corrugatedSlug
+          {illustration
+            ? <AdditionalMaterialDrawing illustration={illustration} annotations={annotations} />
+            : material.slug === corrugatedSlug
             ? <CorrugatedDrawing annotations={annotations} />
             : <CoreMaterialDrawing material={material.slug} annotations={annotations} />}
         </div>
@@ -116,7 +141,12 @@ function CuttingStudyPanel({ study, count }: { study: CuttingStudy; count: numbe
           <dl className={styles.specs}>
             {study.annotations.map(({ key, label, value }) => (
               <div key={key}>
-                <dt><span className={styles.specTag} aria-hidden="true">{annotationTags[key]}</span>{label}</dt>
+                <dt>
+                  {(!illustration || illustration.leaders.some((leader) => leader.key === key)) && (
+                    <span className={styles.specTag} aria-hidden="true">{annotationTags[key]}</span>
+                  )}
+                  {label}
+                </dt>
                 <dd>{value}</dd>
               </div>
             ))}
