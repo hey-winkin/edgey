@@ -8,7 +8,7 @@ import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin
 import { connectAccountDb } from "../helpers/account-fixture";
 import { scanBothThemes } from "../helpers/accessibility";
 import { resetBrowserQuoteBudget } from "../helpers/quote-budget";
-import { signInStaff } from "./admin-fixtures";
+import { setVerifiedStaffSession } from "./admin-fixtures";
 
 test.use({ trace: "off" });
 
@@ -145,7 +145,7 @@ async function capture(page: Page, name: string, theme: "dark" | "light", width:
   }
 }
 
-test("Net 30 confirmation and the trade panel read only the verified buyer's orders and invoices", async ({ page, browser }) => {
+test("Net 30 confirmation and the trade panel read only the verified buyer's orders and invoices", async ({ page, browser, baseURL }) => {
   test.setTimeout(120_000);
   const fixture = await stage();
   try {
@@ -162,7 +162,7 @@ test("Net 30 confirmation and the trade panel read only the verified buyer's ord
     const staff = await browser.newContext({ baseURL: new URL(page.url()).origin });
     try {
       const finance = await staff.newPage();
-      await signInStaff(finance, fixture.other);
+      await setVerifiedStaffSession(finance, fixture.other, baseURL);
       await finance.goto(`/admin/finance/accounts/${fixture.tradeId}`);
       await expect(finance.getByRole("heading", { level: 1, name: "Estuary Print Studio" })).toBeVisible();
       await scanBothThemes(finance);

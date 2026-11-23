@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/admin/auth";
 import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { formatPoundsInput } from "@/lib/admin/pounds";
 import { formatGbp } from "@/lib/commerce";
+import { BANK_HOLIDAYS_URL, otherClosureDates, readBankHolidays } from "@/lib/delivery/bank-holidays";
 import type { Database } from "@/lib/supabase/database.types";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "../ui";
 import { removeDeliveryRule, saveDeliveryCalendar, saveDeliveryRule } from "./actions";
@@ -12,12 +13,20 @@ export const metadata: Metadata = { title: staffDestinationLabels.customerDelive
 type Calendar = Database["public"]["Tables"]["delivery_calendars"]["Row"];
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const path = "/admin/delivery";
+const ukDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" });
+const londonDateKey = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit",
+});
 
 function formatCutoff(minutes: number | null | undefined) {
   return minutes == null ? "" : [Math.floor(minutes / 60), minutes % 60].map((part) => String(part).padStart(2, "0")).join(":");
 }
 
-function CalendarEditor({ kind, calendar }: { kind: "warehouse" | "carrier"; calendar?: Calendar }) {
+function CalendarEditor({ kind, calendar, officialHolidays }: {
+  kind: "warehouse" | "carrier";
+  calendar?: Calendar;
+  officialHolidays: ReadonlySet<string>;
+}) {
   return <AdminSection title={kind === "warehouse" ? "Warehouse calendar" : "Carrier calendar"}>
     <AdminForm action={saveDeliveryCalendar.bind(null, kind)} submit={kind === "warehouse" ? "Save warehouse calendar" : "Save carrier calendar"}>
       <div className="admin-grid">
@@ -33,11 +42,9 @@ function CalendarEditor({ kind, calendar }: { kind: "warehouse" | "carrier"; cal
           <input type="checkbox" name="weekday" value={index} defaultChecked={calendar?.working_weekdays.includes(index)} /> {day}
         </label>)}
       </fieldset>
-      <AdminField label="Bank holidays (YYYY-MM-DD)">
-        <textarea name="bankHolidays" rows={3} maxLength={44000} defaultValue={calendar?.bank_holidays.join("\n")} />
-      </AdminField>
       <AdminField label="Other closures (YYYY-MM-DD)">
-        <textarea name="closures" rows={3} maxLength={44000} defaultValue={calendar?.closures.join("\n")} />
+        <textarea name="closures" rows={3} maxLength={44000}
+          defaultValue={calendar && otherClosureDates(calendar, officialHolidays).join("\n")} />
       </AdminField>
     </AdminForm>
   </AdminSection>;
@@ -47,13 +54,21 @@ export default async function DeliverySettings({ searchParams }: {
   searchParams: Promise<{ scope?: string | string[]; code?: string | string[] }>;
 }) {
   const { db } = await requireStaff("warehouse");
-  const [rules, calendars, params] = await Promise.all([
+  const [rules, calendars, params, bankHolidays] = await Promise.all([
     db.from("delivery_rules").select("*").order("scope").order("code"),
     db.from("delivery_calendars").select("*"),
     searchParams,
+    readBankHolidays(),
   ]);
   if (rules.error || calendars.error) throw new Error("Couldn’t load delivery settings.");
   const rule = rules.data.find(({ scope, code }) => scope === params.scope && code === params.code);
+  const officialHolidays = new Set(bankHolidays.events.map(({ date }) => date));
+  const today = londonDateKey.format(new Date());
+  const currentYear = Number(today.slice(0, 4));
+  const nextYearEnd = `${currentYear + 1}-12-31`;
+  const upcoming = bankHolidays.events.filter(({ date }) => date >= today && date <= nextYearEnd);
+  const holidaysByYear = Object.groupBy(upcoming, ({ date }) => date.slice(0, 4));
+  const usesSavedDates = bankHolidays.supplementedDates.some((date) => date >= today && date <= nextYearEnd);
 
   return <>
     <AdminHeading title={staffDestinationLabels.customerDeliverySettings} eyebrow="Warehouse"
@@ -108,9 +123,27 @@ export default async function DeliverySettings({ searchParams }: {
         </details>;
       }) : <AdminNotice>No postcode rules configured.</AdminNotice>}
     </AdminSection>
+    <AdminSection title="Bank holidays (England and Wales)">
+      <p>Bank holidays from <a href={BANK_HOLIDAYS_URL} className="textlink">GOV.UK</a> apply automatically within each calendar’s active dates. Use Other closures for any additional days off.</p>
+      <p className="admin-muted">
+        {bankHolidays.source === "snapshot" ? "Using the saved GOV.UK calendar. Snapshot date: " : "Last refreshed: "}
+        <time dateTime={bankHolidays.refreshedAt}>{ukDate.format(new Date(bankHolidays.refreshedAt))}</time>
+        {usesSavedDates && ". Some dates are from the saved GOV.UK calendar."}
+      </p>
+      {!upcoming.length && <AdminNotice>No upcoming bank holidays in the available calendar.</AdminNotice>}
+      {Object.entries(holidaysByYear).map(([year, events]) => <details key={year} open>
+        <summary>{year} bank holidays</summary>
+        <AdminTable label={`England and Wales bank holidays in ${year}`} headers={["Date", "Bank holiday"]}>
+          {events?.map(({ date, title, notes }) => <tr key={`${date}:${title}`}>
+            <td><time dateTime={date}>{ukDate.format(new Date(date))}</time></td>
+            <td>{title}{notes && ` (${notes})`}</td>
+          </tr>)}
+        </AdminTable>
+      </details>)}
+    </AdminSection>
     <div className="admin-grid">
-      <CalendarEditor kind="warehouse" calendar={calendars.data.find(({ calendar }) => calendar === "warehouse")} />
-      <CalendarEditor kind="carrier" calendar={calendars.data.find(({ calendar }) => calendar === "carrier")} />
+      <CalendarEditor kind="warehouse" calendar={calendars.data.find(({ calendar }) => calendar === "warehouse")} officialHolidays={officialHolidays} />
+      <CalendarEditor kind="carrier" calendar={calendars.data.find(({ calendar }) => calendar === "carrier")} officialHolidays={officialHolidays} />
     </div>
   </>;
 }

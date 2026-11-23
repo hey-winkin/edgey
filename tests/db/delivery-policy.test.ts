@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "vitest";
+import { promiseForReservedOrder } from "@/lib/delivery/terms";
 import { setDbClaims } from "../helpers/db-claims";
-import { connectAccountDb, createAccountBuyer } from "../helpers/account-fixture";
+import { connectAccountDb, createAccountBuyer, createAccountCatalogue } from "../helpers/account-fixture";
 
 test("warehouse alone edits delivery policy and a district overrides its area without fallback", async () => {
   const db = await connectAccountDb();
@@ -73,6 +74,58 @@ test("warehouse alone edits delivery policy and a district overrides its area wi
     expect(schedule).toEqual({ warehouseCalendar: terms.warehouseCalendar, cutoffMinutes: terms.cutoffMinutes });
     await db.query("reset role; set local role anon");
     await expect(db.query("select public.checkout_warehouse_calendar()")).rejects.toMatchObject({ code: "42501" });
+  } finally {
+    await db.query("rollback");
+    await db.end();
+  }
+});
+
+test("merges official dates with old calendar entries and freezes them on new orders", async () => {
+  const db = await connectAccountDb();
+  await db.query("begin");
+  try {
+    const { available } = await createAccountCatalogue(db);
+    await db.query(`
+      update public.delivery_calendars
+      set active_from = '2026-11-23',
+        active_through = case when calendar = 'warehouse' then date '2026-11-26' else date '2026-11-30' end,
+        working_weekdays = '{1,2,3,4,5}',
+        bank_holidays = case when calendar = 'warehouse' then '{2026-11-24,2026-11-25}'::date[] else '{2026-11-27}'::date[] end,
+        closures = case when calendar = 'carrier' then '{2026-11-26}'::date[] else '{}'::date[] end
+    `);
+    await db.query("set local role service_role");
+    const official = ["2026-11-27", "2026-11-23", "2026-11-24", "2026-11-24"];
+    const { rows: [delivery] } = await db.query<{ terms: unknown }>(
+      "select public.checkout_delivery_terms('SW3 1AA', $1) as terms", [official],
+    );
+    const terms = delivery?.terms;
+    const warehouseCalendar = { bankHolidays: ["2026-11-23", "2026-11-24", "2026-11-25"], closures: [] };
+    const deliveryCalendar = { bankHolidays: ["2026-11-23", "2026-11-24", "2026-11-27"], closures: ["2026-11-26"] };
+    expect(terms).toMatchObject({ warehouseCalendar, deliveryCalendar, cutoffMinutes: 930 });
+    const { rows: [schedule] } = await db.query<{ schedule: unknown }>(
+      "select public.checkout_warehouse_calendar($1) as schedule", [official],
+    );
+    expect(schedule?.schedule).toMatchObject({ warehouseCalendar, cutoffMinutes: 930 });
+
+    const attempt = randomUUID();
+    const reserve = async (dates: string[]) => db.query<{ id: string; delivery_terms: unknown; delivery_service: string }>(`
+      select id, delivery_terms, delivery_service from public.reserve_order_with_delivery(
+        $1, $2::jsonb, '{"email":"fixture@example.test","business_name":"Test","recipient_name":"Buyer","buying_for_work":true}',
+        '{"line1":"1 Example Street","town":"London","postcode":"SW3 1AA","country":"GB"}',
+        '{"goods_net_pence":2350,"delivery_net_pence":695,"vat_rate_bps":2000,"vat_pence":609,"gross_pence":3654}',
+        now() + interval '35 minutes', 'Next working day', date '2026-11-26', date '2026-11-30',
+        $3::jsonb, 'card', null, null, $4
+      )
+    `, [attempt, JSON.stringify([{ variant_id: available.id, quantity: 1, unit_price_pence: 2350 }]), terms, dates]);
+    await db.query("savepoint stale_feed");
+    await expect(reserve(["2026-11-27"])).rejects.toMatchObject({ message: "delivery_terms_changed" });
+    await db.query("rollback to savepoint stale_feed");
+    const { rows: [reserved] } = await reserve(official);
+    expect(reserved?.delivery_terms).toEqual(terms);
+    expect(promiseForReservedOrder(reserved!, "2026-11-23T10:00:00Z")).toEqual({
+      dispatchDate: "2026-11-26", deliveryDate: "2026-11-30",
+    });
+    expect((await reserve([])).rows).toEqual([reserved]);
   } finally {
     await db.query("rollback");
     await db.end();

@@ -12,6 +12,7 @@ export const metadata = { title: deskTitle };
 
 const taskLabels: Record<Exclude<StaffTask, "orders">, [singular: string, plural: string]> = {
   requests: ["customer enquiry to answer or review", "customer enquiries to answer or review"],
+  trialFollowUps: ["trial follow-up due", "trial follow-ups due"],
   outOfStock: ["published blade variant out of stock", "published blade variants out of stock"],
 };
 

@@ -12,6 +12,9 @@ import { parseDeliveryTerms, type DeliveryResolution } from "@/lib/delivery/term
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ getAll: () => [] }) }));
+vi.mock("@/lib/delivery/bank-holidays", () => ({
+  readBankHolidayDates: async () => ["2026-07-17", "2026-07-21"],
+}));
 
 const z10Id = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
 const secondId = "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb";
@@ -356,7 +359,9 @@ describe("live checkout adapter", () => {
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({ p_scope: "selection_quote" });
     const [, deliveryCall, call, namesCall] = fetch.mock.calls;
     expect(new URL(String(deliveryCall?.[0])).pathname).toBe("/rest/v1/rpc/checkout_delivery_terms");
-    expect(deliveryCall?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ p_postcode: "SW1A 1AA" }) });
+    expect(deliveryCall?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({
+      p_postcode: "SW1A 1AA", p_official_bank_holidays: ["2026-07-17", "2026-07-21"],
+    }) });
     if (!call) throw new Error("No request was made");
     const [target, init] = call;
     const url = new URL(String(target));
@@ -439,7 +444,22 @@ describe("live checkout adapter", () => {
     expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
       "/rest/v1/rpc/consume_request_rate_limit", "/rest/v1/rpc/lookup_selection_quote", "/rest/v1/rpc/checkout_warehouse_calendar",
     ]);
+    expect(JSON.parse(String(fetch.mock.calls[2]?.[1]?.body))).toEqual({
+      p_official_bank_holidays: ["2026-07-17", "2026-07-21"],
+    });
     expect(quote).toMatchObject({ coverage: "unchecked", dispatchDate: "2026-07-17", estimatedDeliveryDate: null });
     expect(JSON.stringify(quote)).not.toMatch(/warehouseCalendar|cutoffMinutes/);
+  });
+
+  it("calculates new dispatch and delivery dates using the merged RPC calendars", async () => {
+    const fetch = mockSupabase();
+    fetch.mockResolvedValueOnce(Response.json(true));
+    fetch.mockResolvedValueOnce(Response.json({
+      ...terms,
+      warehouseCalendar: { ...terms.warehouseCalendar, bankHolidays: ["2026-07-17"] },
+      deliveryCalendar: { ...terms.deliveryCalendar, bankHolidays: ["2026-07-21"] },
+    }));
+    const quote = ok(await quoteSelection([line(1)], fields.postcode));
+    expect(quote).toMatchObject({ dispatchDate: "2026-07-20", estimatedDeliveryDate: "2026-07-22" });
   });
 });

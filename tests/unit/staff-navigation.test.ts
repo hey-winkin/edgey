@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { salesOrderReminder, staffLocation, staffNavigation } from "@/lib/admin/navigation";
+import { salesOrderReminder, staffAreas, staffLocation, staffNavigation } from "@/lib/admin/navigation";
 import { hasPurchasingRole } from "@/lib/admin/roles";
 
 test.each([
@@ -63,6 +63,14 @@ test("groups retain the route permissions and suppress an empty group", () => {
     "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Business details", "Sales reports", "Finance and trade accounts"],
   });
   expect(labels([])).toEqual({ "Sales orders": ["Customer enquiries"], Admin: ["Sales reports"] });
+});
+
+test("the trial follow-up shortcut is on the desk for trial staff without changing the fold-down menu", () => {
+  for (const role of ["warehouse", "catalogue", "finance"] as const) {
+    const desk = staffAreas([role]).find(({ title }) => title === "Sales orders")!;
+    expect(desk.links.some(({ task }) => task === "trialFollowUps")).toBe(role !== "finance");
+    expect(staffNavigation([role]).flatMap(({ links }) => links).map(({ label }) => label)).not.toContain("Trial follow-ups");
+  }
 });
 
 test("history and record paths select exactly one permitted destination", () => {

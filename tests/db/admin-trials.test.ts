@@ -314,6 +314,106 @@ describe("staff trial workflow", () => {
     expect(await stock(item)).toEqual({ stock_on_hand: 0, stock_reserved: 0 });
   });
 
+  test("follows the seven-day London dispatch rule, reschedules, and clears the queue on conversion", async () => {
+    const warehouse = await actor("warehouse");
+    const catalogue = await actor("catalogue");
+    const item = (await variant(warehouse, 10)).id;
+    const trial = await dispatchedTrial(warehouse, catalogue, item);
+    const { today, tomorrow, yesterday, farFuture } = await one<{
+      today: string; tomorrow: string; yesterday: string; farFuture: string;
+    }>(`
+      select today::text, (today + 1)::text tomorrow, (today - 1)::text yesterday, (today + 366)::text "farFuture"
+      from (select (now() at time zone 'Europe/London')::date today) dates
+    `);
+    const age = (days: number) => db.query(`
+      update public.trial_fulfilments set dispatched_at =
+        ((now() at time zone 'Europe/London')::date - $2::integer + time '23:45') at time zone 'Europe/London'
+      where trial_request_id = $1
+    `, [trial, days]);
+    await setDbClaims(db, "authenticated", catalogue, true);
+    const asStaff = async () => { await db.query("set local role authenticated"); };
+    const due = () => db.query(
+      "select due_on::text, days_waiting from public.admin_trial_follow_up_status() where trial_request_id = $1", [trial],
+    ).then(({ rows }) => rows);
+    const record = (date: string, outcome: string, next: string | null, expected: string | null) =>
+      rpc("record_trial_follow_up", [trial, date, outcome, "  Called the print room.  ", next, expected]);
+
+    await age(6);
+    await asStaff();
+    expect(await due()).toEqual([]);
+    await db.query("reset role");
+    await age(7);
+    await asStaff();
+    expect(await due()).toEqual([{ due_on: today, days_waiting: 7 }]);
+    await rejects(() => record(today, "follow_up_again", null, null), "22023", "invalid_trial_follow_up_next_date");
+    await rejects(() => record(today, "follow_up_again", today, null), "22023", "invalid_trial_follow_up_next_date");
+    await rejects(() => record(today, "follow_up_again", farFuture, null), "22023", "trial_follow_up_next_date_too_far");
+    await rejects(() => record(tomorrow, "no_reply", null, null), "22023", "invalid_trial_follow_up_date");
+    const first = await record(yesterday, "follow_up_again", today, null);
+    expect(await due()).toHaveLength(1);
+    await rejects(() => record(today, "follow_up_again", tomorrow, null), "22023", "trial_follow_up_stale");
+    const future = await record(today, "follow_up_again", tomorrow, first);
+    expect(await due()).toEqual([]);
+    expect(await one("select note, recorded_by, next_on::text from public.trial_follow_ups where id = $1", [first]))
+      .toEqual({ note: "Called the print room.", recorded_by: catalogue, next_on: today });
+    const current = await record(yesterday, "follow_up_again", today, future);
+    expect(await due()).toEqual([{ due_on: today, days_waiting: 7 }]);
+    await db.query("reset role");
+    const purchase = await order(item, randomUUID());
+    await pay(purchase.id);
+    await asStaff();
+    expect(await due()).toHaveLength(1);
+    await db.query("reset role");
+    await link(trial, purchase.id, warehouse);
+    await asStaff();
+    expect(await due()).toEqual([]);
+    expect(await one("select converted, due_on from public.admin_trial_follow_up_status($1)", [trial]))
+      .toEqual({ converted: true, due_on: null });
+    await rejects(() => record(today, "ordered", null, current), "22023", "trial_follow_up_unavailable");
+    await db.query("reset role");
+    await unlink(trial, purchase.id, warehouse);
+    await asStaff();
+    expect(await due()).toHaveLength(1);
+    await record(today, "not_a_fit", null, current);
+    expect(await due()).toEqual([]);
+  });
+
+  test("only stepped-up warehouse and catalogue staff can read or record trial follow-ups", async () => {
+    const warehouse = await actor("warehouse");
+    const catalogue = await actor("catalogue");
+    const finance = await actor("finance");
+    const buyer = await actor();
+    const trial = await dispatchedTrial(warehouse, catalogue, (await variant(warehouse, 2)).id);
+    const status = () => db.query("select trial_request_id from public.admin_trial_follow_up_status($1)", [trial]);
+    const record = (outcome: string, expected: string | null) => one<{ id: string }>(`
+      select public.record_trial_follow_up($1, (now() at time zone 'Europe/London')::date, $2, null, null, $3) id
+    `, [trial, outcome, expected]);
+    let latest: string | null = null;
+    for (const id of [warehouse, catalogue]) {
+      await setDbClaims(db, "authenticated", id, true);
+      await db.query("set local role authenticated");
+      expect((await status()).rows).toEqual([{ trial_request_id: trial }]);
+      latest = (await record(id === warehouse ? "no_reply" : "ordered", latest)).id;
+      expect(await one("select recorded_by from public.trial_follow_ups where id = $1", [latest]))
+        .toEqual({ recorded_by: id });
+      await rejects(() => db.query("delete from public.trial_follow_ups where id = $1", [latest]), "42501");
+      await db.query("reset role");
+    }
+    for (const [id, mfa] of [[warehouse, false], [finance, true], [buyer, false]] as const) {
+      await setDbClaims(db, "authenticated", id, mfa);
+      await db.query("set local role authenticated");
+      expect((await db.query("select id from public.trial_follow_ups where trial_request_id = $1", [trial])).rows).toEqual([]);
+      await rejects(status, "42501", "requests_role_required");
+      await rejects(() => record("no_reply", latest), "42501", "requests_role_required");
+      await db.query("reset role");
+    }
+    await setDbClaims(db, "anon");
+    await db.query("set local role anon");
+    await rejects(status, "42501");
+    await rejects(() => record("no_reply", latest), "42501");
+    await rejects(() => db.query("select id from public.trial_follow_ups"), "42501");
+  });
+
   test("links only after explicit selection and counts qualifying first purchases by buyer ID or guest email", async () => {
     const warehouse = await actor("warehouse");
     const catalogue = await actor("catalogue");

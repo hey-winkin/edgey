@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireStaff } from "@/lib/admin/auth";
 import { resolveStaffDelivery } from "@/lib/admin/carrier-settings";
+import { trialFollowUpsHref } from "@/lib/admin/navigation";
 import { requestsDb, type EnquiryMutation } from "@/lib/admin/request-schema";
 import { requireRequestsStaff } from "@/lib/admin/requests";
+import { trialFollowUpOutcomes, type TrialFollowUpOutcome } from "@/lib/admin/trial-follow-ups";
 import { isWarehouseId, warehouseOrderLookup } from "@/lib/admin/warehouse-format";
 import { deliveryCoverageForPostcode } from "@/lib/delivery/server";
 import type { AdminResult } from "../form";
@@ -54,6 +57,12 @@ const messages = {
   not_a_subsequent_purchase: "Select an authorised, non-cancelled purchase placed after the trial was dispatched.",
   trial_order_already_linked: "This order is already linked to a trial.",
   trial_order_link_changed: "The linked order has changed. Reload before removing the link.",
+  trial_follow_up_unavailable: "Only a dispatched trial without a linked order can have a follow-up recorded.",
+  invalid_trial_follow_up_date: "Enter a contact date between dispatch and today.",
+  invalid_trial_follow_up_details: "Choose an outcome and keep the note under 2,000 characters.",
+  invalid_trial_follow_up_next_date: "Enter a next follow-up date after the contact date.",
+  trial_follow_up_next_date_too_far: "Set the next follow-up within the next 365 days.",
+  trial_follow_up_stale: "This trial’s follow-ups changed. Reload to see the latest history.",
 } satisfies Record<string, string>;
 
 function field(form: FormData, name: string) {
@@ -171,6 +180,10 @@ export async function handleTrial(action: TrialAction, _previous: AdminResult | 
   if (result.error) return updateError(result.error, "Could not confirm the trial update. Try again with the same values.", true);
   revalidatePath("/admin/requests");
   revalidatePath(`/admin/requests/trials/${action.id}`);
+  if (action.kind === "dispatch" || action.kind === "link" || action.kind === "unlink") {
+    revalidatePath(trialFollowUpsHref);
+    revalidatePath("/admin");
+  }
   if (action.kind === "approve" || action.kind === "cancel" || action.kind === "dispatch") {
     for (const path of ["/", "/blades", "/admin/stock"]) revalidatePath(path);
     revalidatePath("/blades/[slug]", "page");
@@ -178,9 +191,36 @@ export async function handleTrial(action: TrialAction, _previous: AdminResult | 
   }
   if (orderId) {
     revalidatePath(`/admin/warehouse/${orderId}`);
-    revalidatePath("/admin");
   }
   return { ok: true, message };
+}
+
+export async function recordTrialFollowUp(
+  id: string, expectedId: number | null, _previous: AdminResult | null, form: FormData,
+): Promise<AdminResult> {
+  const { db } = await requireRequestsStaff();
+  if (!isWarehouseId(id)) return refused(messages.trial_not_found);
+  const followedOn = field(form, "followedOn");
+  const outcome = field(form, "outcome");
+  const note = field(form, "note");
+  const nextOn = field(form, "nextOn");
+  if (followedOn.startsWith("0000") || !z.iso.date().safeParse(followedOn).success) {
+    return refused(messages.invalid_trial_follow_up_date);
+  }
+  if (!Object.hasOwn(trialFollowUpOutcomes, outcome) || note.length > 2000) {
+    return refused(messages.invalid_trial_follow_up_details);
+  }
+  const followAgain = outcome === "follow_up_again";
+  if (followAgain && (!z.iso.date().safeParse(nextOn).success || nextOn <= followedOn)) {
+    return refused(messages.invalid_trial_follow_up_next_date);
+  }
+  const { error } = await requestsDb(db).rpc("record_trial_follow_up", {
+    p_trial_request_id: id, p_expected_id: expectedId, p_followed_on: followedOn,
+    p_outcome: outcome as TrialFollowUpOutcome, p_note: note || null, p_next_on: followAgain ? nextOn : null,
+  });
+  if (error) return updateError(error, "Could not confirm the follow-up. Reload the trial before trying again.");
+  for (const path of ["/admin", trialFollowUpsHref, `/admin/requests/trials/${id}`]) revalidatePath(path);
+  return { ok: true, message: "Follow-up recorded." };
 }
 
 export async function handleEnquiry(action: EnquiryAction, _previous: AdminResult | null, form: FormData): Promise<AdminResult> {

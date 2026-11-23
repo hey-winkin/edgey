@@ -1,14 +1,16 @@
 import type { StaffRole } from "./auth";
 import { hasPurchasingRole, purchaseRoles } from "./roles";
 
-export type StaffTask = "orders" | "requests" | "outOfStock";
+export type StaffTask = "orders" | "requests" | "trialFollowUps" | "outOfStock";
 export const stockOutOfStockHref = "/admin/stock?view=out-of-stock";
+export const trialFollowUpsHref = "/admin/requests/trial-follow-ups";
 export const orderStockHref = "/admin/purchase-orders/new";
 export const orderStockLabel = "Order stock";
 
 export const staffDestinationLabels = {
   newSalesOrders: "New sales orders",
   customerEnquiries: "Customer enquiries",
+  trialFollowUps: "Trial follow-ups",
   pastSalesOrders: "Past sales orders",
   purchaseOrders: "Purchase orders",
   suppliers: "Suppliers",
@@ -34,11 +36,12 @@ export function salesOrderReminder(count: number | null) {
 const areas: {
   title: string;
   orderStock?: true;
-  links: { label: string; href: string; roles?: readonly StaffRole[]; task?: StaffTask; taskHref?: string }[];
+  links: { label: string; href: string; roles?: readonly StaffRole[]; task?: StaffTask; taskHref?: string; deskOnly?: true }[];
 }[] = [
   { title: "Sales orders", links: [
     { label: labels.newSalesOrders, href: "/admin/warehouse", roles: ["warehouse"], task: "orders" },
     { label: labels.customerEnquiries, href: "/admin/requests", task: "requests" },
+    { label: labels.trialFollowUps, href: trialFollowUpsHref, roles: ["warehouse", "catalogue"], task: "trialFollowUps", deskOnly: true },
     { label: labels.pastSalesOrders, href: "/admin/warehouse?view=history", roles: ["warehouse"] },
   ] },
   { title: "Purchasing", orderStock: true, links: [
@@ -58,17 +61,18 @@ const areas: {
   ] },
 ];
 
-export function staffAreas(roles: readonly StaffRole[]) {
+export function staffAreas(roles: readonly StaffRole[], surface: "desk" | "menu" = "desk") {
   return areas.map(({ title, links, orderStock }) => ({
     title,
     orderStock: orderStock && hasPurchasingRole(roles),
-    links: links.filter(({ roles: required }) => !required || required.some((role) => roles.includes(role)))
+    links: links.filter(({ roles: required, deskOnly }) =>
+      (!deskOnly || surface === "desk") && (!required || required.some((role) => roles.includes(role))))
       .map(({ label, href, task, taskHref }) => ({ label, href, task, taskHref })),
   })).filter(({ links }) => links.length > 0);
 }
 
 export function staffNavigation(roles: readonly StaffRole[]) {
-  return staffAreas(roles).map(({ title, links }) => ({
+  return staffAreas(roles, "menu").map(({ title, links }) => ({
     title, links: links.map(({ label, href }) => ({ label, href })),
   }));
 }

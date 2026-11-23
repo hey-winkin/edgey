@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireStaff } from "@/lib/admin/auth";
 import { getVerifiedBuyer } from "@/lib/auth/server";
+import { readBankHolidayDates } from "@/lib/delivery/bank-holidays";
 import type { CreateOrderInput } from "@/lib/orders";
 import { orderReservationArgs, type ReservationRateKeys } from "@/lib/orders/reservation-input";
 import { serviceClient } from "@/lib/supabase/service";
@@ -93,6 +94,7 @@ export async function createNet30OrderWithHolds(input: Net30OrderInput, rateKeys
     p_po_number: input.poNumber,
     p_delivery_terms: input.deliveryTerms,
     p_payment_method: "net30",
+    p_official_bank_holidays: await readBankHolidayDates(),
   });
 }
 

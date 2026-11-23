@@ -1,0 +1,3 @@
+.form :is(input[type="date"][name], select, textarea)[name] {
+  border-color: var(--edgey-control-border);
+}

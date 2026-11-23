@@ -1,0 +1,12 @@
+.company {
+  margin-block-end: 8px;
+  font: 600 1.08rem/1.3 var(--edgey-font-sans);
+  letter-spacing: -.02em;
+}
+
+.company a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: inherit;
+}

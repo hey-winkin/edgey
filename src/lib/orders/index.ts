@@ -1,5 +1,6 @@
 import "server-only";
 
+import { readBankHolidayDates } from "@/lib/delivery/bank-holidays";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type { DeliveryTerms } from "@/lib/delivery/terms";
 import { serviceClient } from "@/lib/supabase/service";
@@ -70,12 +71,13 @@ async function call<Name extends keyof Functions>(
   return data;
 }
 
-export function createOrderWithReservations(input: CreateOrderInput, rateKeys?: ReservationRateKeys) {
+export async function createOrderWithReservations(input: CreateOrderInput, rateKeys?: ReservationRateKeys) {
   return call("reserve_order_with_delivery", {
     ...orderReservationArgs(input, rateKeys),
     p_buyer_id: input.buyerId,
     p_delivery_terms: input.deliveryTerms,
     p_payment_method: "card",
+    p_official_bank_holidays: await readBankHolidayDates(),
   });
 }
 
