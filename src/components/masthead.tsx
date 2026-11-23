@@ -30,6 +30,7 @@ export async function Masthead() {
             empty: brands ? "No machine pages are listed yet. Try searching by part number." :
               "Machine links are temporarily unavailable. Try searching by part number." },
           { title: "Buying", links: [
+            { label: "Quick order", href: "/quick-order" },
             { label: "Trade accounts", href: "/trade" },
             { label: "Two-blade trial", href: "/sample-pack" },
           ] },

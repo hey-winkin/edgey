@@ -213,6 +213,9 @@ export function SelectionDialog() {
           <button type="button" ref={browsing} className="secondary tray-action" onClick={() => dialog.current?.close()}>
             {pathname === "/checkout" ? "Return to checkout" : "Continue browsing"}
           </button>
+          {pathname !== "/quick-order" && (
+            <Link href="/quick-order" className="secondary tray-action" onNavigate={() => dialog.current?.close()}>Quick order</Link>
+          )}
         </div>
       </div>
     </dialog>

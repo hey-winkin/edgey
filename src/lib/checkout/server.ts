@@ -8,7 +8,7 @@ import { prepareCheckoutAttempt } from "./attempt";
 import { quoteSelectionWith, type QuoteDependencies } from "./quote";
 import type { QuoteResult } from "./types";
 
-const lookup: QuoteDependencies["lookup"] = async (lines) => {
+export const lookupSelectionVariants: QuoteDependencies["lookup"] = async (lines) => {
   const { data, error } = await serviceClient().rpc("lookup_selection_quote", {
     p_variant_ids: lines.map(({ variantId }) => variantId),
     p_quantities: lines.map(({ quantity }) => quantity),
@@ -33,7 +33,7 @@ const lookup: QuoteDependencies["lookup"] = async (lines) => {
   }));
 };
 
-const deps: QuoteDependencies = { lookup, now: () => new Date(), resolveDelivery: resolveCheckoutDelivery, readWarehouseSchedule };
+const deps: QuoteDependencies = { lookup: lookupSelectionVariants, now: () => new Date(), resolveDelivery: resolveCheckoutDelivery, readWarehouseSchedule };
 
 export function quoteCurrentSelection(lines: unknown, postcode?: unknown) {
   return quoteSelectionWith(lines, postcode, deps);

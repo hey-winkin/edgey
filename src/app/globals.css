@@ -463,7 +463,7 @@ footer { padding-top: 22px; }
 .selection-dialog .dialog-heading { flex: none; min-height: 54px; padding: 14px var(--dialog-padding) 0; }
 .selection-dialog .dialog-heading h2 { max-width: calc(100% - 32px); }
 .selection-dialog .dialog-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px var(--dialog-padding) var(--dialog-padding); }
-.selection-dialog .dialog-actions { flex: none; border-top: 1px solid var(--line); padding: 0 var(--dialog-padding) 14px; }
+.selection-dialog .dialog-actions { display: flex; flex: none; flex-wrap: wrap; column-gap: 10px; border-top: 1px solid var(--line); padding: 0 var(--dialog-padding) 14px; }
 @media (max-width: 490px) {
   .figure-plate-plain { aspect-ratio: auto; min-height: 54px; }
   .product { padding-top: 15px; }

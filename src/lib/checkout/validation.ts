@@ -7,6 +7,7 @@ const controls = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 const emailPattern = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 export const MAX_ORDER_INTEGER = 2_147_483_647;
+export const MAX_BASKET_LINES = 100;
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -28,7 +29,7 @@ export function normaliseAttemptToken(value: unknown) {
 }
 
 export function normaliseLines(input: unknown): LineRequest[] | null {
-  if (!Array.isArray(input) || input.length > 100) return null;
+  if (!Array.isArray(input) || input.length > MAX_BASKET_LINES) return null;
   const quantities = new Map<string, number>();
   for (const line of input) {
     if (!isRecord(line) || !isPositiveQuantity(line.quantity)) return null;

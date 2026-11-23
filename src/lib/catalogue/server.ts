@@ -140,18 +140,23 @@ export const getBrandLanding = cache(async (slug: string) => {
   return brand ? { brand, blades } : null;
 });
 
-const searchBlades = cache(async (query: string): Promise<SearchHit[]> => {
+const searchBlades = cache(async (query: string): Promise<(SearchHit & { variantId: string })[]> => {
   const { data, error } = await publicClient().rpc("search_blades", { query_text: query });
   if (error) throw new Error("Search failed: " + error.message);
-  return (data as { match_type: SearchHit["matchType"]; matched_code: string | null; product_slug: string; sku: string }[]).map(
+  return (data as { match_type: SearchHit["matchType"]; matched_code: string | null; product_slug: string; sku: string; variant_id: string }[]).map(
     (row) => ({
       matchType: row.match_type,
       matchedCode: row.matched_code,
       productSlug: row.product_slug,
       sku: row.sku,
+      variantId: row.variant_id,
     }),
   );
 });
+
+export async function searchExactBladeCodes(code: string) {
+  return (await searchBlades(code)).filter(({ matchType }) => matchType === "exact");
+}
 
 export async function loadCatalogue(filters: CatalogueFilters) {
   const query = filters.q.trim();
