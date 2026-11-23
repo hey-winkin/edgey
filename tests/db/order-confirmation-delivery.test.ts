@@ -380,7 +380,8 @@ test("dispatch bypasses the invoice wait and retries a lost provider response wi
       expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(`outbox-email/${first.id}`);
       expect(init?.body).toBe(first.send_payload);
     }
-    await db.query("update public.order_outbox set state = 'failed' where order_id = $1 and message_key = 'order_dispatched'", [id]);
+    await db.query(`update public.order_outbox set state = 'failed', sent_at = null, provider_message_id = null
+      where order_id = $1 and message_key = 'order_dispatched'`, [id]);
     await db.query("update public.order_outbox set state = 'sent' where order_id = $1 and message_key = 'order_confirmation'", [id]);
     expect(await replayOrderConfirmation(id)).toBe("not_replayable");
     expect((await readDispatch()).state).toBe("failed");
