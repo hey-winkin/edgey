@@ -183,7 +183,7 @@ test("uploads three photos at the total payload limit through the real server ac
     await page.getByLabel("Add photos", { exact: true }).setInputFiles([photo, photo, photo]);
     await expect(page.getByRole("group", { name: "Photos (optional)" }).getByRole("status")).toHaveText("3 of 3 photos ready");
     await page.getByRole("button", { name: "Send enquiry" }).click();
-    await expect(page.getByRole("status")).toContainText("3 photos attached.");
+    await expect(page.getByText("3 photos attached.", { exact: true })).toBeVisible();
   } finally {
     const key = (await db.query<{ key: string }>("select public.enquiry_photo_storage_key(id) as key from public.enquiries where email = $1", [email])).rows[0]?.key;
     if (key) await admin.storage.from("enquiry-photos").remove([`${key}/1.jpg`, `${key}/2.jpg`, `${key}/3.jpg`]);
