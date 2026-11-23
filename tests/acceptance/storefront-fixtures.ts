@@ -139,7 +139,7 @@ export async function drainEmails(api: APIRequestContext, queue: "order-confirma
 export async function messagesTo(recipient: string) {
   const directory = process.env.EMAIL_OUTBOX_DIR!;
   const messages = await Promise.all((await readdir(directory)).filter((name) => name.endsWith(".json"))
-    .map(async (name) => JSON.parse(await readFile(join(directory, name), "utf8")) as { to: string[]; subject: string; text: string }));
+    .map(async (name) => JSON.parse(await readFile(join(directory, name), "utf8")) as { to: string[]; subject: string; text: string; html?: string }));
   return messages.filter(({ to }) => to.includes(recipient));
 }
 

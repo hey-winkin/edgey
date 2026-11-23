@@ -9,15 +9,17 @@ import { getWarehouseOrder, getWarehouseReturns } from "@/lib/admin/warehouse";
 import { runWarehouseAction } from "@/lib/admin/warehouse-actions";
 import { isWarehouseId, movementTime, warehouseLabel } from "@/lib/admin/warehouse-format";
 import { returnCategories } from "@/lib/commercial/returns";
+import { orderMailStatus } from "@/lib/email/status";
 import { PickDetails } from "./pick-details";
 
 export default async function WarehouseOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { db } = await requireStaff("warehouse");
   const { id } = await params;
   if (!isWarehouseId(id)) notFound();
-  const [result, trial] = await Promise.all([
+  const [result, trial, mail] = await Promise.all([
     getWarehouseOrder(db, id),
     db.from("trial_fulfilments").select("trial_request_id").eq("subsequent_order_id", id).maybeSingle(),
+    db.rpc("admin_order_mail_status", { p_order_id: id }),
   ]);
   if (!result) notFound();
   if (trial.error) throw new Error("Could not load the linked trial.");
@@ -50,12 +52,16 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
           <dt>Order reference</dt><dd className="admin-mono break-all">{order.order_reference}</dd>
           <dt>Fulfilment</dt><dd>{warehouseLabel(status)}</dd>
           <dt>Payment</dt><dd>{warehouseLabel(order.payment_status)}</dd>
+          <dt>Confirmation email</dt>
+          <dd>{mail.error ? "Status unavailable" : orderMailStatus(mail.data.find((row) => row.message_key === "order_confirmation"))}</dd>
           {trial.data && <><dt>Linked trial</dt><dd><AdminLink href={`/admin/requests/trials/${trial.data.trial_request_id}`}>View trial request</AdminLink></dd></>}
           {order.dispatched_at && (
             <>
               <dt>Dispatched</dt><dd><time dateTime={order.dispatched_at}>{movementTime(order.dispatched_at)}</time></dd>
               <dt>Carrier</dt><dd>{order.carrier}</dd>
               <dt>Tracking number</dt><dd className="admin-mono break-all">{order.tracking_number}</dd>
+              <dt>Dispatch email</dt>
+              <dd>{mail.error ? "Status unavailable" : orderMailStatus(mail.data.find((row) => row.message_key === "order_dispatched"))}</dd>
             </>
           )}
         </dl>
@@ -77,6 +83,7 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
           <AdminForm action={runWarehouseAction.bind(null, { kind: "dispatch", orderId: order.id, key: randomUUID() })} submit="Record dispatch" preserveOnError>
             <p className="break-words">Service on this order: {order.delivery_service}</p>
             <p>Check the carrier against the parcel label. If it isn’t listed, select Other and enter the carrier.</p>
+            <p>Recording dispatch queues an email to the buyer with these tracking details.</p>
             <StaffDeliveryFields choices={deliveryChoices} service={order.delivery_service} dispatch />
             <div className="admin-narrow">
               <AdminField label="Tracking number"><input name="trackingNumber" maxLength={200} required /></AdminField>

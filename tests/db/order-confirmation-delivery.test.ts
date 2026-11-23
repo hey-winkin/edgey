@@ -267,6 +267,27 @@ test("keeps delivery RPCs and sensitive outbox data service-only", async () => {
   ]);
 });
 
+test("only the operator can configure carrier templates and invalid pattern shapes are rejected", async () => {
+  const { rows } = await db.query(`
+    select role,
+      has_table_privilege(role, 'public.delivery_tracking_patterns', 'select') as read,
+      has_table_privilege(role, 'public.delivery_tracking_patterns', 'insert') as write,
+      has_column_privilege(role, 'public.order_outbox', 'dispatch_lines', 'select') as snapshot
+    from unnest(array['anon', 'authenticated', 'service_role']) as role
+  `);
+  expect(rows).toEqual([
+    { role: "anon", read: false, write: false, snapshot: false },
+    { role: "authenticated", read: false, write: false, snapshot: false },
+    { role: "service_role", read: true, write: false, snapshot: true },
+  ]);
+  for (const pattern of [
+    "http://carrier.example.test/{tracking}", "https://carrier.example.test/track", "https://carrier.example.test/{tracking}/{tracking}",
+  ]) {
+    await expect(db.query("insert into public.delivery_tracking_patterns values ('Fixture Invalid Carrier', $1)", [pattern]))
+      .rejects.toMatchObject({ code: "23514" });
+  }
+});
+
 test("gives a recently authorised order time to pick up its invoice without freezing a body", async () => {
   const id = await fixture("failed");
   vi.stubEnv("EMAIL_PROVIDER", "resend");
@@ -323,6 +344,63 @@ test("freezes the first Stripe invoice and Resend body across actual PostgREST c
   }
   expect(await readOutbox(id)).toMatchObject({
     state: "sent", attempt_count: 2, provider_message_id: "resend-message-id", send_payload: first.send_payload,
+  });
+});
+
+test("dispatch bypasses the invoice wait and retries a lost provider response with the same bytes and key", async () => {
+  const id = await fixture("failed", `in_${randomUUID()}`);
+  const carrier = `Fixture ${randomUUID()}`;
+  await db.query("insert into public.delivery_tracking_patterns (carrier, url_pattern) values ($1, $2)",
+    [carrier, "https://carrier.example.test/track/{tracking}"]);
+  try {
+    await db.query("update public.orders set fulfilment_status = 'picking' where id = $1", [id]);
+    await db.query(`update public.orders set fulfilment_status = 'dispatched', dispatched_at = now(),
+      carrier = $2, tracking_number = 'TRACK/01' where id = $1`, [id, carrier]);
+    vi.stubEnv("EMAIL_PROVIDER", "resend");
+    vi.stubEnv("EMAIL_FROM", "orders@example.test");
+    vi.stubEnv("RESEND_API_KEY", "test-mocked-resend-key");
+    const provider = mockResend().mockRejectedValueOnce(new Error("Response lost"));
+    const readDispatch = async () => (await db.query<Row>(
+      "select * from public.order_outbox where order_id = $1 and message_key = 'order_dispatched'", [id],
+    )).rows[0]!;
+
+    expect(await processOrderConfirmations()).toEqual({ sent: 0, failed: 0, pending: 1 });
+    const first = await readDispatch();
+    expect(first).toMatchObject({ state: "pending", delivery_uncertain: true, attempt_count: 1 });
+    expect(JSON.parse(first.send_payload!).text).toContain("https://carrier.example.test/track/TRACK%2F01");
+    await db.query("update public.delivery_tracking_patterns set url_pattern = $2 where carrier = $1",
+      [carrier, "https://other.example.test/{tracking}"]);
+    await db.query("update public.order_outbox set next_attempt_at = now() where id = $1", [first.id]);
+    const outcomes = await Promise.all([processOrderConfirmations(), processOrderConfirmations()]);
+    expect(outcomes.reduce((sum, result) => sum + result.sent, 0)).toBe(1);
+    expect(await readDispatch()).toMatchObject({ state: "sent", attempt_count: 2, send_payload: first.send_payload });
+    expect(retrieveInvoice).not.toHaveBeenCalled();
+    expect(provider.mock.calls).toHaveLength(2);
+    for (const [init] of provider.mock.calls) {
+      expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(`outbox-email/${first.id}`);
+      expect(init?.body).toBe(first.send_payload);
+    }
+    await db.query(`update public.order_outbox set state = 'failed', sent_at = null, provider_message_id = null
+      where order_id = $1 and message_key = 'order_dispatched'`, [id]);
+    await db.query("update public.order_outbox set state = 'sent' where order_id = $1 and message_key = 'order_confirmation'", [id]);
+    expect(await replayOrderConfirmation(id)).toBe("not_replayable");
+    expect((await readDispatch()).state).toBe("failed");
+  } finally {
+    await db.query("delete from public.delivery_tracking_patterns where carrier = $1", [carrier]);
+  }
+});
+
+test("keeps previously queued trial dispatch copy without retroactive address expansion", async () => {
+  const email = `${randomUUID()}@example.test`;
+  configureRequests(email);
+  const trial = await requestFixture("trial_requests", email);
+  await markIntakeSent(trial);
+  await db.query(`insert into public.order_outbox (trial_request_id, message_key, message_subject, message_body)
+    values ($1, 'trial_dispatched', 'Legacy dispatch', 'Tracking number: LEGACY')`, [trial.id]);
+  const provider = mockResend();
+  expect(await processRequestEmails()).toEqual({ sent: 1, failed: 0, pending: 0 });
+  expect(JSON.parse(String(provider.mock.calls[0]?.[0]?.body))).toEqual({
+    from: "orders@example.test", to: [email], subject: "Legacy dispatch", text: "Tracking number: LEGACY",
   });
 });
 
@@ -500,7 +578,7 @@ test("does not send a frozen staff notice after the explicit destination changes
   });
 });
 
-test("delivers all staff-authored request messages as text without bypassing intake receipt limits", async () => {
+test("delivers staff-authored text and the trial shipment without bypassing intake receipt limits", async () => {
   const email = `${randomUUID()}@example.test`;
   configureRequests(email);
   const catalogue = await requestActor("catalogue");
@@ -546,10 +624,20 @@ test("delivers all staff-authored request messages as text without bypassing int
       headers: expect.objectContaining({ "Idempotency-Key": `outbox-email/${row.id}` }),
       body: row.send_payload,
     }));
-    expect(JSON.parse(row.send_payload!)).toEqual({
-      from: "orders@example.test", to: [email], subject: row.message_subject, text: row.message_body,
-    });
-    expect(row.send_payload).not.toMatch(new RegExp(`${privateReason}|Private Street|Private recipient|Private enquiry text`));
+    const payload = JSON.parse(row.send_payload!);
+    if (row.message_key === "trial_dispatched") {
+      expect(payload).toEqual({
+        from: "orders@example.test", to: [email], subject: `Edgey trial pack dispatched: ${dispatched.id}`,
+        text: expect.stringContaining(`Carrier: Test Carrier\nTracking number: ${tracking}\n\nDelivery address:\nPrivate recipient\n1 Private Street`),
+        html: expect.stringContaining("TRACK-&lt;17&gt;&amp;"),
+      });
+    } else {
+      expect(payload).toEqual({
+        from: "orders@example.test", to: [email], subject: row.message_subject, text: row.message_body,
+      });
+      expect(row.send_payload).not.toMatch(/Private Street|Private recipient/);
+    }
+    expect(row.send_payload).not.toMatch(new RegExp(`${privateReason}|Private enquiry text`));
   }
 });
 

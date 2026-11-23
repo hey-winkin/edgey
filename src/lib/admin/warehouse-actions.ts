@@ -84,8 +84,9 @@ export async function runWarehouseAction(action: WarehouseAction, _previous: Sta
         if (!delivery.ok && delivery.reason === "stale") {
           return refused("That carrier service is no longer configured. Reload for the current choices, or select Other.");
         }
-        if (!delivery.ok || !trackingNumber || trackingNumber.length > 200) {
-          return refused("Enter a carrier (up to 100 characters) and tracking number (up to 200 characters).");
+        if (!delivery.ok || !trackingNumber || trackingNumber.length > 200 ||
+          /\p{Cc}/u.test(delivery.carrier) || /\p{Cc}/u.test(trackingNumber)) {
+          return refused("Enter a carrier (up to 100 characters) and a tracking number (up to 200 characters) on a single line.");
         }
         await dispatchOrder({ orderId: action.orderId, actorId, operationKey, carrier: delivery.carrier, trackingNumber });
         message = "Dispatch recorded.";

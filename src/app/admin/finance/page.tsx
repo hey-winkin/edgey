@@ -5,6 +5,7 @@ import { displayState, displayTimestamp } from "@/lib/admin/format";
 import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminPage, adminPageSize } from "@/lib/admin/pagination";
 import { amountMismatch } from "@/lib/admin/payment-review";
+import { orderMailStatus } from "@/lib/email/status";
 import { lateCapture } from "@/lib/payments/card-refund";
 import { AdminPagination } from "../pagination";
 import { AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "../ui";
@@ -177,22 +178,23 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         ) : <AdminNotice>No failed provider events on this page.</AdminNotice>}
         {nav("events")}
       </AdminSection>
-      <AdminSection title="Confirmation outbox">
+      <AdminSection title="Order email outbox">
         {overview.outbox.length ? (
-          <AdminTable label="Confirmation outbox" headers={["Order", "Status", "Last error", "Updated", "Retry"]}>
-            {overview.outbox.slice(0, adminPageSize).map((message) => <tr key={message.order_id}>
-              <td className="admin-mono">
-                {message.orders?.order_reference && <span className="block">{message.orders.order_reference}</span>}
-                {message.order_id}
-              </td><td>{displayState(message.state)}</td>
+          <AdminTable label="Order email outbox" headers={["Order", "Message", "Status", "Last error", "Updated", "Retry"]}>
+            {overview.outbox.slice(0, adminPageSize).map((message) => <tr key={message.id}>
+              <td className="admin-mono">{message.orders?.order_reference ?? message.order_id}</td>
+              <td>{message.message_key === "order_dispatched" ? "Dispatch" : "Confirmation"}</td>
+              <td>{orderMailStatus(message)}</td>
               <td>{message.last_error ? displayState(message.last_error) : "—"}</td>
-              <td className="admin-mono">{displayTimestamp(message.updated_at)}</td><td>{message.state !== "failed" || !message.order_id ? "—" :
-              replayLabel(`confirmation:${message.order_id}:${message.updated_at}`) ?? (
-                <AdminForm action={retryFinanceFailure.bind(null, { kind: "confirmation", id: message.order_id })} submit="Resend confirmation" />
-              )}</td>
+              <td className="admin-mono">{displayTimestamp(message.updated_at)}</td>
+              <td>{message.state !== "failed" || !message.order_id ? "—" :
+                message.message_key === "order_dispatched" ? "No manual retry" :
+                replayLabel(`confirmation:${message.order_id}:${message.updated_at}`) ?? (
+                  <AdminForm action={retryFinanceFailure.bind(null, { kind: "confirmation", id: message.order_id })} submit="Resend confirmation" />
+                )}</td>
             </tr>)}
           </AdminTable>
-        ) : <AdminNotice>No pending or failed confirmations on this page.</AdminNotice>}
+        ) : <AdminNotice>No queued or failed order emails on this page.</AdminNotice>}
         {nav("outbox")}
       </AdminSection>
       <AdminSection title="Orders">

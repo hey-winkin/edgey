@@ -146,7 +146,7 @@ const movement = (item: Variant, kind: string, order: Order | null, onHand: numb
   });
 
 const outbox = async (order: Order) => (await db.query(`
-  select order_id, message_key, state from public.order_outbox where order_id = $1
+  select order_id, message_key, state from public.order_outbox where order_id = $1 order by message_key
 `, [order.id])).rows;
 
 const confirmation = (order: Order) => ({
@@ -490,8 +490,8 @@ describe("order transactions", () => {
     const session = key("cs");
     const intent = key("pi");
     await pay(order, session, intent);
-    const dispatch = (tracking = "TEST123") =>
-      rpc("dispatch_order", [order.id, "dispatch", actor.id, "Parcel Carrier", tracking]);
+    const dispatch = (tracking = "TEST123", operation = "dispatch") =>
+      rpc("dispatch_order", [order.id, operation, actor.id, "Parcel Carrier", tracking]);
     const returnId = randomUUID();
     const recordReturn = (id = returnId, count = 1) =>
       rpc("record_return", [order.id, id, actor.id, item.id, count, "Inspect returned blade", "OEM-45"]);
@@ -500,16 +500,28 @@ describe("order transactions", () => {
     await rejects(() => rpc("start_picking", [order.id, "pick", finance.id]), "warehouse_role_required", "42501");
     expect(await rpc("start_picking", [order.id, "pick", actor.id])).toMatchObject({ fulfilment_status: "picking" });
     expect(await rpc("start_picking", [order.id, "pick", actor.id])).toMatchObject({ fulfilment_status: "picking" });
+    expect(await outbox(order)).toEqual([confirmation(order)]);
+    await rejects(() => dispatch("TRACK\nSECOND LINE"), "carrier_and_tracking_required");
+    await db.query("savepoint refuse_dispatch_mail");
+    await db.query("alter table public.order_outbox add constraint test_dispatch_mail_refused check (message_key <> 'order_dispatched') not valid");
+    await rejects(() => dispatch(), 'new row for relation "order_outbox" violates check constraint "test_dispatch_mail_refused"', "23514");
+    await db.query("rollback to savepoint refuse_dispatch_mail");
+    expect(await reservations(order)).toEqual([{ variant_id: item.id, quantity: 2, state: "allocated" }]);
+    expect(await stock(item)).toEqual(quantity(2, 2));
     const dispatched = await dispatch();
     expect(dispatched).toMatchObject({
       fulfilment_status: "dispatched", payment_status: "paid", carrier: "Parcel Carrier",
       tracking_number: "TEST123", dispatched_at: expect.any(Date),
     });
     expect(await dispatch()).toMatchObject({ dispatched_at: dispatched.dispatched_at });
+    expect(await dispatch("TEST123", "another-form")).toMatchObject({ dispatched_at: dispatched.dispatched_at });
     await rejects(() => dispatch("OTHER"), "operation_key_conflict");
     await rejects(() => rpc("cancel_order", [order.id, "cancel", actor.id]), "order_cannot_be_cancelled");
     expect(await reservations(order)).toEqual([{ variant_id: item.id, quantity: 2, state: "dispatched" }]);
     expect(await stock(item)).toEqual(quantity(0, 0));
+    expect(await outbox(order)).toEqual([
+      confirmation(order), { order_id: order.id, message_key: "order_dispatched", state: "pending" },
+    ]);
 
     const refund = (id: string, amount: number, paymentIntent = intent) =>
       rpc("record_refund", [order.id, id, paymentIntent, amount, "GBP"]);
@@ -565,6 +577,31 @@ describe("order transactions", () => {
           where variant_id = v.id and state in ('held', 'allocated')) as reservations_match
       from public.variants v where v.id = $1
     `, [item.id])).toEqual({ on_hand_matches: true, reserved_matches: true, reservations_match: true });
+  });
+
+  test("a pre-existing dispatch is not emailed on retry, and status requires an assured warehouse session", async () => {
+    const actor = await user("warehouse");
+    const buyer = await user();
+    const item = await variant(await product(), 1);
+    const order = await createOrder([line(item)], { buyer: buyer.id });
+    await pay(order, key("cs"), key("pi"));
+    await rpc("start_picking", [order.id, "pick", actor.id]);
+    const dispatch = (operation: string) =>
+      rpc("dispatch_order", [order.id, operation, actor.id, "Parcel Carrier", "TRACK-LEGACY"]);
+    await db.query("alter table public.orders disable trigger enqueue_dispatch_email");
+    const original = await dispatch("original");
+    await db.query("alter table public.orders enable trigger enqueue_dispatch_email");
+    expect(await dispatch("original")).toMatchObject({ dispatched_at: original.dispatched_at });
+    expect(await dispatch("new-form")).toMatchObject({ dispatched_at: original.dispatched_at });
+    expect(await outbox(order)).toEqual([confirmation(order)]);
+
+    const status = () => db.query("select * from public.admin_order_mail_status($1)", [order.id]);
+    for (const identity of [buyer.id, actor.id]) {
+      await asRole("authenticated", identity, () => rejects(status, "warehouse_role_required", "42501"));
+    }
+    expect((await asRole("authenticated", actor.id, status, true)).rows).toEqual([
+      { message_key: "order_confirmation", state: "pending", delivery_uncertain: false },
+    ]);
   });
 
   test("full refunds block new picking and dispatch without silently changing stock", async () => {
