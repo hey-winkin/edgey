@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { AdminHeading, AdminLink } from "@/app/admin/ui";
+import { AdminLink } from "@/app/admin/ui";
+import { Wordmark } from "@/components/wordmark";
 import { requireStaff } from "@/lib/admin/auth";
 import { readPurchaseDocument } from "@/lib/admin/purchase-document-data";
 import {
-  formatPurchaseDocumentMoney, lineMerchandiseMinor, purchaseDocumentTerms,
+  formatPurchaseDocumentDate, formatPurchaseDocumentMoney, lineMerchandiseMinor, purchaseDocumentTerms,
   purchaseDocumentWarning, totalMerchandiseMinor, type PurchaseDocumentDetail,
 } from "@/lib/admin/purchase-document";
 import { PrintPurchaseOrderButton } from "./print-button";
 import "./print.css";
 
 export const metadata: Metadata = { title: "Print purchase order" };
-
-const date = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
 
 function PartyDetails({ title, details }: { title: string; details: PurchaseDocumentDetail[] }) {
   if (!details.length) return null;
@@ -48,18 +47,22 @@ export default async function PrintPurchaseOrderPage({ params }: { params: Promi
         <AdminLink href="/admin/purchase-orders">Back to purchase orders</AdminLink>
         <AdminLink href={`/admin/purchase-orders/${id}`}>Back to order</AdminLink>
         <a className="textlink" href={`/admin/purchase-orders/${id}/export`}>Download CSV</a>
+        <a className="textlink" href={`/admin/purchase-orders/${id}/export/pdf`}>Download PDF</a>
         <PrintPurchaseOrderButton />
         <p className="admin-muted basis-full">This uses the current buyer and supplier details. Save a copy of what you send.</p>
       </nav>
       <article className="po-document">
-        <AdminHeading title="Purchase order" eyebrow={order.number} />
+        <header className="po-document-masthead">
+          <div className="po-document-brand" role="img" aria-label="Edgey"><Wordmark /></div>
+          <h1>Purchase order</h1>
+        </header>
         {warning && <p className="po-document-warning admin-mono">{warning}</p>}
-        <dl className="admin-spec po-document-reference">
-          <dt>Order number</dt><dd className="admin-mono">{order.number}</dd>
-          <dt>Revision</dt><dd className="admin-mono">{order.revision}</dd>
-          <dt>Ordered on</dt><dd>{date.format(new Date(order.orderedOn))}</dd>
-          {order.expectedOn && <><dt>Expected on</dt><dd>{date.format(new Date(order.expectedOn))}</dd></>}
-          <dt>Currency</dt><dd className="admin-mono">{order.currency}</dd>
+        <dl className="po-document-reference">
+          <div><dt>Order number</dt><dd>{order.number}</dd></div>
+          <div><dt>Revision</dt><dd>{order.revision}</dd></div>
+          <div><dt>Ordered on</dt><dd>{formatPurchaseDocumentDate(order.orderedOn)}</dd></div>
+          {order.expectedOn && <div><dt>Expected on</dt><dd>{formatPurchaseDocumentDate(order.expectedOn)}</dd></div>}
+          <div><dt>Currency</dt><dd>{order.currency}</dd></div>
         </dl>
         {(order.buyer.length > 0 || order.supplier.length > 0) && (
           <div className="po-document-parties">

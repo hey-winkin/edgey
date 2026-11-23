@@ -26,6 +26,12 @@ export type PurchaseDocument = {
 
 export const purchaseDocumentTerms = "Merchandise prices and totals exclude VAT, shipping, duty and other charges.";
 
+const documentDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
+
+export function formatPurchaseDocumentDate(value: string) {
+  return documentDate.format(new Date(value));
+}
+
 export function purchaseDocumentWarning(status: string) {
   if (status === "draft") return "Draft — not issued";
   if (status === "cancelled") return "Cancelled — do not fulfil";

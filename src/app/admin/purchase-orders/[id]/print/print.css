@@ -1,12 +1,35 @@
 .po-document {
+  --line: #d1d3cd;
+  --muted: #5b605e;
+  --panel: transparent;
   margin-block: 24px;
   border: 1px solid var(--line);
   padding: clamp(16px, 4vw, 48px);
+  background: #fafaf8;
+  color: #232627;
+  color-scheme: light;
   overflow-wrap: anywhere;
 }
 
-.po-document .admin-heading {
-  margin-top: 0;
+.po-document-masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 12px;
+}
+
+.po-document-brand {
+  width: 8rem;
+  max-width: 100%;
+}
+
+.po-document-masthead h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3.3vw, 2.5rem);
+  line-height: 1.15;
 }
 
 .po-document h2 {
@@ -17,10 +40,25 @@
 }
 
 .po-document-reference {
-  max-width: 36rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr));
+  gap: 10px 14px;
+  margin-block: 16px 24px;
+}
+
+.po-document-reference dt {
+  color: var(--muted);
+  font: .75rem/1.5 var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.po-document-reference dd {
+  margin: 2px 0 0;
 }
 
 .po-document-warning {
+  margin-top: 12px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   font-weight: 650;
@@ -28,13 +66,17 @@
 
 .po-document-parties {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 18px;
   margin-block: 24px;
 }
 
 .po-document .po-document-table {
   min-width: 40rem;
+}
+
+.po-document-table thead {
+  border-block-end: 1px solid currentColor;
 }
 
 .po-document-table th:nth-child(n + 4),
@@ -109,7 +151,7 @@
     overflow: visible;
   }
 
-  .po-document .admin-heading h1 {
+  .po-document-masthead h1 {
     font-size: 24pt;
   }
 
