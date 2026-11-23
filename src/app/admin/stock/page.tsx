@@ -14,10 +14,15 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       <AdminHeading
         title="Stock"
         eyebrow="Warehouse"
-        description="Choose a SKU to receive stock, record an adjustment or review its movements. Available stock excludes units held for orders and trials."
+        description="Receive a whole delivery, or choose a SKU to receive individual blades, record an adjustment or review its movements."
       />
-      <div><AdminLink href="/admin/warehouse">Picking queue</AdminLink></div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        <AdminLink href="/admin/stock/receive">Receive a delivery</AdminLink>
+        <AdminLink href="/admin/stock/deliveries">Delivery history</AdminLink>
+        <AdminLink href="/admin/warehouse">Picking queue</AdminLink>
+      </div>
       <AdminSection title="Variant balances">
+        <p className="admin-muted mb-3">Available stock excludes units held for orders and trials.</p>
         {rows.length ? (
           <AdminTable label="Variant balances" headers={["SKU", "Variant", "Catalogue status", "On hand", "Reserved", "Available"]}>
             {rows.map((row) => (

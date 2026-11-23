@@ -8,6 +8,7 @@ const privatePaths = [
   "/admin", "/admin/warehouse", "/admin/warehouse/8028e331-bde6-4d32-97c4-7fcf1bed9190",
   "/admin/warehouse/8028e331-bde6-4d32-97c4-7fcf1bed9190/print", "/admin/stock",
   "/admin/stock/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/catalogue",
+  "/admin/stock/receive", "/admin/stock/deliveries", "/admin/stock/deliveries/8028e331-bde6-4d32-97c4-7fcf1bed9190",
   "/admin/catalogue/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/finance", "/admin/requests", "/admin/sales",
 ];
 
@@ -43,6 +44,7 @@ test("anonymous users and signed-in buyers cannot reach any staff page", async (
       expect(response.headers()["cache-control"]).toContain("no-store");
       expect(await response.text()).toBe("Staff sign-in required.");
     }
+    expect((await page.request.get("/admin/stock/receive/template")).status()).toBe(403);
   };
   await checkAll();
   const buyer = await createLocalAdminUser("buyer");
@@ -140,6 +142,8 @@ test("a stale stock form cannot act after switching to catalogue or finance", as
       const otherPage = await other.newPage();
       await signInStaff(otherPage, await createLocalAdminUser(role));
       await otherPage.goto(path);
+      await expect(otherPage).toHaveURL(/\/admin$/);
+      await otherPage.goto("/admin/stock/receive");
       await expect(otherPage).toHaveURL(/\/admin$/);
       await page.context().clearCookies();
       await page.context().addCookies(await other.cookies());

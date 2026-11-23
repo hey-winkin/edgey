@@ -492,8 +492,8 @@ test.describe("staff shell", () => {
         await expect(page.getByRole("heading", { name: "Staff desk" })).toBeVisible();
         await staffMenu(page).click();
         const areas = ["Staff desk", "Requests", ...(
-          role === "warehouse" ? ["Pick and dispatch", "Stock", "Delivery settings", "Sales", "Commercial measures"] :
-            role === "finance" ? ["Catalogue", "Sales", "Finance"] : ["Catalogue", "Sales"]
+          role === "warehouse" ? ["Pick and dispatch", "Stock", "Receive a delivery", "Delivery history", "Delivery settings", "Sales", "Commercial measures"] :
+            role === "finance" ? ["Delivery history", "Catalogue", "Sales", "Finance"] : ["Delivery history", "Catalogue", "Sales"]
         )];
         await expect(staffNav(page).getByRole("link")).toHaveText(areas);
         await expect(staffNav(page).getByRole("link", { name: "Staff desk" })).toHaveAttribute("aria-current", "page");
