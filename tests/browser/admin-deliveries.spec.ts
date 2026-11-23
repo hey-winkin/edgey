@@ -132,6 +132,16 @@ test("manual fields entered before hydration survive review and receipt", async 
       const field = page.getByLabel(label);
       await field.pressSequentially(value);
       await expect(field).toHaveValue(value);
+      if (label === "Blade code for line 1") {
+        await field.press("Enter");
+        await expect(page.getByLabel("Quantity for line 1")).toBeFocused();
+      } else if (label === "Quantity for line 1") {
+        await field.press("Enter");
+        await expect(page.getByLabel("Unit cost (£) for line 1")).toBeFocused();
+      } else if (label === "Unit cost (£) for line 1") {
+        await field.press("Enter");
+        await expect(page.getByRole("button", { name: "Add line", exact: true })).toBeFocused();
+      }
     }
   });
 
@@ -229,6 +239,9 @@ for (const method of ["spreadsheet rows", "CSV upload"] as const) {
 
     await expectEnhancedKeyboardNavigation(page);
     await expect(page.getByRole("button", { name: "Add imported lines" })).toBeVisible();
+    await expectSourceToSurvive();
+    await page.getByRole("button", { name: "Review delivery" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: method === "CSV upload" ? "Add the CSV lines" : "Add the pasted lines" })).toBeVisible();
     await expectSourceToSurvive();
     await page.getByRole("button", { name: "Add imported lines" }).click();
     await expect(page.getByLabel("Blade code for line 1")).toHaveValue(first.sku);
@@ -342,6 +355,43 @@ test.describe("receiving without JavaScript", () => {
       { sku: second.sku, quantity: 8, costPence: null },
     ] });
   });
+});
+
+test("warehouse can fix a failed native pasted import without losing the table", async ({ browser, baseURL }) => {
+  const { blades: [first], reference } = await deliveryFixture();
+  const page = await browser.newPage({ baseURL, javaScriptEnabled: false });
+  const note = "Fictional warehouse-only delivery.";
+  try {
+    await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
+    await page.goto("/admin/stock/receive");
+    await page.getByLabel("Delivery reference").fill(reference);
+    await page.getByLabel("Date received").fill(testReceivedOn);
+    await page.getByLabel("Delivery note (optional)").fill(note);
+    const invalid = `code,quantity\n"${first.sku},7`;
+    await pasteLines(page, invalid);
+    const paste = page.getByLabel("Spreadsheet rows");
+    await expect(page.getByText(/check the quotes/i)).toBeVisible();
+    await expect(paste).toBeVisible();
+    await expect(paste).toHaveValue(invalid);
+
+    await page.getByRole("button", { name: "Check blade codes" }).click();
+    await expect(paste).toBeVisible();
+    await expect(paste).toHaveValue(invalid);
+    await page.getByRole("button", { name: "Review delivery" }).click();
+    await expect(page.getByText(/add the pasted lines or clear/i)).toBeVisible();
+    await expect(paste).toHaveValue(invalid);
+
+    await paste.fill(`code,quantity,unit cost\n"${first.sku}",7,9.88`);
+    await page.getByRole("button", { name: "Add imported lines" }).click();
+    await expect(page.getByLabel("Blade code for line 1")).toHaveValue(first.sku);
+    await expect(page.getByLabel(/unit cost .* for line 1/i)).toHaveCount(0);
+    await page.getByRole("button", { name: "Review delivery" }).click();
+    await expect(page.getByRole("region", { name: "Review delivery" })).not.toContainText("9.88");
+    await page.getByRole("button", { name: "Receive stock", exact: true }).click();
+    await expectStoredReceipt(page, { reference, note, lines: [{ sku: first.sku, quantity: 7, costPence: null }] });
+  } finally {
+    await page.close();
+  }
 });
 
 test("paste preview flags bad matches and quantities without moving stock until review is confirmed", async ({ page, baseURL }) => {

@@ -15,7 +15,7 @@ import { commitDelivery, findRecentDelivery, importDeliveryLines, lookupDelivery
 export async function runDeliveryEditor(previous: EditorState, form: FormData): Promise<EditorState | { recordedId: string }> {
   const { roles } = await requireStaff("warehouse");
   const showCosts = canManageCosts(roles);
-  const intent = form.get("intent");
+  const intent = form.get("intent") ?? "review";
   if (intent === "commit" || intent === "back") {
     const review = previous?.review;
     if (!Array.isArray(review?.input?.lines) || !Array.isArray(previous.draft?.rows) ||
@@ -40,10 +40,16 @@ export async function runDeliveryEditor(previous: EditorState, form: FormData): 
 
   const submitted = readDeliveryDraft(form, showCosts);
   if (!isWarehouseId(submitted.id)) submitted.id = randomUUID();
-  if (!showCosts || new TextEncoder().encode(submitted.paste).byteLength > MAX_DELIVERY_IMPORT_BYTES) submitted.paste = "";
+  if (new TextEncoder().encode(submitted.paste).byteLength > MAX_DELIVERY_IMPORT_BYTES) {
+    return {
+      draft: { ...submitted, paste: "" }, matches: [],
+      error: "The pasted table exceeded 128 KB and could not be kept. Paste a smaller table.",
+      errorAt: "receipt-import-error", importOpen: true,
+    };
+  }
   const edited = typeof intent === "string" ? editDeliveryRows(submitted, intent) : null;
   const draft = edited?.draft ?? submitted;
-  const state: EditorState = { ...edited, draft, matches: [] };
+  const state: EditorState = { ...edited, draft, matches: [], importOpen: !!draft.paste.trim() };
   if (edited?.error) return state;
 
   if (intent === "import") {
@@ -58,6 +64,7 @@ export async function runDeliveryEditor(previous: EditorState, form: FormData): 
     const added = result.rows.map((row) => ({ ...row, id: allocateId() }));
     draft.rows = [...existing, ...added];
     draft.paste = "";
+    state.importOpen = false;
     state.matches = result.matches;
     state.checkedCodes = [...new Set(added.map(({ code }) => code.trim()).filter((code) => !deliveryCodeError(code)))];
     state.errorAt = `receipt-${added[0]?.id}-code`;
@@ -75,6 +82,15 @@ export async function runDeliveryEditor(previous: EditorState, form: FormData): 
   }
 
   if (intent === "review") {
+    const file = form.get("file");
+    if (file instanceof File && file.size) {
+      return { ...state, error: "Choose the CSV again and add its imported lines before reviewing the delivery.",
+        errorAt: "receipt-import-error", importOpen: true };
+    }
+    if (draft.paste.trim()) {
+      return { ...state, error: "Add the pasted lines or clear the pasted table before reviewing the delivery.",
+        errorAt: "receipt-import-error", importOpen: true };
+    }
     for (const [field, error] of Object.entries(deliveryHeaderErrors(draft))) {
       if (error) return { ...state, error, errorAt: `receipt-${field}` };
     }

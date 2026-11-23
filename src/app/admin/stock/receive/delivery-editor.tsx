@@ -127,8 +127,9 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
 
     const form = event.currentTarget;
     const formData = new FormData(form, (event.nativeEvent as SubmitEvent).submitter);
-    const intent = formData.get("intent");
+    const intent = formData.get("intent") ?? "review";
     if (typeof intent !== "string") return;
+    formData.set("intent", intent);
     const submitted = review ? state.draft : readDeliveryDraft(formData, showCosts);
     const importOpen = importing.current?.open ?? state.importOpen;
     const edit = review ? null : editDeliveryRows(submitted, intent);
@@ -136,8 +137,15 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
       setEnhanced({ base: nativeState, state: { matches: state.matches, checkedCodes: state.checkedCodes, importOpen, ...edit } });
       return;
     }
+    const file = formData.get("file");
+    if (intent === "review" && file instanceof File && file.size) {
+      setEnhanced({ base: nativeState, state: {
+        ...state, draft: submitted, error: "Add the CSV lines or clear the chosen file before reviewing the delivery.",
+        errorAt: "receipt-import-error", importOpen: true,
+      } });
+      return;
+    }
     if (intent === "import") {
-      const file = formData.get("file");
       if ((file instanceof File && file.size > MAX_DELIVERY_IMPORT_BYTES) ||
           new TextEncoder().encode(String(formData.get("paste") ?? "")).byteLength > MAX_DELIVERY_IMPORT_BYTES) {
         setEnhanced({ base: nativeState, state: {

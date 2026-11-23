@@ -88,6 +88,26 @@ describe("delivery editor form transitions", () => {
     expect(commitDelivery).not.toHaveBeenCalled();
   });
 
+  it("keeps warehouse input on a failed import and does not review with pending pasted lines", async () => {
+    requireStaff.mockResolvedValue({ roles: ["warehouse"] });
+    const pasted = 'code,quantity\n"FIX-A,9';
+    importDeliveryLines.mockResolvedValue({ ok: false, error: "Check the quotes on row 2." });
+    const fields: [string, string][] = [...enteredFields(), ["paste", pasted]];
+    await expect(runDeliveryEditor(state, formFor("import", fields))).resolves.toMatchObject({
+      draft: { paste: pasted, rows: [{ unitCost: "" }] }, importOpen: true, error: "Check the quotes on row 2.",
+    });
+    await expect(runDeliveryEditor(state, formFor("review", fields))).resolves.toMatchObject({
+      draft: { paste: pasted }, importOpen: true, error: expect.stringContaining("Add the pasted lines"),
+    });
+  });
+
+  it("reports an oversized paste without echoing it", async () => {
+    const result = await runDeliveryEditor(state, formFor("check", [["paste", "£".repeat(65_537)]]));
+    expect(result).toMatchObject({
+      draft: { paste: "" }, importOpen: true, error: expect.stringContaining("exceeded 128 KB"),
+    });
+  });
+
   it("does not turn a back request into a commit while retry is locked", async () => {
     const reviewed = await runDeliveryEditor(state, formFor("review", enteredFields())) as EditorState;
     const retry = { ...reviewed, retryOnly: true, error: "Receipt not confirmed." };
