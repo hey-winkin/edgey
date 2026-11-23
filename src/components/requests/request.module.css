@@ -114,3 +114,94 @@ textarea.control {
 .signedIn p {
   margin-block-end: .5rem;
 }
+
+.photos {
+  display: grid;
+  gap: .5rem;
+  min-width: 0;
+  padding: .75rem;
+  border: 1px solid var(--line);
+  font-size: .92rem;
+}
+
+.photos legend {
+  padding-inline: .25rem;
+}
+
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.photoPicker {
+  position: relative;
+  display: inline-grid;
+  min-height: var(--edgey-field-height);
+  align-items: center;
+  padding: .35rem .75rem;
+  border: 1px solid var(--edgey-control-border);
+  background: var(--edgey-field);
+  cursor: pointer;
+}
+
+.photoPicker:has(input:focus-visible) {
+  outline: var(--edgey-focus-width) solid var(--edgey-focus);
+  outline-offset: 2px;
+}
+
+.photoPicker:has(input:disabled) {
+  color: var(--muted);
+  cursor: default;
+}
+
+.photoPicker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+
+.photoCamera {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .photoCamera {
+    display: inline-grid;
+  }
+}
+
+.photoList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photoList li {
+  display: grid;
+  width: 5.5rem;
+  border: 1px solid var(--line);
+  background: var(--edgey-field);
+}
+
+.photoList img {
+  width: 100%;
+  height: 4.125rem;
+  object-fit: contain;
+  background: var(--panel);
+}
+
+.photoList button {
+  min-height: 2.75rem;
+  padding-inline: .25rem;
+  text-decoration: underline;
+  text-underline-offset: .18em;
+}
+
+.photos p:empty {
+  position: absolute;
+}

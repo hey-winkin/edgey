@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/stripe-reconciliation", "schedule": "* * * * *" },
     { "path": "/api/cron/order-confirmations", "schedule": "* * * * *" },
-    { "path": "/api/cron/request-emails", "schedule": "* * * * *" }
+    { "path": "/api/cron/request-emails", "schedule": "* * * * *" },
+    { "path": "/api/cron/enquiry-photos", "schedule": "30 3 * * *" }
   ]
 }

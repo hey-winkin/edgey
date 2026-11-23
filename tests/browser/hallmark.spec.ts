@@ -34,7 +34,8 @@ for (const theme of themes) {
     await expect(contact).toHaveCSS("outline-color", theme === "light" ? "rgb(33, 93, 173)" : "rgb(155, 227, 249)");
 
     await page.goto("/enquiry");
-    await expectControlBoundary(page.locator("main form :is(input:not([type=hidden], [tabindex='-1']), textarea, .select-field)"));
+    await expectControlBoundary(page.locator("main form :is(input:not([type=hidden], [type=file], [tabindex='-1']), textarea, .select-field)"));
+    await expectControlBoundary(page.getByLabel("Add photos", { exact: true }).locator(".."));
     await page.goto("/trade");
     await expectControlBoundary(page.getByRole("textbox", { name: "Work email" }));
     await page.goto("/admin/sign-in");

@@ -3322,6 +3322,13 @@ export type Database = {
                 };
                 Returns: Json;
             };
+            "claim_enquiry_photo_upload": {
+                Args: {
+                    "p_photo_count": number;
+                    "p_token_hash": string;
+                };
+                Returns: string;
+            };
             "claim_finance_retries": {
                 Args: {
                     "p_kind": string;
@@ -3964,6 +3971,12 @@ export type Database = {
                     isSetofReturn: false;
                 };
             };
+            "enquiry_photo_storage_key": {
+                Args: {
+                    "p_enquiry_id": string;
+                };
+                Returns: string;
+            };
             "finish_finance_retry": {
                 Args: {
                     "p_kind": string;
@@ -4050,6 +4063,14 @@ export type Database = {
                 };
                 Returns: boolean;
             };
+            "issue_enquiry_photo_upload": {
+                Args: {
+                    "p_enquiry_id": string;
+                    "p_photo_count": number;
+                    "p_token_hash": string;
+                };
+                Returns: boolean;
+            };
             "last_staff_purchase_price": {
                 Args: {
                     "p_currency": string;
@@ -4132,6 +4153,10 @@ export type Database = {
                     "code": string;
                 };
                 Returns: string;
+            };
+            "orphaned_enquiry_photos": {
+                Args: Record<PropertyKey, never>;
+                Returns: (string)[];
             };
             "prepare_cancelled_card_refund": {
                 Args: {
