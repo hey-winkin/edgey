@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
@@ -6,6 +7,7 @@ import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { requestsDb } from "@/lib/admin/request-schema";
 import { enquiryStatus, publishedRequestVariants, requireRequestsStaff, requestBrand, requestVariantLabels, variantLabel } from "@/lib/admin/requests";
 import { isWarehouseId } from "@/lib/admin/warehouse-format";
+import { listEnquiryPhotoSlots } from "@/lib/requests/photos";
 import { handleEnquiry } from "../../actions";
 import { RequestTextarea } from "../../request-textarea";
 import { VariantSelect } from "../../variant-select";
@@ -23,12 +25,13 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
   if (!enquiry) notFound();
   const closed = enquiry.status === "resolved";
   const matching = !closed && enquiry.status !== "converted" && enquiry.kind === "compatibility";
-  const [replies, options, labels] = await Promise.all([
+  const [replies, options, labels, photos] = await Promise.all([
     requestsDb().from("order_outbox").select("id,created_at,state,message_body")
       .eq("enquiry_id", id).like("message_key", "enquiry_reply:%")
       .order("created_at", { ascending: false }).order("id").limit(20),
     matching ? publishedRequestVariants() : [],
     requestVariantLabels(enquiry.matched_variant_id ? [enquiry.matched_variant_id] : []),
+    enquiry.kind === "compatibility" ? listEnquiryPhotoSlots(enquiry.id).catch(() => null) : [],
   ]);
   if (replies.error) throw new Error("Could not load the recorded replies.");
   const selected = enquiry.matched_variant_id;
@@ -53,6 +56,25 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
         </dd></div>}
       </dl>
     </AdminSection>
+    {enquiry.kind === "compatibility" && (
+      <AdminSection title="Buyer photos">
+        {photos === null ? <p>Couldn’t load the photos. Reload the enquiry to try again.</p> : photos.length ? (
+          <ul className="flex list-none flex-wrap gap-4 p-0">
+            {photos.map((slot) => {
+              const url = `/api/enquiry-photos/${enquiry.id}/${slot}`;
+              return (
+                <li key={slot}>
+                  <a className="textlink inline-grid gap-1" href={url} target="_blank" rel="noopener noreferrer">
+                    <Image unoptimized src={url + "?size=thumb"} width={160} height={120} className="h-[120px] w-[160px] object-contain" alt="" />
+                    Open photo {slot} full size
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p>No photos attached.</p>}
+      </AdminSection>
+    )}
     {!closed && <div className="admin-grid">
       <AdminSection title="Reply by email">
         <AdminForm key={enquiry.updated_at} action={handleEnquiry.bind(null, { ...actionTarget, kind: "reply", key: randomUUID() })} submit="Queue reply">

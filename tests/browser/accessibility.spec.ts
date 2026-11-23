@@ -6,6 +6,7 @@ import { localAdminClient } from "../../scripts/seed-admin";
 import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
 import { scanAccessibility, themes, saveThemeBeforeLoad, type Theme } from "../helpers/accessibility";
 import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
+import { enquiryPhotoFixture } from "./fixtures/enquiry-photo";
 import { company, withNet30Data } from "./fixtures/net30-data";
 
 const noPage = "We could not find that page";
@@ -152,6 +153,8 @@ for (const theme of themes) {
         ["/checkout/net30/" + randomUUID(), "Checkout not found"],
       ]);
       await page.goto("/enquiry");
+      await page.getByLabel("Add photos", { exact: true }).setInputFiles(await enquiryPhotoFixture());
+      await expect(page.getByRole("group", { name: "Photos (optional)" }).getByRole("status")).toHaveText("1 of 3 photos ready");
       await page.getByRole("button", { name: "Send enquiry" }).click();
       await expect(page.getByRole("heading", { name: "Check the form" })).toBeFocused();
       await scanAccessibility(page, theme);

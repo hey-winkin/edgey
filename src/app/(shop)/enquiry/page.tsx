@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { RequestForm, type RequestField } from "@/components/requests/request-form";
 import { RequestPage } from "@/components/requests/request-page";
 import { queryValue, type RouteQuery } from "@/lib/catalogue";
-import { submitEnquiry } from "@/lib/requests/actions";
+import { submitEnquiry, uploadEnquiryPhotos } from "@/lib/requests/actions";
 import { MACHINE_BRANDS } from "@/lib/requests/forms";
 
 type Props = { searchParams: Promise<RouteQuery> };
@@ -46,6 +46,7 @@ export default async function EnquiryPage({ searchParams }: Props) {
         action={submitEnquiry.bind(null, kind)}
         attemptId={crypto.randomUUID()}
         fields={fields}
+        uploadPhotos={delivery ? undefined : uploadEnquiryPhotos}
         submitLabel="Send enquiry"
         successTitle="Enquiry received"
         successMessage="We’ll reply by email."

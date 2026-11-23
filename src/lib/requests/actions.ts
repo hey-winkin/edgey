@@ -4,6 +4,7 @@ import { getVerifiedBuyer } from "@/lib/auth/server";
 import { serviceClient } from "@/lib/supabase/service";
 import { requestAvailability, requestsUnavailable } from "./availability";
 import { blockedSubmission, type EnquiryKind, type RequestFormState } from "./forms";
+import { issuePhotoUploadToken, saveEnquiryPhotos } from "./photos";
 import {
   caughtInHoneypot,
   compatibilitySchema,
@@ -55,10 +56,21 @@ export async function submitEnquiry(
   const input = readForm(compatibilitySchema, form);
   if (!input.success) return formErrors(input.error);
   const { attemptId, email, query, machineBrand, message } = input.data;
-  return submit("enquiry", email, () => serviceClient().rpc("submit_enquiry", {
+  const result = await submit("enquiry", email, () => serviceClient().rpc("submit_enquiry", {
     p_id: attemptId, p_kind: "compatibility", p_email: email, p_query: query || undefined,
     p_machine_brand: machineBrand || undefined, p_message: message,
   }));
+  if (result.status !== "success") return result;
+  const photoUploadToken = await issuePhotoUploadToken(attemptId, form.get("photoCount"));
+  return photoUploadToken ? { ...result, photoUploadToken } : result;
+}
+
+export async function uploadEnquiryPhotos(token: string, form: FormData): Promise<number> {
+  try {
+    return await saveEnquiryPhotos(token, form.getAll("photo"));
+  } catch {
+    return 0;
+  }
 }
 
 export async function submitTrialRequest(_previous: RequestFormState, form: FormData): Promise<RequestFormState> {
