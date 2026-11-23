@@ -22,9 +22,9 @@ const variant: Variant = {
   availability: "in_stock",
   substrates: [{ slug: "foamex", name: "Foamex", swatch: null, sortOrder: 0 }],
   compatibility: [
-    mapping({}),
-    mapping({ code: "3910301", kind: "item_number" }),
-    mapping({ code: "500-9802", kind: "item_number", brand: summa, machine: "F-Series", tool: "Drag module", adapter: "6 mm sleeve" }),
+    mapping({ tool: "UCT, SCT" }),
+    mapping({ code: "3910301", kind: "item_number", tool: "uct" }),
+    mapping({ code: "500-9802", kind: "item_number", brand: summa, machine: "F-Series", tool: "D-Series Drag; F-Series Drag Module", adapter: "6 mm sleeve" }),
   ],
 };
 const family: Family = {
@@ -50,17 +50,17 @@ describe("blade reference guide", () => {
     expect(guide.map(({ rows }) => rows)).toEqual([
       [{
         sku: "EDG-FIRST", name: family.name, href: "/blades/edg-family?variant=EDG-FIRST",
-        codes: ["500-9802"], machines: ["F-Series"], heads: ["Drag module", "Adapter: 6 mm sleeve"],
+        codes: ["500-9802"], machines: ["F-Series"], heads: ["D-Series Drag", "F-Series Drag Module"], adapters: ["6 mm sleeve"],
         angle: "50°", depth: "4.8 mm", materials: ["Foamex"],
       }],
       [{
         sku: "EDG-FIRST", name: family.name, href: "/blades/edg-family?variant=EDG-FIRST",
-        codes: ["Z10", "3910301"], machines: ["G3, S3"], heads: ["UCT"],
+        codes: ["Z10", "3910301"], machines: ["G3, S3"], heads: ["UCT", "SCT"], adapters: [],
         angle: "50°", depth: "4.8 mm", materials: ["Foamex"],
       }],
       [{
         sku: "EDG-SECOND", name: family.name, href: "/blades/edg-family?variant=EDG-SECOND",
-        codes: [], machines: [], heads: [], angle: null, depth: null, materials: [],
+        codes: [], machines: [], heads: [], adapters: [], angle: null, depth: null, materials: [],
       }],
     ]);
   });
@@ -75,7 +75,7 @@ describe("blade reference guide", () => {
     }]);
     expect(guide).toHaveLength(2);
     expect(guide[0]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["Z10"], heads: [] });
-    expect(guide[1]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["NO-BRAND"], heads: ["Adapter: Approved adapter"] });
+    expect(guide[1]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["NO-BRAND"], heads: [], adapters: ["Approved adapter"] });
   });
 
   test("searches only visible fields, normalising printed codes, case and diacritics", () => {
@@ -85,6 +85,9 @@ describe("blade reference guide", () => {
     expect(filterReferenceGuide(guide, "500 9802")).toEqual([guide[0]]);
     expect(filterReferenceGuide(guide, "edgsecond")).toEqual([guide[2]]);
     expect(filterReferenceGuide(guide, "f-series 4.8 mm")).toEqual([guide[0]]);
+    expect(filterReferenceGuide(guide, "D-Series Drag; F-Series Drag Module")).toEqual([guide[0]]);
+    expect(filterReferenceGuide(guide, "UCT, SCT")).toEqual([guide[1]]);
+    expect(filterReferenceGuide(guide, "adapter sleeve")).toEqual([guide[0]]);
     expect(filterReferenceGuide(guide, "First 3910301")).toEqual([guide[1]]);
     for (const query of ["Unverified hidden model", "Unused option", "Description not used", "Default holder", "1195"]) {
       expect(JSON.stringify(guide)).not.toContain(query);

@@ -64,6 +64,10 @@ export function familyBrands(family: Family): { slug: string; name: string }[] {
   return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export function compatibilityToolHeads(tool: Compatibility["tool"]): string[] {
+  return (tool ?? "").split(/[,;]/).map((head) => queryValue(head, 160)).filter(Boolean);
+}
+
 export function referenceToolFit(variant: Variant, references = variant.compatibility): string[] {
   const tools = references.map(({ tool }) => tool).filter((tool): tool is string => Boolean(tool));
   const adapters = references.flatMap(({ adapter }) => adapter ? ["Adapter: " + adapter] : []);
@@ -171,8 +175,7 @@ export function buildCatalogueView(families: Family[], hits: SearchHit[] | null,
     for (const brand of familyBrands(family)) machines.set(brand.slug, brand);
     for (const { compatibility } of family.variants) {
       for (const reference of compatibility) {
-        const names = (reference.tool ?? "").split(/[,;]/).map((name) => queryValue(name, 160)).filter(Boolean);
-        const slugs = names.map((name) => {
+        const slugs = compatibilityToolHeads(reference.tool).map((name) => {
           const slug = name.toLowerCase();
           const head = toolHeads.get(slug) ?? { slug, name, machines: [] };
           if (reference.brand && !head.machines.includes(reference.brand.slug)) head.machines.push(reference.brand.slug);

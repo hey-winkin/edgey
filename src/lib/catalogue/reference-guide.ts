@@ -1,4 +1,4 @@
-import { formatNumber, productHref, referenceToolFit, type Compatibility, type Family } from "./index";
+import { compatibilityToolHeads, formatNumber, productHref, type Compatibility, type Family } from "./index";
 
 type ReferenceRow = {
   sku: string;
@@ -7,6 +7,7 @@ type ReferenceRow = {
   codes: string[];
   machines: string[];
   heads: string[];
+  adapters: string[];
   angle: string | null;
   depth: string | null;
   materials: string[];
@@ -33,13 +34,21 @@ export function buildReferenceGuide(families: Family[]): ReferenceGroup[] {
           name: references[0]?.brand?.name ?? "No verified machine brand",
           rows: [],
         };
+        const heads = new Map<string, string>();
+        for (const { tool } of references) {
+          for (const head of compatibilityToolHeads(tool)) {
+            const key = head.toLowerCase();
+            if (!heads.has(key)) heads.set(key, head);
+          }
+        }
         group.rows.push({
           sku: variant.sku,
           name: family.name,
           href: productHref(family.slug, family.variants.length > 1 ? variant.sku : null),
           codes: [...new Set(references.map(({ code }) => code))],
           machines: [...new Set(references.flatMap(({ machine }) => machine ? [machine] : []))],
-          heads: referenceToolFit({ ...variant, tool: null }, references),
+          heads: [...heads.values()],
+          adapters: [...new Set(references.flatMap(({ adapter }) => adapter ? [adapter] : []))],
           angle: variant.angleDeg === null ? null : formatNumber(variant.angleDeg) + "°",
           depth: variant.cuttingDepthMm === null ? null : formatNumber(variant.cuttingDepthMm) + " mm",
           materials: variant.substrates.map(({ name }) => name),
@@ -62,7 +71,8 @@ function searchText(value: string): string {
 export function filterReferenceGuide(groups: ReferenceGroup[], query: string): ReferenceGroup[] {
   const key = searchText(query.trim());
   if (!key) return groups;
-  const terms = key.split(/\s+/);
+  const terms = key.split(/[\s,;]+/).filter(Boolean);
+  if (terms.length === 0) return [];
   const compactKey = key.replace(/[\s-]/g, "");
   return groups.flatMap((group) => {
     const rows = group.rows.filter((row) => {
@@ -70,7 +80,10 @@ export function filterReferenceGuide(groups: ReferenceGroup[], query: string): R
       if (compactKey && codes.some((code) => searchText(code).replace(/[\s-]/g, "").includes(compactKey))) {
         return true;
       }
-      const fields = [group.name, row.name, ...codes, ...row.machines, ...row.heads, ...row.materials, row.angle ?? "", row.depth ?? ""];
+      const fields = [
+        group.name, row.name, ...codes, ...row.machines, ...row.heads,
+        ...row.adapters.map((adapter) => "Adapter: " + adapter), ...row.materials, row.angle ?? "", row.depth ?? "",
+      ];
       const searchable = fields.map(searchText);
       return terms.every((term) => searchable.some((field) => field.includes(term)));
     });
