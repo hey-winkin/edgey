@@ -28,6 +28,7 @@ describe("quick order input", () => {
     expect(result.lines.slice(0, 5).every((row) => "issue" in row)).toBe(true);
     expect(result.lines[5]).toMatchObject({ quantity: MAX_ORDER_INTEGER });
     expect(parseQuickOrder(" \n").issue).toBeTruthy();
+    expect(parseQuickOrder("a 1\n".repeat(25)).lines).toHaveLength(25);
     expect(parseQuickOrder("a 1\n".repeat(26)).lines).toEqual([]);
     expect(parseQuickOrder("x".repeat(4001)).lines).toEqual([]);
   });
@@ -56,7 +57,7 @@ describe("quick order basket rules", () => {
     ]);
     const shortage = planQuickOrder(rows, [{ ...stock, availableQuantity: 9 }], groupedQuantities(rows), basket, [stock]);
     expect(shortage.lines).toEqual(basket);
-    expect(shortage.rows.every(({ issue }) => issue?.startsWith("Not enough stock"))).toBe(true);
+    expect(shortage.rows.every(({ issue }) => issue?.includes("not enough for the combined quantity"))).toBe(true);
   });
 
   it("does not add unknown, out-of-stock, or unpublished lines but keeps other matches", () => {

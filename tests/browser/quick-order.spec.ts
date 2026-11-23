@@ -32,7 +32,7 @@ test("checks maker codes, lets buyers choose and correct, then adds only ready l
   await input.fill(sample);
   await check.press("Enter");
   const results = page.getByRole("region", { name: "Checked lines" });
-  await expect(results.getByText("5–9 blades tier · 9 combined")).toHaveCount(2);
+  await expect(results.getByText("Tier: 5–9 blades · 9 combined")).toHaveCount(2);
   await expect(results.getByText("£19.95 ex VAT / ea", { exact: false })).toHaveCount(2);
   await expect(results.getByText("Out of stock.", { exact: true })).toBeVisible();
   await expect(results.getByText("No blade matches this part number.")).toHaveCount(2);
@@ -46,7 +46,7 @@ test("checks maker codes, lets buyers choose and correct, then adds only ready l
   await input.press("Shift+Home");
   await page.keyboard.insertText("EDG-Z10 1");
   await results.getByRole("button", { name: "Check choices" }).press("Enter");
-  await expect(results.getByText("10+ blades tier · 10 combined")).toHaveCount(3);
+  await expect(results.getByText("Tier: 10+ blades · 10 combined")).toHaveCount(3);
   await expect(results.getByText("£17.50 ex VAT / ea", { exact: false })).toHaveCount(3);
   await add.press("Enter");
   await expect(results.getByText("Added 7 blades to your basket.")).toBeFocused();
@@ -66,6 +66,7 @@ test.describe("with JavaScript disabled", () => {
 
   test("native form submission checks lines and accepts a choice", async ({ page }) => {
     await page.goto("/quick-order");
+    await expect(page.getByText(/Enable JavaScript to add/)).toBeVisible();
     const input = page.getByRole("textbox", { name: "Part numbers and quantities" });
     await input.fill("3910301,5\nSPB 0030 1");
     await page.getByRole("button", { name: "Check lines" }).press("Enter");
@@ -76,7 +77,7 @@ test.describe("with JavaScript disabled", () => {
     await choice.selectOption({ index: 1 });
     await results.getByRole("button", { name: "Check choices" }).press("Enter");
     await expect(results.getByText("In stock.", { exact: true })).toHaveCount(2);
-    await expect(results.getByText(/Enable JavaScript to add/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Skip to the results" })).toBeVisible();
     await expect(results.getByRole("button", { name: "Add ready lines to basket" })).toHaveCount(0);
   });
 });
@@ -128,6 +129,38 @@ test("bulk add also works with the in-memory basket when local storage is blocke
   await expect(page.getByRole("button", { name: "Basket 3 blades" })).toBeVisible();
 });
 
+test("bulk add does not overwrite a basket changed by another tab during the stock check", async ({ page, context }) => {
+  await page.goto("/quick-order");
+  await page.getByRole("textbox", { name: "Part numbers and quantities" }).fill("EDG-Z10 2");
+  await page.getByRole("button", { name: "Check lines" }).click();
+  const add = page.getByRole("button", { name: "Add ready lines to basket" });
+  await expect(add).toBeVisible();
+
+  const started = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  await page.route("**/quick-order", async (route) => {
+    if (route.request().method() === "POST") {
+      started.resolve();
+      await release.promise;
+    }
+    await route.continue();
+  });
+  await add.click();
+  const other = await context.newPage();
+  try {
+    await started.promise;
+    await other.goto("/blades/edg-z16");
+    await other.getByRole("button", { name: "Add to basket", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Basket 1 blade" })).toBeVisible();
+  } finally {
+    release.resolve();
+    await other.close();
+  }
+  await expect(page.getByText("We couldn’t update your basket. Check it and try adding again.")).toBeVisible();
+  await add.click();
+  await expect(page.getByRole("button", { name: "Basket 3 blades" })).toBeVisible();
+});
+
 for (const theme of themes) {
   for (const [width, height] of [[1440, 900], [1280, 800], [390, 844], [320, 800]] as const) {
     test(`quick order reflows and scans at ${width} × ${height} in ${theme}`, async ({ page }) => {
@@ -146,7 +179,7 @@ for (const theme of themes) {
       await scanAccessibility(page, theme);
       if (process.env.EDGEY_QUICK_ORDER_RENDER_DIR) {
         await page.evaluate(() => window.scrollTo(0, 0));
-        await main.screenshot({ path: `${process.env.EDGEY_QUICK_ORDER_RENDER_DIR}/${width}-${theme}.png` });
+        await page.screenshot({ fullPage: true, path: `${process.env.EDGEY_QUICK_ORDER_RENDER_DIR}/${width}-${theme}.png` });
       }
     });
   }

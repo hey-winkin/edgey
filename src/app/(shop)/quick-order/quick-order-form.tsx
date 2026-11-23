@@ -32,7 +32,8 @@ function LineResult({ row, added, failure, adding }: {
       </p>
       {"blade" in row && row.blade && (
         <p>
-          <Link className="textlink" href={productHref(row.blade.slug, row.blade.sku)}>
+          <Link className="textlink" href={productHref(row.blade.slug, row.blade.sku)}
+            aria-label={`${row.blade.name}, ${row.blade.sku}`}>
             {row.blade.name}
           </Link>
           <span className={styles.bladeDetails}>{
@@ -58,7 +59,7 @@ function LineResult({ row, added, failure, adding }: {
         {"price" in row && row.price && !added && (
           <span className={styles.price}>
             {formatUnitPriceExVat(row.price.unit)}
-            <small>{tiers[row.price.minimum]} tier{row.price.combinedQuantity !== row.quantity && ` · ${row.price.combinedQuantity.toLocaleString("en-GB")} combined`}</small>
+            <small>Tier: {tiers[row.price.minimum]}{row.price.combinedQuantity !== row.quantity && ` · ${row.price.combinedQuantity.toLocaleString("en-GB")} combined`}</small>
           </span>
         )}
       </p>
@@ -133,6 +134,10 @@ export function QuickOrderForm() {
     <form action={check} className={styles.order} onChange={() => setChanged(review.id)} onReset={(event) => event.preventDefault()}>
       <input type="hidden" name="basket" value={JSON.stringify(lines)} />
       <div className={styles.entry}>
+        <noscript>
+          <p className="muted">You can check lines and choose blades without JavaScript. Prices and availability shown here don’t include items already in your basket. Enable JavaScript to add blades.</p>
+          {review.id && <a className="textlink" href="#quick-order-results">Skip to the results</a>}
+        </noscript>
         <label htmlFor="quick-order-lines">Part numbers and quantities</label>
         <p className="muted" id="quick-order-format">
           Type or paste up to {MAX_QUICK_ORDER_LINES} lines. Put one part number and quantity on each line, separated by a tab, comma or space.
@@ -147,16 +152,21 @@ export function QuickOrderForm() {
         </button>
       </div>
       <section className={styles.results} aria-labelledby="quick-order-results">
-        <h2 tabIndex={-1} ref={heading} id="quick-order-results">{review.id ? "Checked lines" : "Before you add"}</h2>
+        <h2 tabIndex={-1} ref={heading} id="quick-order-results"
+          aria-describedby={review.error ? "quick-order-error" : review.rows.length ? "quick-order-summary" : undefined}>
+          {review.error ? "Couldn’t check lines" : review.id ? "Checked lines" : "Check before adding"}
+        </h2>
         {!review.id && <p className="muted">Check the blade, quantity, price and availability for each line before adding to your basket.</p>}
         {review.error && <p id="quick-order-error" role="status">{review.error}</p>}
         {!!review.rows.length && (
           <>
-            <p className={styles.summary}>
+            <p id="quick-order-summary" className={styles.summary}>
               {ready.length} {ready.length === 1 ? "line" : "lines"} ready to add
               {needsAttention > 0 && ` · ${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`}
             </p>
-            <p className="muted">To correct a line, <a className="textlink" href="#quick-order-lines">edit your list</a> and check again. Basket prices combine quantities of the same blade.</p>
+            <p className="muted">To correct a line, <a className="textlink" href="#quick-order-lines">edit your list</a> and check again.{" "}
+              {hydrated && "Basket prices combine quantities of the same blade."}
+            </p>
             <ol role="list" className={styles.rows}>
               {review.rows.map((row) => (
                 <LineResult key={`${review.id}:${row.number}`} row={row} added={added.includes(row.number)}
@@ -179,7 +189,6 @@ export function QuickOrderForm() {
               {!!added.length && <button type="button" className="secondary" onClick={(event) => open(event.currentTarget)}>View basket</button>}
             </div>
             {!ready.length && !added.length && <p className="muted">No lines are ready to add.</p>}
-            {ready.length > 0 && <noscript><p className="muted">Your lines are checked. Enable JavaScript to add them to your basket.</p></noscript>}
           </>
         )}
       </section>

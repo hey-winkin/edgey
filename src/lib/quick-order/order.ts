@@ -94,8 +94,8 @@ export function planQuickOrder(
       quantity > MAX_ORDER_INTEGER ? "The combined quantity exceeds the basket limit." :
         !price?.ok ? "This blade can’t be ordered at this quantity." :
           !variant.availableQuantity ? "Out of stock." :
-            variant.availableQuantity < quantity ? "Not enough stock for the combined quantity. Try fewer blades." :
-              !quantities.has(id) && quantities.size >= MAX_BASKET_LINES ? "Your basket has reached its limit of 100 different blades." : undefined;
+            variant.availableQuantity < quantity ? "In stock, but not enough for the combined quantity. Try fewer blades." :
+              existing === undefined && quantities.size >= MAX_BASKET_LINES ? `Your basket has reached its limit of ${MAX_BASKET_LINES} different blades.` : undefined;
     if (!issue && variant) {
       const previous = priced.get(id);
       quantities.set(id, quantity);

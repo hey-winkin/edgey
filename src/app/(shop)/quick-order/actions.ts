@@ -15,6 +15,7 @@ import type { LineRequest } from "@/lib/commerce";
 type Review = { id: string; text: string; rows: ResultLine[]; error?: string; invalidInput?: boolean };
 const retry = "We couldn’t check the latest prices and availability. Try again.";
 const tooMany = "There have been too many checks. Try again later.";
+const maxParallelSearches = 5;
 const reviewedLine = z.object({
   number: z.int().positive().max(MAX_QUICK_ORDER_INPUT),
   code: z.string().refine(validPartCode),
@@ -29,7 +30,13 @@ async function prepare(
   basket: LineRequest[] = [],
 ) {
   const codes = [...new Set(parsed.flatMap((line) => "code" in line ? [line.code] : []))];
-  const hits = new Map(await Promise.all(codes.map(async (code) => [code, await searchExactBladeCodes(code)] as const)));
+  const hits = new Map<string, Awaited<ReturnType<typeof searchExactBladeCodes>>>();
+  for (let i = 0; i < codes.length; i += maxParallelSearches) {
+    for (const [code, matches] of await Promise.all(codes.slice(i, i + maxParallelSearches)
+      .map(async (code) => [code, await searchExactBladeCodes(code)] as const))) {
+      hits.set(code, matches);
+    }
+  }
   const ids = [...new Set([...hits.values()].flatMap((matches) => matches.map(({ variantId }) => variantId)))];
   const blades = new Map<string, Blade>();
   for (let i = 0; i < ids.length; i += MAX_BASKET_LINES) {
@@ -77,19 +84,25 @@ export async function checkQuickOrder(_: Review, form: FormData): Promise<Review
     text: text.length <= MAX_QUICK_ORDER_INPUT * 2 ? text : "",
     rows: parsed.lines.filter((line) => "issue" in line),
   };
-  if (parsed.issue) return { ...initial, error: parsed.issue, invalidInput: true };
+  if (parsed.issue) return {
+    ...initial,
+    error: initial.text || !text ? parsed.issue : `${parsed.issue} Paste a shorter list below.`,
+    invalidInput: true,
+  };
   if (!parsed.lines.some((line) => "code" in line)) return initial;
   try {
     if (!await allowSelectionQuote()) return { ...initial, rows: [], error: tooMany };
     const basketInput = form.get("basket");
-    const basket = typeof basketInput === "string" && basketInput.length <= 9_000
-      ? normaliseLines(JSON.parse(basketInput)) ?? [] : [];
+    const basket = basketInput === null ? [] : typeof basketInput === "string" && basketInput.length <= 9_000
+      ? normaliseLines(JSON.parse(basketInput)) : null;
+    if (!basket) return { ...initial, rows: [], error: "We couldn’t read your basket. Check it and try again." };
     const { rows } = await prepare(parsed.lines, (line) => {
       const choice = form.get(choiceField(line));
       return { choice: typeof choice === "string" && choice.length === 36 ? choice : undefined };
     }, basket);
     return { ...initial, rows };
   } catch {
+    console.error("Quick order check failed.");
     return { ...initial, rows: [], error: retry };
   }
 }
@@ -115,6 +128,7 @@ export async function confirmQuickOrder(checked: unknown, currentBasket: unknown
       failures: rows.flatMap(({ number, issue }) => issue ? [{ number, issue }] : []),
     };
   } catch {
+    console.error("Quick order confirmation failed.");
     return { error: retry };
   }
 }
