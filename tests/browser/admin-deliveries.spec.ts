@@ -398,7 +398,7 @@ test("paste preview flags bad matches and quantities without moving stock until 
   const { blades: [first, second, third], makerRef, ambiguousRef, reference, db } = await deliveryFixture();
   await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
   await page.goto("/admin/stock");
-  await page.getByRole("link", { name: "Receive a delivery", exact: true }).click();
+  await page.getByRole("link", { name: "Book in a delivery", exact: true }).click();
   await page.getByLabel("Delivery reference").fill(reference);
   await page.getByLabel("Delivery note (optional)").fill("Fictional delivery for testing");
   await pasteLines(page, `code\tquantity\tunit cost\n${first.sku}\t10\t1.01\n${makerRef}\t4\t\n${ambiguousRef}\t3\t\nTEST-NOT-FOUND\t2\t\n${second.sku}\t0\t`);
@@ -443,7 +443,7 @@ test("warehouse can import CSV and receive without cost; finance can cost the sa
   const { blades: [first, second], db, reference } = await deliveryFixture();
   await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
   await page.goto("/admin");
-  await (await openStaffMenu(page)).getByRole("link", { name: "Receive a delivery" }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Book in a delivery" }).click();
   const template = await page.request.get("/admin/stock/receive/template");
   expect(template.headers()["content-disposition"]).toContain("edgey-delivery-template.csv");
   expect(await template.text()).toBe("code,quantity\r\n");
@@ -563,7 +563,7 @@ for (const theme of themes) {
     await checkEverySize("review");
     await page.getByRole("button", { name: "Receive stock", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: reference })).toBeVisible();
-    await expect(page.locator(".admin-location")).toHaveText("Purchases");
+    await expect(page.locator(".admin-location")).toHaveText("Purchasing");
     const menu = await openStaffMenu(page);
     await expect(menu.locator("[aria-current]")).toHaveCount(1);
     await expect(menu.getByRole("link", { name: "Delivery history" })).toHaveAttribute("aria-current", "location");

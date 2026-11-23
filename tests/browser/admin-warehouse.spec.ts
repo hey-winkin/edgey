@@ -16,7 +16,7 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   expect(before.error).toBeNull();
 
   await signInStaff(page, staff);
-  await (await openStaffMenu(page)).getByRole("link", { name: "Pick and dispatch" }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "New sales orders" }).click();
   const orderLink = page.getByRole("link", { name: reference, exact: true });
   await expect(orderLink).toHaveAttribute("href", `/admin/warehouse/${order.id}`);
   for (const lookup of [order.id, ` ${reference.toLowerCase()} `]) {
@@ -94,7 +94,7 @@ test("a warehouse receipt updates the variant balance and ledger", async ({ page
   if (before.error) throw before.error;
   const staff = await createLocalAdminUser("warehouse");
   await signInStaff(page, staff);
-  await (await openStaffMenu(page)).getByRole("link", { name: "Stock and adjustments", exact: true }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock levels", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
   await page.getByLabel("Received quantity").fill("3");
   await page.getByRole("button", { name: "Record stock receipt" }).click();

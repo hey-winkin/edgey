@@ -4,8 +4,8 @@ import { signInStaff } from "./admin-fixtures";
 
 test("warehouse staff save and remove a configured district service", async ({ page }) => {
   await signInStaff(page, await createLocalAdminUser("warehouse"));
-  await page.getByRole("link", { name: "Delivery settings" }).click();
-  await expect(page.getByRole("heading", { name: "Delivery settings" })).toBeVisible();
+  await page.getByRole("link", { name: "Customer delivery settings" }).click();
+  await expect(page.getByRole("heading", { name: "Customer delivery settings" })).toBeVisible();
   await page.getByLabel("Rule scope").selectOption("district");
   await page.getByLabel("Postcode area or district").fill("SW99");
   await page.getByLabel("Service type").selectOption("agreed");

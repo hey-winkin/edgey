@@ -78,7 +78,7 @@ test("warehouse separates releasing an allocation from a card refund", async ({ 
   }
   await page.goto("/admin/warehouse?view=blocked");
   await expect(page.getByRole("link", { name: order.reference })).toHaveCount(0);
-  await page.getByRole("link", { name: "Dispatch and cancellation history" }).click();
+  await page.getByRole("link", { name: "Past sales orders" }).click();
   await expect(page.getByRole("row").filter({ hasText: order.reference })).toContainText("Not dispatched");
 });
 

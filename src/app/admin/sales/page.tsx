@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { missingSalesMigration, readSalesReport } from "@/lib/sales/database";
 import {
   decimalHundredths, displaySalesRange, parseSalesQuery, productSorts, salesMoney, salesParams, sortProducts,
@@ -10,7 +11,7 @@ import SalesFilters from "./filters";
 import RevenueChart from "./revenue-chart";
 import "./sales.css";
 
-export const metadata = { title: "Sales" };
+export const metadata = { title: staffDestinationLabels.salesReports };
 
 const number = new Intl.NumberFormat("en-GB");
 const rate = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
@@ -129,7 +130,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   };
 
   return <>
-    <AdminHeading title="Sales" description="See what sold, how it compares and how long your stock may last." />
+    <AdminHeading title={staffDestinationLabels.salesReports} description="See what sold, how it compares and how long your stock may last." />
     <SalesFilters key={salesParams(query).toString()} query={query} />
     {result && !report && <AdminNotice>Sales reporting isn’t available yet. Try again after the database update.</AdminNotice>}
     {report && query.range && <>

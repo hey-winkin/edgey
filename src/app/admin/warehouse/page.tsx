@@ -1,23 +1,49 @@
+import type { Metadata } from "next";
 import { AdminField, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { countWarehousePaymentBlocks, getWarehouseQueue, type WarehouseView } from "@/lib/admin/warehouse";
 import { dispatchDate, movementTime, warehouseLabel, warehouseOrderLookup, warehousePage } from "@/lib/admin/warehouse-format";
 import { WarehousePagination } from "./pagination";
 
-const views: Record<WarehouseView, { title: string; empty: string; href: string }> = {
-  queue: { title: "Ready to pick and picking", empty: "There are no orders waiting to pick or dispatch.", href: "/admin/warehouse" },
-  history: { title: "Dispatch and cancellation history", empty: "There are no dispatched or cancelled orders.", href: "/admin/warehouse?view=history" },
-  blocked: { title: "Payment blocks", empty: "There are no orders blocked by a void or full refund.", href: "/admin/warehouse?view=blocked" },
+const views = {
+  queue: {
+    title: staffDestinationLabels.newSalesOrders,
+    tableLabel: "Ready to pick and picking",
+    empty: "There are no orders waiting to pick or dispatch.",
+    href: "/admin/warehouse",
+  },
+  history: {
+    title: staffDestinationLabels.pastSalesOrders,
+    tableLabel: "Dispatch and cancellation history",
+    empty: "There are no dispatched or cancelled orders.",
+    href: "/admin/warehouse?view=history",
+  },
+  blocked: {
+    title: "Payment blocks",
+    tableLabel: "Payment blocks",
+    empty: "There are no orders blocked by a void or full refund.",
+    href: "/admin/warehouse?view=blocked",
+  },
 };
 
-export default async function WarehousePage({
-  searchParams,
-}: {
+type Props = {
   searchParams: Promise<{ view?: string; reference?: string; page?: string }>;
-}) {
+};
+
+function warehouseView(view?: string): WarehouseView {
+  return view === "history" || view === "blocked" ? view : "queue";
+}
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const { view } = await searchParams;
+  return { title: views[warehouseView(view)].title };
+}
+
+export default async function WarehousePage({ searchParams }: Props) {
   const { db } = await requireStaff("warehouse");
   const { view: selected, reference, page: requestedPage } = await searchParams;
-  const view = selected === "history" || selected === "blocked" ? selected : "queue";
+  const view = warehouseView(selected);
   const lookup = typeof reference === "string" ? reference.trim().slice(0, 100) : "";
   const parsedLookup = warehouseOrderLookup(lookup);
   const invalid = Boolean(lookup) && !parsedLookup;
@@ -31,15 +57,15 @@ export default async function WarehousePage({
     <>
       <AdminHeading
         eyebrow="Warehouse"
-        title={view === "queue" ? "Pick and dispatch" : views[view].title}
+        title={views[view].title}
         description={view === "blocked"
           ? "Do not dispatch these orders. Open an order to release its allocation once you confirm it has not left the warehouse."
           : "Pick against the order snapshot and record carrier and tracking when the parcel leaves."}
       />
       <nav aria-label="Warehouse views" className="flex flex-wrap gap-4">
-        {view !== "queue" && <AdminLink href={views.queue.href}>Picking queue</AdminLink>}
-        {view !== "history" && <AdminLink href={views.history.href}>Dispatch and cancellation history</AdminLink>}
-        {view !== "blocked" && <AdminLink href={views.blocked.href}>Payment blocks</AdminLink>}
+        {view !== "queue" && <AdminLink href={views.queue.href}>{views.queue.title}</AdminLink>}
+        {view !== "history" && <AdminLink href={views.history.href}>{views.history.title}</AdminLink>}
+        {view !== "blocked" && <AdminLink href={views.blocked.href}>{views.blocked.title}</AdminLink>}
       </nav>
       {view !== "blocked" && blocked > 0 && <AdminNotice>
         Stock action needed: <AdminLink href={views.blocked.href}>{blocked} payment-blocked {blocked === 1 ? "order" : "orders"}</AdminLink> still {blocked === 1 ? "has" : "have"} stock allocated.
@@ -55,13 +81,13 @@ export default async function WarehousePage({
         <button type="submit" className="admin-secondary">Find order</button>
         {lookup && <AdminLink href={views[view].href}>Clear lookup</AdminLink>}
       </form>
-      <AdminSection title={lookup ? "Order lookup" : view === "queue" ? views.queue.title : "Orders"}>
+      <AdminSection title={lookup ? "Order lookup" : view === "queue" ? views.queue.tableLabel : "Orders"}>
         {!rows.length ? (
           <AdminNotice>{invalid ? "Enter the full order reference." : lookup
             ? "No authorised order matches that reference." : views[view].empty}</AdminNotice>
         ) : (
           <AdminTable
-            label={lookup ? "Order lookup" : views[view].title}
+            label={lookup ? "Order lookup" : views[view].tableLabel}
             headers={["Order reference", "Recipient", "Service", "Promised dispatch", "Fulfilment", view === "history" && !lookup ? "Dispatched" : "Payment"]}
           >
             {rows.map((order) => (

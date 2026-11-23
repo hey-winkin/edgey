@@ -74,12 +74,14 @@ test("every App Router page is accounted for in the accessibility suite", () => 
 });
 
 async function scanRoutes(
-  page: Page, theme: Theme, routes: readonly (readonly [string, string | RegExp, ("Orders" | "Purchases" | "Admin")?])[],
+  page: Page, theme: Theme, routes: readonly (readonly [string, string | RegExp, ("Sales orders" | "Purchasing" | "Admin")?])[],
+  checkTitle = false,
 ) {
   for (const [url, heading, group] of routes) {
     await test.step(url, async () => {
       await page.goto(url);
       await expect(page.getByRole("heading", { level: 1, name: heading, exact: typeof heading === "string" })).toBeVisible();
+      if (checkTitle && typeof heading === "string") await expect(page).toHaveTitle(`${heading} | Edgey`);
       if (group) {
         await expect(page.locator(".admin-location")).toHaveText(group);
         await expect(page.locator(".admin-heading > [data-area-eyebrow]")).toBeHidden();
@@ -234,29 +236,31 @@ for (const theme of themes) {
           await expectFallbackTheme(context, missing, theme, 404);
           await scanRoutes(page, theme, [
             ["/admin", "Staff desk"],
-            ["/admin/delivery", "Delivery settings"],
-            ["/admin/commercial", "Commercial measures"],
-            ["/admin/catalogue/new", "Add draft variant", "Admin"],
-            ["/admin/warehouse", "Pick and dispatch"],
-            ["/admin/warehouse?view=history", "Dispatch and cancellation history"],
+            ["/admin/delivery", "Customer delivery settings"],
+            ["/admin/commercial", "Shop performance"],
+            ["/admin/warehouse", "New sales orders"],
+            ["/admin/warehouse?view=history", "Past sales orders"],
             ["/admin/warehouse?view=blocked", "Payment blocks"],
-            [`/admin/warehouse/${order.id}`, "Warehouse order", "Orders"],
+            ["/admin/stock", "Stock levels"],
+            ["/admin/stock?view=out-of-stock", "Out of stock", "Purchasing"],
+            ["/admin/stock/receive", "Book in a delivery", "Purchasing"],
+            ["/admin/stock/deliveries", "Delivery history", "Purchasing"],
+            ["/admin/catalogue", "Products and prices"],
+            ["/admin/catalogue?q=EDG-Z10&status=published", "Products and prices"],
+            ["/admin/finance", "Finance and trade accounts"],
+            ["/admin/sales", "Sales reports"],
+            ["/admin/requests", "Customer enquiries"],
+          ], true);
+          await scanRoutes(page, theme, [
+            ["/admin/catalogue/new", "Add draft variant", "Admin"],
+            [`/admin/warehouse/${order.id}`, "Warehouse order", "Sales orders"],
             [missing, noPage],
-            ["/admin/stock", "Stock"],
-            ["/admin/stock?view=out-of-stock", "Out of stock", "Purchases"],
-            ["/admin/stock/receive", "Receive delivery", "Purchases"],
-            ["/admin/stock/deliveries", "Delivery history", "Purchases"],
-            [`/admin/stock/${variantId}`, sku, "Purchases"],
-            ["/admin/catalogue", "Catalogue"],
-            ["/admin/catalogue?q=EDG-Z10&status=published", "Catalogue"],
+            [`/admin/stock/${variantId}`, sku, "Purchasing"],
             [`/admin/catalogue/${ids["EDG-Z10"]}`, product, "Admin"],
             [`/admin/catalogue/${ids["EDG-Z11"]}`, /blade/i, "Admin"],
-            ["/admin/finance", "Finance"],
-            ["/admin/sales", "Sales"],
-            ["/admin/requests", "Requests"],
-            [`/admin/requests/enquiries/${enquiry}`, "Compatibility enquiry", "Orders"],
-            [`/admin/requests/trials/${trial}`, "Trial request", "Orders"],
-            [`/admin/requests/trade/${application}`, company, "Orders"],
+            [`/admin/requests/enquiries/${enquiry}`, "Compatibility enquiry", "Sales orders"],
+            [`/admin/requests/trials/${trial}`, "Trial request", "Sales orders"],
+            [`/admin/requests/trade/${application}`, company, "Sales orders"],
           ]);
           await page.goto(`/admin/requests/enquiries/${enquiry}`);
           await page.locator("summary").filter({ hasText: /^Close enquiry$/ }).click();
@@ -290,7 +294,7 @@ for (const theme of themes) {
           await scanAccessibility(page, theme);
           await page.goto(`/admin/warehouse/${order.id}/print`);
           await expect(page.getByRole("heading", { name: "Pick list" })).toBeVisible();
-          await expect(page.locator(".admin-location")).toHaveText("Orders");
+          await expect(page.locator(".admin-location")).toHaveText("Sales orders");
           await scanAccessibility(page, theme);
           await page.emulateMedia({ media: "print" });
           await expect(page.locator("html")).toHaveCSS("background-color", "rgb(255, 255, 255)");

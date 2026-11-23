@@ -1,8 +1,9 @@
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { commercialDb } from "@/lib/commercial/database";
 import { AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "../ui";
 
-export const metadata = { title: "Commercial measures" };
+export const metadata = { title: staffDestinationLabels.shopPerformance };
 
 function share(numerator: number, denominator: number) {
   return denominator ? `${numerator} of ${denominator} (${new Intl.NumberFormat("en-GB", {
@@ -17,7 +18,7 @@ export default async function CommercialPage() {
   const { finder, trials, dispatch, wrongFit, uncategorisedReturns } = data;
 
   return <>
-    <AdminHeading title="Commercial measures" description="Pilot measures across all retained records. For staff use only." />
+    <AdminHeading title={staffDestinationLabels.shopPerformance} description="Pilot measures across all retained records. For staff use only." />
     <AdminLink href="/admin">Staff desk</AdminLink>
     <AdminSection title="Finder searches">
       <dl className="admin-spec">

@@ -15,7 +15,7 @@ async function inspectAtWidths(page: Page, name: string) {
     for (const width of [1440, 820, 390, 320]) {
       await page.setViewportSize({ width, height: 940 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-      const back = page.getByRole("link", { name: "Requests inbox" });
+      const back = page.getByRole("main").getByRole("link", { name: "Customer enquiries", exact: true });
       await back.focus();
       await page.keyboard.press("Tab");
       await page.keyboard.press("Shift+Tab");
@@ -56,7 +56,7 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await expect(page.getByRole("status")).toContainText("No delivery has been arranged");
 
   await signInStaff(page, catalogue);
-  await page.getByRole("main").getByRole("link", { name: /customer requests?/i }).click();
+  await page.getByRole("main").getByRole("link", { name: /customer (?:enquiry|enquiries)/i }).click();
   await page.getByRole("table", { name: "Trial requests", exact: true }).getByRole("link", { name: company, exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Trial request" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Trial email status" }).getByRole("row", { name: /Customer receipt/ }))

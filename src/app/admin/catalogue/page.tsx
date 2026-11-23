@@ -1,5 +1,6 @@
 import { requireStaff } from "@/lib/admin/auth";
 import { catalogueCodeMaxLength, catalogueStatuses, listAdminCatalogue } from "@/lib/admin/catalogue";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { getPurchaseStock } from "@/lib/admin/purchase-order-data";
 import { displayState } from "@/lib/admin/format";
 import { formatPence } from "@/lib/catalogue/display-prices";
@@ -7,6 +8,8 @@ import { AdminPagination } from "@/app/admin/pagination";
 import { AdminField, AdminHeading, AdminLink, AdminNotice, AdminTable } from "@/app/admin/ui";
 import { OnOrder } from "@/app/admin/purchase-orders/on-order";
 import "./list.css";
+
+export const metadata = { title: staffDestinationLabels.productsAndPrices };
 
 const pathname = "/admin/catalogue";
 
@@ -22,7 +25,7 @@ export default async function CataloguePage({ searchParams }: {
   return (
     <div className="catalogue-list">
       <div className="catalogue-list-heading">
-        <AdminHeading title="Catalogue" description={canEdit
+        <AdminHeading title={staffDestinationLabels.productsAndPrices} description={canEdit
           ? "Manage blade variants, prices, costs and publication."
           : "Review blade prices and manage supplier cost estimates."} />
         {canEdit && <AdminLink href={`${pathname}/new`}>Add draft variant</AdminLink>}

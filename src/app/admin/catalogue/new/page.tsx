@@ -1,4 +1,5 @@
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { serviceClient } from "@/lib/supabase/service";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminSection } from "../../ui";
 import { PriceTierFields } from "../price-tier-fields";
@@ -14,7 +15,7 @@ export default async function NewVariantPage() {
 
   return <>
     <AdminHeading title="Add draft variant" description="Add a distinct, unstocked SKU to an existing product family. It will not appear in the storefront." />
-    <AdminLink href="/admin/catalogue">Catalogue</AdminLink>
+    <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
     <AdminSection title="Variant details">
       <AdminForm action={createDraftVariant} submit="Create draft">
         <AdminField label="Product family">

@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/admin/auth";
 import { staffDeskCounts } from "@/lib/admin/desk";
-import { staffAreas, type StaffTask } from "@/lib/admin/navigation";
+import { salesOrderReminder, staffAreas, type StaffTask } from "@/lib/admin/navigation";
+import { OrderStockLink } from "./purchase-orders/order-stock-link";
 import { AdminHeading, AdminLink } from "./ui";
 
-const taskLabels: Record<StaffTask, [singular: string, plural: string]> = {
-  orders: ["order to pick or dispatch", "orders to pick or dispatch"],
-  requests: ["customer request to answer or review", "customer requests to answer or review"],
+const deskTitle = "Staff desk";
+export const metadata = { title: deskTitle };
+
+const taskLabels: Record<Exclude<StaffTask, "orders">, [singular: string, plural: string]> = {
+  requests: ["customer enquiry to answer or review", "customer enquiries to answer or review"],
   outOfStock: ["published blade variant out of stock", "published blade variants out of stock"],
 };
 
@@ -18,17 +21,28 @@ export default async function AdminPage() {
 
   return (
     <>
-      <AdminHeading title="Staff desk" eyebrow="Today’s work" description="Start with today’s reminders, or open a work area." />
-      {caughtUp && <p className="admin-desk-clear">There are no daily reminders to show for your role right now.</p>}
+      <AdminHeading title={deskTitle} eyebrow="Today’s work" />
+      {caughtUp && <p className="admin-desk-clear">You’re caught up on today’s reminders.</p>}
       <div className="admin-desk">
-        {groups.map(({ title, links }) => {
+        {groups.map(({ title, links, orderStock }) => {
+          const headingId = `staff-desk-${title.toLowerCase().replaceAll(" ", "-")}`;
+          const sales = links.find(({ task }) => task === "orders");
           const work = links.flatMap(({ label, href, task, taskHref }) =>
-            task && counts[task] !== 0 ? [{ label, href: counts[task] === null ? href : taskHref ?? href, task, count: counts[task] }] : [],
+            task && task !== "orders" && counts[task] !== 0
+              ? [{ label, href: counts[task] === null ? href : taskHref ?? href, task, count: counts[task] }] : [],
           );
-          const shortcuts = links.filter(({ task }) => !task || counts[task] === 0);
+          const shortcuts = links.filter(({ task }) => !task || (task !== "orders" && counts[task] === 0));
           return (
-            <section key={title} className="admin-desk-group" aria-labelledby={`staff-desk-${title.toLowerCase()}`}>
-              <h2 id={`staff-desk-${title.toLowerCase()}`}>{title}</h2>
+            <section key={title} className="admin-desk-group" aria-labelledby={headingId}>
+              <h2 id={headingId}>{title}</h2>
+              {sales && <div className="admin-desk-action">
+                <Link href={sales.href} prefetch={false} className="primary"
+                  aria-describedby={counts.orders === null ? "staff-sales-count-status" : undefined}>
+                  {salesOrderReminder(counts.orders)}
+                </Link>
+                {counts.orders === null && <p id="staff-sales-count-status" className="admin-muted">Count unavailable</p>}
+              </div>}
+              {orderStock && <div className="admin-desk-action"><OrderStockLink /></div>}
               {work.length > 0 && <ul className="admin-desk-work" role="list">
                 {work.map(({ label, href, task, count }) => <li key={href}>
                   <Link href={href} prefetch={false} className="admin-desk-task">

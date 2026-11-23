@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "@/app/admin/ui";
 import { displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { requestsDb } from "@/lib/admin/request-schema";
 import { publishedRequestVariants, requireRequestsStaff, requestBrand, requestVariantLabels, trialStatus, variantLabel } from "@/lib/admin/requests";
 import { isWarehouseId, warehouseOrderLookup } from "@/lib/admin/warehouse-format";
@@ -57,7 +58,7 @@ export default async function TrialPage({ params, searchParams }: {
 
   return <>
     <AdminHeading title="Trial request" eyebrow="Requests" description={trialStatus(trial.status, fulfilment?.state)} />
-    <AdminLink href="/admin/requests">Requests inbox</AdminLink>
+    <AdminLink href="/admin/requests">{staffDestinationLabels.customerEnquiries}</AdminLink>
     <TrialMailStatus db={db} id={id} />
     <div className="admin-grid">
       <AdminSection title="Submitted details">

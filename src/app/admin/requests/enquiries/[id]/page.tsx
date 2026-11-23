@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { requestsDb } from "@/lib/admin/request-schema";
 import { enquiryStatus, publishedRequestVariants, requireRequestsStaff, requestBrand, requestVariantLabels, variantLabel } from "@/lib/admin/requests";
 import { isWarehouseId } from "@/lib/admin/warehouse-format";
@@ -35,7 +36,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
 
   return <>
     <AdminHeading title={`${displayState(enquiry.kind)} enquiry`} eyebrow="Requests" description={enquiryStatus(enquiry.status)} />
-    <AdminLink href="/admin/requests">Requests inbox</AdminLink>
+    <AdminLink href="/admin/requests">{staffDestinationLabels.customerEnquiries}</AdminLink>
     <AdminSection title="Submitted details">
       <dl className="admin-spec">
         <div><dt>Reply email</dt><dd className="admin-mono">{enquiry.email}</dd></div>

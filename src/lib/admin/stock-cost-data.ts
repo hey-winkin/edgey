@@ -3,12 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StaffRole } from "./auth";
+import { hasPurchasingRole } from "./roles";
 
 type StaffDb = SupabaseClient<Database>;
 
-export function canManageCosts(roles: StaffRole[]) {
-  return roles.includes("catalogue") || roles.includes("finance");
-}
+export const canManageCosts = hasPurchasingRole;
 
 export function stockSchemaUnavailable(error: { code: string }) {
   return ["42703", "42P01", "42883", "PGRST202", "PGRST204", "PGRST205"].includes(error.code);
