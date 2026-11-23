@@ -24,9 +24,10 @@ function rowId(row: EditorRow, field: string) {
   return `receipt-${row.id}-${field}`;
 }
 
-export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorState; showCosts: boolean; today: string }) {
+export function DeliveryEditor({ initial, permalink, showCosts, today }: {
+  initial: EditorState; permalink: string; showCosts: boolean; today: string;
+}) {
   const router = useRouter();
-  const permalink = initial.purchase ? `/admin/stock/receive?po=${initial.purchase.id}` : "/admin/stock/receive";
   const [nativeState, action, nativePending] = useActionState(submitDeliveryEditor, initial, permalink);
   const [enhanced, setEnhanced] = useState<{ base: EditorState; state: EditorState }>();
   const state = enhanced?.base === nativeState ? enhanced.state : nativeState;
@@ -312,7 +313,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
                 <h2 id="receipt-lines-heading">Delivery lines</h2>
                 <p>{purchase ? "Enter what arrived. Leave a planned quantity blank or set it to zero if no units arrived."
                   : <>Enter a SKU or maker code. {live?.state === state && "Press Enter to move to the next field or line."}</>}</p>
-                {showCosts && <p>Unit cost is optional. Enter landed cost in pounds per blade.</p>}
+                {showCosts && <p>Optional: actual landed cost per blade (£), including delivery and import.</p>}
               </div>
               <dl className={styles.tally}>
                 <div><dt>Lines ready</dt><dd>{ready.length}<span> / {entered}</span></dd></div>
@@ -323,7 +324,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
             {!purchase && <details className={styles.import} ref={importing} open={state.importOpen} suppressHydrationWarning>
               <summary>Import lines</summary>
               <div className={styles.importForm}>
-                <p id="receipt-import-help">Paste spreadsheet rows or choose a CSV file. Use columns in this order: code, quantity{showCosts ? ", optional unit cost" : ""}. Up to 200 lines and 128 KB.</p>
+                <p id="receipt-import-help">Paste spreadsheet rows or choose a CSV file. Use columns in this order: code, quantity{showCosts ? ", optional landed unit cost (GBP)" : ""}. Up to 200 lines and 128 KB.</p>
                 <div className={styles.importFields}>
                   <AdminField label="Spreadsheet rows">
                     <textarea id="receipt-paste" name="paste" rows={4} maxLength={MAX_DELIVERY_IMPORT_BYTES + 1} defaultValue={state.draft.paste}

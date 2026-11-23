@@ -33,32 +33,52 @@ async function catalogueListQuery(roles: StaffRole[], query: CatalogueListQuery)
   const brand = brands.find(({ slug }) => slug === query.brand)?.slug;
   const filters = { q: q || undefined, status, brand };
 
-  if (q && !code) return { brands, filters, variants: null };
-
-  let variants = service.from("variants")
-    .select(`id, sku, option_label, publication_status, approved_at, rejected_at, products(name),
-      stock_on_hand, stock_reserved, price_10_plus_pence, code_matches:compatibility(), brand_matches:compatibility()`)
-    .order("sku", { ascending: true });
-  const canReadPrivateMappings = roles.includes("catalogue");
-  if (code) {
-    variants = variants.like("code_matches.code_normalised", `%${code}%`)
-      .or(`sku_normalised.like.*${code}*,code_matches.not.is.null`);
-    if (!canReadPrivateMappings) variants = variants.eq("code_matches.is_private", false)
-      .eq("code_matches.verification_state", "approved");
+  function variants(ids?: readonly string[]) {
+    let result = service.from("variants")
+      .select(`id, sku, option_label, publication_status, approved_at, rejected_at, products(name),
+        stock_on_hand, stock_reserved, price_10_plus_pence, code_matches:compatibility(), brand_matches:compatibility()`)
+      .order("sku", { ascending: true });
+    const canReadPrivateMappings = roles.includes("catalogue");
+    if (code) {
+      result = result.like("code_matches.code_normalised", `%${code}%`)
+        .or(`sku_normalised.like.*${code}*,code_matches.not.is.null`);
+      if (!canReadPrivateMappings) result = result.eq("code_matches.is_private", false)
+        .eq("code_matches.verification_state", "approved");
+    }
+    if (brand) {
+      result = result.eq("brand_matches.brand", brand).not("brand_matches", "is", null);
+      if (!canReadPrivateMappings) result = result.eq("brand_matches.is_private", false)
+        .eq("brand_matches.verification_state", "approved");
+    }
+    if (status) result = result.eq("publication_status", status);
+    if (ids) result = result.in("id", ids).eq("publication_status", "published");
+    return result;
   }
-  if (brand) {
-    variants = variants.eq("brand_matches.brand", brand).not("brand_matches", "is", null);
-    if (!canReadPrivateMappings) variants = variants.eq("brand_matches.is_private", false)
-      .eq("brand_matches.verification_state", "approved");
-  }
-  if (status) variants = variants.eq("publication_status", status);
-  return { brands, filters, variants };
+  return { brands, filters, variants: q && !code ? null : variants };
 }
 
-export async function getOrderableCatalogueIds(roles: StaffRole[], query: CatalogueListQuery) {
+async function readScopedCatalogue(variants: NonNullable<Awaited<ReturnType<typeof catalogueListQuery>>["variants"]>,
+  ids: readonly string[], start: number, limit: number,
+) {
+  const matched = [];
+  for (let offset = 0; offset < ids.length && matched.length < start + limit; offset += 80) {
+    const batch = ids.slice(offset, offset + 80);
+    const { data, error } = await variants(batch);
+    if (error) throw new Error("Could not load the selected stock view.");
+    const rowsById = new Map(data.map((row) => [row.id, row]));
+    for (const id of batch) {
+      const row = rowsById.get(id);
+      if (row) matched.push(row);
+    }
+  }
+  return matched.slice(start, start + limit);
+}
+
+export async function getOrderableCatalogueIds(roles: StaffRole[], query: CatalogueListQuery, ids?: readonly string[]) {
   const { variants } = await catalogueListQuery(roles, query);
   if (!variants) return [];
-  const { data, error } = await variants.neq("publication_status", "archived").limit(stockSelectionLimit + 1);
+  if (ids) return (await readScopedCatalogue(variants, ids, 0, stockSelectionLimit + 1)).map(({ id }) => id);
+  const { data, error } = await variants().neq("publication_status", "archived").limit(stockSelectionLimit + 1);
   if (error) throw new Error("Could not select the matching blades.");
   return data.map(({ id }) => id);
 }
@@ -66,11 +86,14 @@ export async function getOrderableCatalogueIds(roles: StaffRole[], query: Catalo
 export async function listAdminCatalogue(
   { db, roles }: { db: SupabaseClient<Database>; roles: StaffRole[] },
   query: CatalogueListQuery,
+  ids?: readonly string[],
 ) {
   const page = adminPage(query.page);
   const { brands, filters, variants } = await catalogueListQuery(roles, query);
   if (!variants) return { brands, filters, page, length: 0, rows: [] };
-  const { data, error } = await variants.range(...adminRange(page));
+  const { data, error } = ids
+    ? { data: await readScopedCatalogue(variants, ids, adminRange(page)[0], adminPageSize + 1), error: null }
+    : await variants().range(...adminRange(page));
   if (error) throw new Error("Could not load the staff catalogue.");
 
   const visible = data.slice(0, adminPageSize);
@@ -106,6 +129,7 @@ export async function getAdminCatalogueVariant(id: string) {
     supplier_name, supplier_part_number, price_1_4_pence, price_5_9_pence, price_10_plus_pence, availability,
     publication_status, approved_at, approved_by, rejected_at, rejected_by, evidence_source, evidence_note, catalogue_updated_at,
     products(name, family_code, description, tool_category, media, updated_at), variant_substrates(substrate),
+    staff_variant_suppliers(supplier_id, supplier_part_number, is_usual),
     compatibility(id, code, code_kind, brand, machine, tool, adapter, evidence_source, evidence_note, evidence_url,
       verification_state, is_private, approved_at, approved_by, rejected_at, rejected_by, updated_at)
   `).eq("id", id).order("code", { referencedTable: "compatibility" }).maybeSingle();

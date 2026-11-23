@@ -5,6 +5,7 @@ import AdminPage from "@/app/admin/page";
 const { staffDeskCounts } = vi.hoisted(() => ({ staffDeskCounts: vi.fn() }));
 vi.mock("@/lib/admin/auth", () => ({ requireStaff: async () => ({ roles: ["warehouse"] }) }));
 vi.mock("@/lib/admin/desk", () => ({ staffDeskCounts }));
+vi.mock("@/lib/admin/running-low", () => ({}));
 
 test.each([
   [0, "No new sales orders"],

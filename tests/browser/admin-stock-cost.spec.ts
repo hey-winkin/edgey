@@ -39,16 +39,20 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
 
   await (await openStaffMenu(page)).getByRole("link", { name: "Adjust stock", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
-  await page.getByLabel("Received quantity").fill("8");
-  await page.getByText("Add receipt costs (optional)").click();
-  await page.getByLabel("Supplier unit price", { exact: true }).fill("4.20");
-  await page.getByLabel("Supplier currency", { exact: true }).selectOption("USD");
-  await page.getByLabel("Landed unit cost (£)", { exact: true }).fill("3.50");
-  await page.getByRole("button", { name: "Record stock receipt" }).click();
-  await expect(page.getByText("Stock receipt recorded.", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Book in a delivery", exact: true }).click();
+  await page.getByRole("link", { name: "Receive without a purchase order", exact: true }).click();
+  const reference = `Costed stock receipt ${id.slice(0, 8)}`;
+  await page.getByLabel("Delivery reference").fill(reference);
+  await page.getByLabel("Blade code for line 1").fill(sku);
+  await page.getByLabel("Quantity for line 1").fill("8");
+  await expect(page.getByText("Optional: actual landed cost per blade (£), including delivery and import.", { exact: true })).toBeVisible();
+  await page.getByLabel("Unit cost (£) for line 1").fill("3.50");
+  await page.getByRole("button", { name: "Review delivery" }).click();
+  await page.getByRole("button", { name: "Receive stock", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: reference, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: sku, exact: true }).click();
   const ledger = page.getByRole("table", { name: "Movement ledger" });
   const receipt = ledger.getByRole("row").filter({ hasText: "£3.50 landed" });
-  await expect(receipt).toContainText("USD");
   await expect(receipt).toContainText("+8");
 
   await page.getByLabel("Quantity change").fill("-2");

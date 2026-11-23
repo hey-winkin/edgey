@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/admin/auth";
 import { catalogueId, mutateAdminCatalogue } from "@/lib/admin/catalogue";
 import { emptyTierPrices, parseTierPrices } from "@/lib/admin/price-tiers";
+import { maxSupplierPartNumberLength } from "@/lib/admin/variant-suppliers";
 
 type State = { message: string; ok: boolean };
 class CatalogueInputError extends Error {}
@@ -14,6 +15,7 @@ const feedback: Record<string, string> = {
   catalogue_variant_not_found: "This variant no longer exists.",
   catalogue_mapping_not_found: "This reference does not belong to this variant.",
   catalogue_invalid_selling_data: "Check the selling data, dimensions and price tiers.",
+  staff_supplier_not_found: "That supplier is no longer in the register. Reload the page and choose another.",
   catalogue_review_evidence_required: "Enter a verified source and a note explaining your decision.",
   catalogue_mapping_brand_required: "Choose the OEM brand before approving a public reference.",
   catalogue_invalid_publication: "An archived variant cannot be published or returned to draft here.",
@@ -67,14 +69,24 @@ function sellingData(data: FormData) {
   const prices = parseTierPrices(data);
   if (!prices.ok) throw new CatalogueInputError(prices.message);
 
+  const usualSupplier = field(data, "usual_supplier_id", 36);
+  const partFor = field(data, "usual_supplier_part_for", 36);
+  if (usualSupplier && !catalogueId.test(usualSupplier)) throw new CatalogueInputError("Choose a supplier from the register.");
+  const part = field(data, "usual_supplier_part_number", maxSupplierPartNumberLength);
+  if (/[\u0000-\u001f\u007f]/u.test(part)) throw new CatalogueInputError("Enter a supplier part number without control characters.");
+  if (usualSupplier !== partFor && data.has("usual_supplier_part_number")
+    && part !== field(data, "usual_supplier_part_original", maxSupplierPartNumberLength)) {
+    throw new CatalogueInputError("Save the usual supplier selection before editing its part number.");
+  }
+
   return {
     name: field(data, "name", 160),
     description: field(data, "description", 2000),
     tool_category: field(data, "tool_category", 100),
     option_label: field(data, "option_label", 160),
     tool: field(data, "tool", 160),
-    supplier_name: field(data, "supplier_name", 160),
-    supplier_part_number: field(data, "supplier_part_number", 160),
+    usual_supplier_id: data.has("usual_supplier_id") ? usualSupplier || null : undefined,
+    usual_supplier_part_number: usualSupplier && usualSupplier === partFor && data.has("usual_supplier_part_number") ? part : undefined,
     angle_deg: dimension(data, "angle_deg", true),
     shank_mm: dimension(data, "shank_mm"),
     cutting_depth_mm: dimension(data, "cutting_depth_mm"),

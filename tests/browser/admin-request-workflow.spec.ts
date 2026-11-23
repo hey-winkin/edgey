@@ -9,7 +9,9 @@ import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
 async function inspectAtWidths(page: Page, name: string) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const directory = process.env.EDGEY_ADMIN_REQUEST_RENDERS;
+  const carrierRenders = name === "trial-approval" ? process.env.EDGEY_STAFF_CARRIER_RENDERS : undefined;
   if (directory) await mkdir(directory, { recursive: true });
+  if (carrierRenders) await mkdir(carrierRenders, { recursive: true });
   for (const [theme, nextMode] of [["dark", "light"], ["light", "dark"]] as const) {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     for (const width of [1440, 820, 390, 320]) {
@@ -23,6 +25,16 @@ async function inspectAtWidths(page: Page, name: string) {
       await expect(back).toHaveCSS("outline-style", "solid");
       await page.getByRole("heading", { level: 1 }).click();
       if (directory) await page.screenshot({ path: join(directory, `${name}-${theme}-${width}.png`), fullPage: true });
+      if (carrierRenders) {
+        const choice = page.getByRole("combobox", { name: "Delivery service choice" });
+        const fields = choice.locator("xpath=../..");
+        const original = await choice.inputValue();
+        await fields.screenshot({ path: join(carrierRenders, `trial-carrier-configured-${theme}-${width}.png`) });
+        await choice.selectOption({ label: "Other" });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+        await fields.screenshot({ path: join(carrierRenders, `trial-carrier-other-${theme}-${width}.png`) });
+        await choice.selectOption(original);
+      }
     }
     await switchTheme(page, nextMode);
   }
@@ -106,6 +118,9 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await page.getByLabel("Address line 1").fill("9 Print Road");
   await page.getByLabel("Town or city").fill("London");
   await page.getByLabel("Delivery postcode").fill("HS1 2AA");
+  const choice = page.getByRole("combobox", { name: "Delivery service choice" });
+  await expect(choice.locator("option:checked")).toHaveText("Next working day (enter carrier)");
+  await choice.selectOption({ label: "Other" });
   await page.getByLabel("Carrier", { exact: true }).fill("Fixture Carrier");
   await page.getByLabel("Carrier service", { exact: true }).fill("Tracked service");
   await page.getByLabel("I verified that this carrier service").check();
@@ -113,11 +128,15 @@ test("catalogue and warehouse take a five-field trial through dispatch to a link
   await expect(page.getByLabel("Delivery postcode")).toHaveAccessibleDescription(/outside configured coverage/);
   await expect(page.getByRole("button", { name: "Record dispatch" })).toHaveCount(0);
   await expect(page.getByLabel("Address line 1")).toHaveValue("9 Print Road");
+  await expect(page.getByLabel("Carrier service", { exact: true })).toHaveValue("Tracked service");
   await page.getByLabel("Delivery postcode").fill("SW1A1AA");
   await page.getByLabel("I verified that this carrier service").check();
+  await choice.selectOption({ label: "Next working day (enter carrier)" });
   await page.getByRole("button", { name: "Approve and reserve two units" }).click();
   await expect(page.getByText("Approved · two units reserved")).toBeVisible();
   await expect(page.getByText("9 Print Road, London, SW1A 1AA, United Kingdom")).toBeVisible();
+  await expect(page.getByText("Dispatch the two reserved units with Fixture Carrier · Next working day to the verified address above.")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Delivery service choice" })).toHaveCount(0);
   expect((await readStock()).data).toMatchObject({ stock_reserved: stock.stock_reserved + 2, stock_on_hand: stock.stock_on_hand });
   await inspectAtWidths(page, "trial-allocated");
 

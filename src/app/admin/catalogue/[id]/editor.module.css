@@ -108,6 +108,7 @@
 .overview > div,
 .artworkGrid,
 .fields,
+.supplierSection,
 .references {
   display: grid;
   align-content: start;

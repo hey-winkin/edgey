@@ -8,10 +8,11 @@ import { stockSchemaUnavailable } from "./stock-cost-data";
 
 type StaffDb = SupabaseClient<Database>;
 
-export async function getPurchaseStock(db: StaffDb, variantIds: string[]) {
+export async function getPurchaseStock(db: StaffDb, variantIds: string[], signal?: AbortSignal) {
   if (!variantIds.length) return new Map<string, Database["public"]["Views"]["staff_purchase_order_stock"]["Row"]>();
-  const { data, error } = await db.from("staff_purchase_order_stock")
+  const query = db.from("staff_purchase_order_stock")
     .select("variant_id,quantity,expected_on,has_undated").in("variant_id", variantIds);
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
   if (error) return null;
   return new Map(data.map((row) => [row.variant_id, row]));
 }

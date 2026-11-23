@@ -1,4 +1,4 @@
-import { AdminNotice } from "@/app/admin/ui";
+import { AdminLink, AdminNotice } from "@/app/admin/ui";
 import { CostFields } from "@/app/admin/cost-fields";
 import { displayTimestamp } from "@/lib/admin/format";
 import { formatSupplierCost } from "@/lib/admin/stock-cost";
@@ -9,7 +9,7 @@ import { EditorForm } from "./editor-form";
 import styles from "./editor.module.css";
 
 export function VariantCost({ id, result }: { id: string; result: Awaited<ReturnType<typeof getCurrentStaffCost>> }) {
-  const { available, cost } = result;
+  const { available, cost, purchase } = result;
   const receipt = cost?.source === "receipt" && cost.stock_movement_id !== null
     ? { movementId: cost.stock_movement_id, recordedAt: cost.recorded_at }
     : null;
@@ -31,7 +31,9 @@ export function VariantCost({ id, result }: { id: string; result: Awaited<Return
             ? <AdminNotice>No cost recorded. Set an estimate or add a cost when receiving stock.</AdminNotice>
             : (
               <dl className="admin-spec">
-                <dt>Cost source</dt><dd>{receipt ? "Latest costed receipt" : "Variant estimate"}</dd>
+                <dt>Cost source</dt><dd>{purchase
+                  ? <>Received against <AdminLink href={`/admin/purchase-orders/${purchase.id}`}>{purchase.number}</AdminLink></>
+                  : receipt ? "Latest costed receipt" : "Variant estimate"}</dd>
                 <dt>Supplier price per blade</dt><dd className="admin-mono">{formatSupplierCost(cost.supplier_unit_minor, cost.currency)}</dd>
                 <dt>Landed cost per blade</dt><dd className="admin-mono">{formatGbp(cost.landed_unit_pence)}</dd>
                 <dt>Recorded</dt><dd><time dateTime={cost.recorded_at}>{displayTimestamp(cost.recorded_at)}</time></dd>

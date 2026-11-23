@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminSection } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { savePurchaseBuyerSettings } from "./actions";
 
-export const metadata: Metadata = { title: "Buyer details" };
+export const metadata: Metadata = { title: staffDestinationLabels.businessDetails };
 
 export default async function PurchaseBuyerSettingsPage() {
   const { db } = await requireStaff("catalogue", "finance");
@@ -16,10 +17,10 @@ export default async function PurchaseBuyerSettingsPage() {
 
   return (
     <>
-      <AdminHeading title="Buyer details" eyebrow="Purchase orders"
+      <AdminHeading title={staffDestinationLabels.businessDetails}
         description="Set the name, address and registration details shown on supplier copies. Blank fields are omitted." />
       <AdminLink href="/admin/purchase-orders">Back to purchase orders</AdminLink>
-      <AdminSection title="Business details">
+      <AdminSection title="Details for supplier copies">
         <AdminForm action={savePurchaseBuyerSettings} submit="Save buyer details" preserveOnError>
           <div className="admin-grid">
             <AdminField label="Business name">

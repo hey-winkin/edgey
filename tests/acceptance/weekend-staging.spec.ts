@@ -339,6 +339,7 @@ test("Isolation and trials", async ({ db, page, browser, request }) => {
   await page.getByLabel("Address line 1").fill("10 Sample Street");
   await page.getByLabel("Town or city").fill("London");
   await page.getByLabel("Delivery postcode").fill("HS1 2AA");
+  await page.getByLabel("Delivery service choice").selectOption({ label: "Other" });
   await page.getByLabel("Carrier", { exact: true }).fill("Fixture Carrier");
   await page.getByLabel("Carrier service", { exact: true }).fill("Tracked service");
   await page.getByLabel("I verified that this carrier service").check();
@@ -474,7 +475,8 @@ test("Weekend staging — exact packet to confirmation and dispatch; only one bu
     await expect(lines.getByRole("cell", { name: "1", exact: true })).toBeVisible();
     await buyer.getByRole("link", { name: "Back to order" }).click();
     await buyer.getByRole("button", { name: "Start picking" }).click();
-    await buyer.getByLabel("Carrier").fill("Fixture Carrier");
+    await buyer.getByLabel("Carrier choice").selectOption({ label: "Other" });
+    await buyer.getByLabel("Carrier", { exact: true }).fill("Fixture Carrier");
     const tracking = "ACCEPTANCE-" + randomUUID().slice(0, 8);
     await buyer.getByLabel("Tracking number").fill(tracking);
     await buyer.getByRole("button", { name: "Record dispatch" }).click();

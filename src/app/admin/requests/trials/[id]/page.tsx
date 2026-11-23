@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { StaffDeliveryFields } from "@/app/admin/staff-delivery-fields";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "@/app/admin/ui";
+import { readStaffDeliveryChoices } from "@/lib/admin/carrier-settings";
 import { displayTimestamp } from "@/lib/admin/format";
 import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { requestsDb } from "@/lib/admin/request-schema";
@@ -32,7 +34,8 @@ export default async function TrialPage({ params, searchParams }: {
 
   const reviewable = trial.status === "pending" || trial.status === "in_review";
   const reviewedIds = trial.reviewed_variant_ids ?? [];
-  const [{ data: duplicateRows, error: duplicateError }, { data: allocations, error: allocationError }, delivery, options] =
+  const canApprove = warehouse && reviewable && trial.eligibility === "eligible" && reviewedIds.length === 2;
+  const [{ data: duplicateRows, error: duplicateError }, { data: allocations, error: allocationError }, delivery, options, coverage, deliveryChoices] =
     await Promise.all([
       requestDb.rpc("admin_trial_duplicate_evidence", { p_trial_request_id: id }),
       db.from("trial_allocations").select("variant_id,quantity").eq("trial_request_id", id).order("variant_id"),
@@ -40,11 +43,12 @@ export default async function TrialPage({ params, searchParams }: {
         .select("state,recipient_name,address_line1,address_line2,address_town,address_region,address_postcode,address_country,address_verified_at,carrier,carrier_service,dispatched_at,tracking_number,cancelled_at,subsequent_order_id")
         .eq("trial_request_id", id).maybeSingle() : null,
       catalogue && reviewable ? publishedRequestVariants() : [],
+      deliveryCoverageForPostcode(trial.postcode),
+      canApprove ? readStaffDeliveryChoices(db) : [],
     ]);
   if (duplicateError || allocationError || delivery?.error) throw new Error("Could not load the trial checks.");
   const fulfilment = delivery?.data;
   const labels = await requestVariantLabels([...new Set([...reviewedIds, ...allocations.map((row) => row.variant_id)])]);
-  const coverage = await deliveryCoverageForPostcode(trial.postcode);
   const linking = Boolean(fulfilment?.state === "dispatched" && fulfilment.dispatched_at && !fulfilment.subsequent_order_id);
   const candidates = linking ? await requestsDb().rpc("admin_trial_order_candidates", { p_trial_request_id: id, p_actor_id: userId }) : null;
   if (candidates?.error) throw new Error("Could not load matching order references.");
@@ -125,8 +129,8 @@ export default async function TrialPage({ params, searchParams }: {
       </AdminSection>
     </div>}
     {warehouse && reviewable && <AdminSection title="Verify delivery and approve">
-      {trial.eligibility === "eligible" && reviewedIds.length === 2 ?
-        <AdminForm action={handleTrial.bind(null, { kind: "approve", id, variantIds: reviewedIds })} submit="Approve and reserve two units">
+      {canApprove ?
+        <AdminForm action={handleTrial.bind(null, { kind: "approve", id, variantIds: reviewedIds })} submit="Approve and reserve two units" preserveOnError>
           <p>Record the complete UK address. Approval reserves both reviewed units and queues the approval notice.</p>
           <div className="admin-grid">
             <AddressInput label="Recipient name" name="recipient" maxLength={200} required />
@@ -135,9 +139,9 @@ export default async function TrialPage({ params, searchParams }: {
             <AddressInput label="Town or city" name="town" maxLength={100} required />
             <AddressInput label="County (optional)" name="region" maxLength={100} />
             <AddressInput label="Delivery postcode" name="postcode" maxLength={32} initial={trial.postcode} required />
-            <AddressInput label="Carrier" name="carrier" maxLength={100} required />
-            <AddressInput label="Carrier service" name="service" maxLength={100} required />
           </div>
+          <p>Select a configured service or choose Other to enter the carrier and service. Enter the carrier if the selected service has none configured.</p>
+          <StaffDeliveryFields choices={deliveryChoices} service={coverage.ok && coverage.value.kind === "covered" ? coverage.value.quote.serviceName : null} />
           <p className="admin-muted">Country: United Kingdom. The delivery postcode is checked again on approval.</p>
           <label className="admin-check"><input type="checkbox" name="verified" value="yes" required /> I verified that this carrier service can deliver to the full address.</label>
         </AdminForm> : <AdminNotice>Catalogue staff must record an eligible decision and select two units before warehouse can approve.</AdminNotice>}

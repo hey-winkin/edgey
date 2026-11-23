@@ -11,6 +11,7 @@ import { getCurrentStaffCost } from "@/lib/admin/stock-cost-data";
 import { editCatalogueVariant } from "./actions";
 import { archiveVariant } from "./cost-actions";
 import { EditorForm, EditorWorkspace, SellingDraftNotice, SellingFields, sellingFormId } from "./editor-form";
+import { SupplierFields } from "./supplier-fields";
 import { VariantCost } from "./variant-cost";
 import { VariantPricing } from "./variant-pricing";
 import styles from "./editor.module.css";
@@ -103,8 +104,13 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
       </div>
     );
   }
-  const [record, cost] = await Promise.all([getAdminCatalogueVariant(id), getCurrentStaffCost(db, roles, id)]);
+  const [record, cost, suppliers] = await Promise.all([
+    getAdminCatalogueVariant(id),
+    getCurrentStaffCost(db, roles, id),
+    db.from("staff_suppliers").select("id, name").order("name").order("id"),
+  ]);
   if (!record) notFound();
+  if (suppliers.error) throw new Error("Could not load the Suppliers register.");
 
   const { variant, family, categories, substrates, brands } = record;
   const media = resolveCatalogueMedia(family.media, family.family_code, variant.sku, variant.publication_status);
@@ -217,8 +223,6 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
                   <div className={styles.specGrid}>
                     <AdminField label="Variant option label"><input form={sellingFormId} name="option_label" defaultValue={variant.option_label ?? ""} maxLength={160} /></AdminField>
                     <AdminField label="Tool or holder"><input form={sellingFormId} name="tool" defaultValue={variant.tool ?? ""} maxLength={160} /></AdminField>
-                    <AdminField label="Supplier name"><input form={sellingFormId} name="supplier_name" defaultValue={variant.supplier_name ?? ""} maxLength={160} /></AdminField>
-                    <AdminField label="Supplier part number"><input form={sellingFormId} name="supplier_part_number" defaultValue={variant.supplier_part_number ?? ""} maxLength={160} /></AdminField>
                     <AdminField label="Angle (degrees)"><input form={sellingFormId} type="number" name="angle_deg" defaultValue={variant.angle_deg ?? ""} min={0.1} max={179.9} step={0.1} /></AdminField>
                     <AdminField label="Shank (mm)"><input form={sellingFormId} type="number" name="shank_mm" defaultValue={variant.shank_mm ?? ""} min={0.01} max={999.99} step={0.01} /></AdminField>
                     <AdminField label="Cutting depth (mm)"><input form={sellingFormId} type="number" name="cutting_depth_mm" defaultValue={variant.cutting_depth_mm ?? ""} min={0.01} max={999.99} step={0.01} /></AdminField>
@@ -228,6 +232,8 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
                   <AdminField label="Extra specifications (one “Label: value” per line)">
                     <textarea form={sellingFormId} name="specs" rows={4} maxLength={4000} defaultValue={specs} />
                   </AdminField>
+                  <SupplierFields suppliers={suppliers.data} associations={variant.staff_variant_suppliers}
+                    legacyName={variant.supplier_name} legacyPart={variant.supplier_part_number} />
                 </div>
                 <fieldset className={`admin-panel ${styles.materials}`}>
                   <legend>Verified materials</legend>

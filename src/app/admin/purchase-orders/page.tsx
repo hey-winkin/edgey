@@ -53,7 +53,7 @@ export default async function PurchaseOrders({ searchParams }: PurchaseOrdersPro
               {roles.includes("warehouse") && <AdminLink href="/admin/stock">{labels.adjustStock}</AdminLink>}
               {showCosts && !orders.error && <>
                 <AdminLink href={`${pathname}/suppliers`}>{labels.suppliers}</AdminLink>
-                <AdminLink href={`${pathname}/settings`}>Buyer settings</AdminLink>
+                <AdminLink href={`${pathname}/settings`}>{labels.businessDetails}</AdminLink>
               </>}
             </>}
       </nav>

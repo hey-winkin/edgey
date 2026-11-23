@@ -84,8 +84,8 @@ export async function setVerifiedStaffSession(page: Page, credentials: StaffCred
 }
 
 export async function seedPaidAdminOrder({
-  mismatch = false, sku = "EDG-Z10", email = "warehouse-fixture@example.test", buyerId,
-}: { mismatch?: boolean; sku?: string; email?: string; buyerId?: string } = {}) {
+  mismatch = false, sku = "EDG-Z10", email = "warehouse-fixture@example.test", buyerId, service = "Next working day",
+}: { mismatch?: boolean; sku?: string; email?: string; buyerId?: string; service?: string } = {}) {
   const db = localAdminClient();
   const { data: variant, error: variantError } = await db.from("variants")
     .select("id,sku,price_1_4_pence")
@@ -97,7 +97,6 @@ export async function seedPaidAdminOrder({
   const vat = Math.round(goods / 5) + Math.round(delivery / 5);
   const gross = goods + delivery + vat;
   const recipient = "Alex Test";
-  const service = "Next working day";
   const dispatchDate = "2026-11-24";
   const deliveryDate = "2026-11-25";
   const created = await db.rpc("create_order_with_reservations", {

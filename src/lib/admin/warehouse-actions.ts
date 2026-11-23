@@ -7,6 +7,7 @@ import {
 } from "@/lib/orders";
 import { commercialDb } from "@/lib/commercial/database";
 import { isReportedLookupCode, isReturnCategory } from "@/lib/commercial/returns";
+import { resolveStaffDelivery } from "./carrier-settings";
 import { isStockAdjustmentReason, parseStaffCost, parseStockAdjustmentQuantity } from "./stock-cost";
 import { canManageCosts, stockSchemaUnavailable } from "./stock-cost-data";
 import { isWarehouseId } from "./warehouse-format";
@@ -75,12 +76,18 @@ export async function runWarehouseAction(action: WarehouseAction, _previous: Sta
         break;
       }
       case "dispatch": {
-        const carrier = text(form, "carrier");
         const trackingNumber = text(form, "trackingNumber");
-        if (!carrier || carrier.length > 100 || !trackingNumber || trackingNumber.length > 200) {
+        const delivery = await resolveStaffDelivery(db, form, true);
+        if (!delivery.ok && delivery.reason === "unavailable") {
+          return refused("Couldn’t check configured delivery services. Try again or select Other.");
+        }
+        if (!delivery.ok && delivery.reason === "stale") {
+          return refused("That carrier service is no longer configured. Reload for the current choices, or select Other.");
+        }
+        if (!delivery.ok || !trackingNumber || trackingNumber.length > 200) {
           return refused("Enter a carrier (up to 100 characters) and tracking number (up to 200 characters).");
         }
-        await dispatchOrder({ orderId: action.orderId, actorId, operationKey, carrier, trackingNumber });
+        await dispatchOrder({ orderId: action.orderId, actorId, operationKey, carrier: delivery.carrier, trackingNumber });
         message = "Dispatch recorded.";
         break;
       }
