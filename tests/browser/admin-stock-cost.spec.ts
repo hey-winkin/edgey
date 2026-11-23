@@ -45,7 +45,7 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
   await page.getByLabel("Delivery reference").fill(reference);
   await page.getByLabel("Blade code for line 1").fill(sku);
   await page.getByLabel("Quantity for line 1").fill("8");
-  await expect(page.getByText(/actual landed cost per blade in GBP/)).toBeVisible();
+  await expect(page.getByText("Optional: actual landed cost per blade (£), including delivery and import.", { exact: true })).toBeVisible();
   await page.getByLabel("Unit cost (£) for line 1").fill("3.50");
   await page.getByRole("button", { name: "Review delivery" }).click();
   await page.getByRole("button", { name: "Receive stock", exact: true }).click();
