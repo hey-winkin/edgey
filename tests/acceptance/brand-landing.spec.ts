@@ -22,5 +22,11 @@ test("verified references link to a brand page, while brands without public fit 
   expect(await zund.text()).not.toMatch(/PRIV-Z10-ALIAS|500-9802/);
   const sitemap = await (await request.get("/sitemap.xml")).text();
   expect(sitemap).toContain(`<loc>${baseURL}/brands/mimaki</loc>`);
+  expect(sitemap).toContain(`<loc>${baseURL}/reference-guide</loc>`);
   expect(sitemap).not.toContain("/brands/graphtec");
+
+  await page.getByRole("link", { name: "Browse the printable cross-reference guide" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Blade cross-reference guide" })).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${baseURL}/reference-guide`);
+  await expect(page.locator('meta[name="robots"][content*="noindex"]')).toHaveCount(0);
 });

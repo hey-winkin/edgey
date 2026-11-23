@@ -24,6 +24,7 @@ export async function Masthead() {
             { label: "Search by part number", href: "/blades#finder" },
             { label: "By material", href: "/blades#materials" },
             { label: "All blades", href: "/blades" },
+            { label: "Cross-reference guide", href: "/reference-guide" },
           ] },
           { title: "By machine", links: (brands ?? []).map(({ name, slug }) => ({ label: name, href: brandHref(slug) })),
             empty: brands ? "No machine pages are listed yet. Try searching by part number." :

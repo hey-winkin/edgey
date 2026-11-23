@@ -112,9 +112,21 @@ for (const theme of themes) {
               const select = element as HTMLSelectElement;
               const css = getComputedStyle(select);
               canvas.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`;
-              const available = select.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
-              return Array.from(select.options).filter((option) => canvas.measureText(option.text).width > available)
-                .map((option) => option.text);
+              const padding = parseFloat(css.paddingLeft) + parseFloat(css.paddingRight);
+              const oversized = Array.from(select.options).filter((option) => canvas.measureText(option.text).width > select.clientWidth - padding);
+              if (css.appearance !== "base-select") return oversized.map((option) => option.text);
+
+              const selected = select.value;
+              select.selectedIndex = 0;
+              const oneLine = select.clientHeight;
+              const clipped = oversized.filter((option) => {
+                select.value = option.value;
+                const wraps = select.clientHeight > oneLine;
+                const fits = canvas.measureText(option.text).width <= select.clientWidth - padding;
+                return (!wraps && !fits) || document.documentElement.scrollWidth > window.innerWidth;
+              });
+              select.value = selected;
+              return clipped.map((option) => option.text);
             });
           })).toEqual([]);
           if (route === "/") {

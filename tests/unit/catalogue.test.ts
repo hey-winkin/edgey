@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildCatalogueView, productHref, queryValue, readFilters, referenceToolFit, variantChoiceCue, type Family, type Variant } from "@/lib/catalogue";
+import { buildCatalogueView, productHref, queryValue, readFilters, referenceToolFit, toolHeadsForMachine, variantChoiceCue, type Family, type Variant } from "@/lib/catalogue";
 import { unitPricePence, withVatPence } from "@/lib/catalogue/display-prices";
 
 const materials = ["vinyl", "textile"].map((slug, sortOrder) => ({ slug, name: slug, sortOrder, swatch: null }));
@@ -47,6 +47,80 @@ test("a filter does not silently preselect one configuration of a shared code", 
   }));
   const { cards } = buildCatalogueView([family], hits, readFilters({ q: "SHARED", machine: "one" }));
   expect(cards[0]?.href).toBe("/blades/edg-demo");
+});
+
+test("tool head options come from references and a brand and head must share a reference", () => {
+  const blade = family.variants[0]!;
+  const twoBrands = {
+    ...blade,
+    tool: "Unmapped tool",
+    compatibility: [
+      { ...blade.compatibility[0]!, tool: "UCT, SCT; DRT" },
+      { ...family.variants[1]!.compatibility[0]!, tool: " EOT ; uct " },
+    ],
+  };
+  const families = [{ ...family, variants: [twoBrands] }];
+  const view = buildCatalogueView(families, null, readFilters({ machine: "two", head: "EOT" }, true));
+  expect(view.cards[0]?.variants).toEqual([twoBrands]);
+  expect(view.toolHeads.map(({ name }) => name)).toEqual(["DRT", "EOT", "SCT", "UCT"]);
+  expect(toolHeadsForMachine(view.toolHeads, "two").map(({ name }) => name)).toEqual(["EOT", "UCT"]);
+  expect(buildCatalogueView(families, null, readFilters({ machine: "two", head: "sct" }, true)).cards).toEqual([]);
+});
+
+test("depth is inclusive and counts distinct missing-depth options only after other filters", () => {
+  const blade = family.variants[0]!;
+  const matches = { ...blade, cuttingDepthMm: 4.8 };
+  const missing = { ...blade, id: "missing", sku: "EDG-MISSING" };
+  const notSearched = { ...blade, id: "not-searched", sku: "EDG-NOT-SEARCHED" };
+  const tooShallow = { ...blade, id: "shallow", sku: "EDG-SHALLOW", cuttingDepthMm: 4.79 };
+  const otherBrand = { ...family.variants[1]!, substrates: blade.substrates };
+  const wrongMaterial = { ...blade, id: "wrong-material", sku: "EDG-WRONG-MATERIAL", substrates: family.variants[1]!.substrates };
+  const wrongHead = { ...blade, id: "wrong-head", sku: "EDG-WRONG-HEAD" };
+  const variants = [matches, missing, notSearched, tooShallow, otherBrand, wrongMaterial].map((item) => ({
+    ...item,
+    compatibility: item.compatibility.map((record) => ({ ...record, tool: "UCT" })),
+  }));
+  const otherTypeBlade = { ...variants[1]!, id: "other-type", sku: "EDG-OTHER-TYPE" };
+  const otherType = { ...family, slug: "oscillating-fit", toolType: { slug: "oscillating", name: "Oscillating", sortOrder: 1 }, variants: [otherTypeBlade] };
+  const families = [{ ...family, variants: [...variants, wrongHead] }, otherType];
+  const hits = [matches, missing, missing, tooShallow, otherBrand, wrongMaterial, wrongHead].map(({ sku }) => ({
+    productSlug: family.slug, sku, matchType: "suggested" as const, matchedCode: null,
+  }));
+  const view = buildCatalogueView(families, [...hits, { ...hits[1]!, productSlug: otherType.slug, sku: otherTypeBlade.sku }], readFilters({
+    q: "demo", machine: "one", material: "vinyl", type: "drag", head: "uct", depth: "4.8",
+  }, true));
+  expect(view.cards[0]?.variants.map(({ sku }) => sku)).toEqual([matches.sku]);
+  expect(view.missingDepthCount).toBe(1);
+});
+
+test("search counts missing depth only in the match group shown before applying depth", () => {
+  const blade = family.variants[0]!;
+  const suggestedMissing = { ...blade, id: "suggested-missing", sku: "EDG-SUGGESTED-MISSING" };
+  const suggestedFit = { ...blade, id: "suggested-fit", sku: "EDG-SUGGESTED-FIT", cuttingDepthMm: 5 };
+  const families = [{ ...family, variants: [blade, suggestedMissing, suggestedFit] }];
+  const hits = [blade, suggestedMissing, suggestedFit].map(({ sku }, index) => ({
+    productSlug: family.slug, sku, matchType: index ? "suggested" as const : "exact" as const, matchedCode: "DEMO",
+  }));
+  const filters = readFilters({ q: "demo", depth: "5" }, true);
+  const view = buildCatalogueView(families, hits, filters);
+  expect(view.missingDepthCount).toBe(1);
+  expect(view.cards[0]?.match).toBe("suggested");
+  expect(view.cards[0]?.variants).toEqual([suggestedFit]);
+
+  const exactFit = { ...blade, cuttingDepthMm: 5 };
+  families[0]!.variants[0] = exactFit;
+  const exactView = buildCatalogueView(families, hits, filters);
+  expect(exactView.missingDepthCount).toBe(0);
+  expect(exactView.cards[0]?.variants).toEqual([exactFit]);
+});
+
+test("blade facets opt in to positive finite decimal depths and normalized heads", () => {
+  for (const depth of ["", "0", "-2", "Infinity", "0x10", "1e999", "4 mm", "NaN"]) {
+    expect(readFilters({ depth }, true).depth).toBe("");
+  }
+  expect(readFilters({ depth: ["4.80", "12"], head: " HF VibraCut " }, true))
+    .toMatchObject({ depth: "4.80", head: "hf vibracut" });
+  expect(readFilters({ depth: "4.8", head: "uct" })).toMatchObject({ depth: "", head: "" });
 });
 
 test("the displayed price applies each break to every blade and rounds VAT on the total", () => {

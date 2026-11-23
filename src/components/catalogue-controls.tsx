@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useTransition } from "react";
-import type { CatalogueFilters } from "@/lib/catalogue";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { toolHeadsForMachine, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
+import styles from "./catalogue-filters.module.css";
 
 type Option = { slug: string; name: string };
 
-const filterNames = ["q", "type", "machine", "material"] as const;
+const filterNames = ["q", "type", "machine", "material", "depth", "head"] as const;
 
 function filterQuery(read: (name: keyof CatalogueFilters) => string): string {
   const params = new URLSearchParams();
@@ -22,29 +23,33 @@ function writeFilters(form: HTMLFormElement | null, filters?: CatalogueFilters) 
     const control = form?.elements.namedItem(name);
     if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
       control.value = filters?.[name] ?? "";
+      if (control instanceof HTMLSelectElement && control.selectedIndex === -1) control.value = "";
     }
   }
 }
 
-// Search and filters. State lives in the address (?q=&type=&machine=&material=)
-// so results are server-rendered, shareable and work without JavaScript.
 export function CatalogueControls({
   filters,
   toolTypes = [],
   machines = [],
   searchFirst = false,
+  bladeFacets,
 }: {
   filters: CatalogueFilters;
   toolTypes?: Option[];
   machines?: Option[];
   searchFirst?: boolean;
+  bladeFacets?: Pick<CatalogueView, "toolHeads" | "materials">;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const form = useRef<HTMLFormElement>(null);
   const requested = useRef<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [invalidDepth, setInvalidDepth] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heads = bladeFacets ? toolHeadsForMachine(bladeFacets.toolHeads, filters.machine) : [];
+  const unlistedHead = Boolean(filters.head && !heads.some(({ slug }) => slug === filters.head));
 
   const received = filterQuery((name) => filters[name]);
   const rendered = useRef(received);
@@ -53,13 +58,23 @@ export function CatalogueControls({
     rendered.current = received;
     const index = requested.current.indexOf(received);
     requested.current = index === -1 ? [] : requested.current.slice(index + 1);
-    if (index === -1) writeFilters(form.current, filters);
+    if (index === -1) {
+      writeFilters(form.current, filters);
+      setInvalidDepth(false);
+    }
   }, [filters, received]);
 
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [pathname]);
 
   function push(element: HTMLFormElement, delay: number, showResults = false) {
     if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const depth = element.elements.namedItem("depth");
+    if (depth instanceof HTMLInputElement) {
+      const invalid = !depth.validity.valid || (depth.value !== "" && !Number.isFinite(depth.valueAsNumber));
+      setInvalidDepth(invalid);
+      if (invalid) return;
+    }
     const data = new FormData(element);
     const query = filterQuery((name) => String(data.get(name) ?? ""));
     timer.current = setTimeout(() => {
@@ -74,7 +89,7 @@ export function CatalogueControls({
   return (
     <form
       ref={form}
-      className="controls"
+      className={"controls" + (bladeFacets ? " " + styles.filters : "")}
       id="catalogue-controls"
       role="search"
       data-search-first={searchFirst || undefined}
@@ -87,13 +102,25 @@ export function CatalogueControls({
         timer.current = null;
         requested.current = [];
         writeFilters(event.currentTarget, filters);
+        setInvalidDepth(false);
       }}
       onSubmit={(event) => {
         event.preventDefault();
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         push(event.currentTarget, 0, searchFirst && submitter !== null);
       }}
-      onChange={(event) => push(event.currentTarget, event.target === event.currentTarget.elements.namedItem("q") ? 160 : 0)}
+      onChange={(event) => {
+        const form = event.currentTarget;
+        const target = event.target;
+        if (target instanceof HTMLInputElement && target.name === "depth") return;
+        if (bladeFacets && target instanceof HTMLSelectElement && target.name === "machine") {
+          const head = form.elements.namedItem("head");
+          if (head instanceof HTMLSelectElement && !toolHeadsForMachine(bladeFacets.toolHeads, target.value).some(({ slug }) => slug === head.value)) {
+            head.value = "";
+          }
+        }
+        push(form, target instanceof HTMLInputElement ? 160 : 0);
+      }}
     >
       {searchFirst && <label htmlFor="finder">Search blades</label>}
       <label className="search-field">
@@ -114,10 +141,45 @@ export function CatalogueControls({
       {searchFirst
         ? <button className="primary" type="submit">Search</button>
         : <CatalogueFacets filters={filters} toolTypes={toolTypes} machines={machines} />}
-      {filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
+      {bladeFacets ? (
+        <>
+          <div className="select-field">
+            <select name="material" aria-label="Material" defaultValue={filters.material}>
+              <option value="">All materials</option>
+              {bladeFacets.materials.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
+            </select>
+          </div>
+          <div className={"select-field " + styles.head}>
+            <select name="head" aria-label="Tool head" aria-describedby={unlistedHead ? "unlisted-tool-head" : undefined} defaultValue={filters.head}>
+              <option value="">All tool heads</option>
+              {heads.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
+            </select>
+          </div>
+          <div className={styles.depthControl}>
+            <label className={"search-field " + styles.depth}>
+              <span>Minimum depth (mm)</span>
+              <input
+                name="depth"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Any"
+                defaultValue={filters.depth}
+                aria-invalid={invalidDepth || undefined}
+                aria-describedby={invalidDepth ? "catalogue-depth-error" : undefined}
+                onInput={(event) => {
+                  const form = event.currentTarget.form;
+                  if (form) push(form, 160);
+                }}
+              />
+            </label>
+            {invalidDepth && <p className={styles.depthError} id="catalogue-depth-error" role="alert">Enter a number of 0 mm or more, or leave it blank.</p>}
+          </div>
+        </>
+      ) : filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
       {!searchFirst && (
         <noscript>
-          <button className="secondary" type="submit">Search</button>
+          <button className="secondary" type="submit">{bladeFacets ? "Apply filters" : "Search"}</button>
         </noscript>
       )}
       {searchFirst && <p id="finder-hint">Enter a part number, OEM code, machine or blade name.</p>}

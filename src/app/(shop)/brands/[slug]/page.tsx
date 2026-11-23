@@ -29,6 +29,7 @@ export default async function BrandPage({ params }: Props) {
     <p className="kicker"><span className="register" aria-hidden="true" /> Verified references</p>
     <h1>{brand.name} blade references</h1>
     <p className={styles.intro}>Check the printed code against these Edgey blade references. Open the blade page to check the machine, tool or holder and any adapter before ordering.</p>
+    <p className={styles.guide}><Link href="/reference-guide" className="textlink">Browse the printable cross-reference guide</Link></p>
     <table className={styles.references} role="table" aria-labelledby="brand-references-caption">
       <caption id="brand-references-caption" className="sr">Published Edgey blades with verified {brand.name} references</caption>
       <thead className={styles.labels} role="rowgroup">
