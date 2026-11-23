@@ -10,6 +10,9 @@ const privatePaths = [
   "/admin/stock/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/catalogue",
   "/admin/stock/receive", "/admin/stock/deliveries", "/admin/stock/deliveries/8028e331-bde6-4d32-97c4-7fcf1bed9190",
   "/admin/catalogue/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/finance", "/admin/requests", "/admin/sales",
+  "/admin/purchase-orders", "/admin/purchase-orders/new", "/admin/purchase-orders/suppliers",
+  "/admin/purchase-orders/suppliers/new", "/admin/purchase-orders/settings",
+  ...["", "/edit", "/print"].map((suffix) => "/admin/purchase-orders/8028e331-bde6-4d32-97c4-7fcf1bed9190" + suffix),
 ];
 
 async function setBuyerSession(page: Page, credentials: { email: string; password: string }, baseURL: string) {
@@ -45,6 +48,7 @@ test("anonymous users and signed-in buyers cannot reach any staff page", async (
       expect(await response.text()).toBe("Staff sign-in required.");
     }
     expect((await page.request.get("/admin/stock/receive/template")).status()).toBe(403);
+    expect((await page.request.get("/admin/purchase-orders/8028e331-bde6-4d32-97c4-7fcf1bed9190/export")).status()).toBe(403);
   };
   await checkAll();
   const buyer = await createLocalAdminUser("buyer");

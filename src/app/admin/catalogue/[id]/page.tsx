@@ -88,6 +88,9 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
       <div className={styles.editor}>
         <AdminLink href="/admin/catalogue">Back to catalogue</AdminLink>
         <AdminHeading eyebrow={variant.sku} title={variant.products.name} description={variant.option_label ?? undefined} />
+        {variant.publication_status !== "archived" && <div className={styles.purchaseAction}>
+          <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>
+        </div>}
         <EditorWorkspace key={id}>
           <AdminSection title="Pricing & costs">
             <div className={styles.pricing}>
@@ -115,6 +118,9 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
     <div className={styles.editor}>
       <AdminLink href="/admin/catalogue">Back to catalogue</AdminLink>
       <AdminHeading eyebrow={variant.sku} title={family.name} description={variant.option_label ?? undefined} />
+      {editable && <div className={styles.purchaseAction}>
+        <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>
+      </div>}
       <nav aria-label="Variant editor sections" className={styles.sectionNav}>
         {sections.filter(([section]) => editable || section === "overview" || section === "pricing")
           .map(([section, label]) => <a key={section} href={`#${section}`}>{label}</a>)}

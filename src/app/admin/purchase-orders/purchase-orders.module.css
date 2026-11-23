@@ -1,0 +1,47 @@
+.links, .actions, .selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+.links > a { min-height: 44px; display: inline-flex; align-items: center; }
+.selection { margin-block: 0 14px; overflow-wrap: anywhere; }
+.actionPanel { margin-top: 16px; }
+.actions { align-items: flex-start; }
+
+.ledger, .summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+
+.indexRow, .recordLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .6fr) minmax(0, .8fr);
+  gap: 8px 18px;
+  padding: clamp(12px, 2vw, 18px);
+  overflow-wrap: anywhere;
+}
+
+.indexRow + .indexRow, .recordLine + .recordLine { border-top: 1px solid var(--line); }
+.recordLine { grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); }
+.linePrice { grid-column: 1 / -1; padding-top: 9px; border-top: 1px solid var(--line); }
+.breakdown { margin-top: 6px; }
+.breakdown summary { cursor: pointer; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+
+.summary > div { padding: 10px 15px; overflow-wrap: anywhere; }
+.lineFacts { margin: 0; display: flex; flex-wrap: wrap; gap: 5px 15px; }
+:is(.summary, .lineFacts) dt { color: var(--muted); font: .78rem/1.45 var(--mono); }
+:is(.summary, .lineFacts) dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 630px) {
+  .indexRow, .recordLine { grid-template-columns: minmax(0, 1fr); }
+}

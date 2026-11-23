@@ -27,8 +27,11 @@
 .catalogue-list .admin-table tbody th { font: inherit; background: transparent; }
 .catalogue-list .admin-table tbody tr:last-child th { border-bottom: 0; }
 .catalogue-list :is(th, td):nth-child(n+3) { text-align: right; }
-.catalogue-list .admin-table :is(th, td):nth-child(3),
 .catalogue-list .admin-table td:last-child .admin-mono { white-space: nowrap; }
+.catalogue-list-stock { overflow-wrap: anywhere; }
+.catalogue-list-stock dl, .catalogue-list-stock dd { margin: 0; }
+.catalogue-list-stock dt { color: var(--muted); font-size: .8rem; }
+.catalogue-list-stock div + div { margin-top: 6px; }
 .catalogue-list .admin-pagination { flex-wrap: wrap; }
 
 .catalogue-list-name, .catalogue-list-detail {
@@ -38,6 +41,7 @@
 .catalogue-list-name { margin-top: 3px; overflow-wrap: anywhere; }
 .catalogue-list-detail { margin-top: 4px; font-size: .8rem; }
 .catalogue-list tbody th .catalogue-list-detail { overflow-wrap: anywhere; }
+.catalogue-list tbody th .catalogue-list-detail > a { display: inline-flex; min-block-size: 24px; align-items: center; }
 .catalogue-list-detail[data-cost-status="missing"] { color: var(--ink); font-weight: 600; }
 
 .catalogue-list-status {

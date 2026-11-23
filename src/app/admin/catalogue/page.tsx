@@ -1,9 +1,11 @@
 import { requireStaff } from "@/lib/admin/auth";
 import { catalogueCodeMaxLength, catalogueStatuses, listAdminCatalogue } from "@/lib/admin/catalogue";
+import { getPurchaseStock } from "@/lib/admin/purchase-order-data";
 import { displayState } from "@/lib/admin/format";
 import { formatPence } from "@/lib/catalogue/display-prices";
 import { AdminPagination } from "@/app/admin/pagination";
 import { AdminField, AdminHeading, AdminLink, AdminNotice, AdminTable } from "@/app/admin/ui";
+import { OnOrder } from "@/app/admin/purchase-orders/on-order";
 import "./list.css";
 
 const pathname = "/admin/catalogue";
@@ -14,6 +16,7 @@ export default async function CataloguePage({ searchParams }: {
   const staff = await requireStaff("catalogue", "finance");
   const canEdit = staff.roles.includes("catalogue");
   const { brands, filters, page, length, rows } = await listAdminCatalogue(staff, await searchParams);
+  const onOrder = await getPurchaseStock(staff.db, rows.map(({ id }) => id));
   const hasFilters = Boolean(filters.q || filters.status || filters.brand);
 
   return (
@@ -51,19 +54,27 @@ export default async function CataloguePage({ searchParams }: {
       {rows.length === 0 ? <AdminNotice>{page > 1
         ? "No catalogue variants on this page."
         : hasFilters ? "No catalogue variants match these filters." : "No catalogue variants yet."}</AdminNotice> : (
-        <AdminTable label="Catalogue variants" headers={["Blade variant", "Status", "Available", "Price from"]}>
+        <AdminTable label="Catalogue variants" headers={["Blade variant", "Status", "Stock", "Price from"]}>
           {rows.map((variant) => (
             <tr key={variant.id}>
               <th scope="row">
                 <span className="admin-mono"><AdminLink href={`${pathname}/${variant.id}`}>{variant.sku}</AdminLink></span>
                 <span className="catalogue-list-name">{variant.name}</span>
                 {variant.option && <span className="catalogue-list-detail admin-muted">{variant.option}</span>}
+                {onOrder && variant.status !== "archived" && <span className="catalogue-list-detail">
+                  <AdminLink href={`/admin/purchase-orders?variant=${variant.id}`}>Add to purchase order <span className="sr">for {variant.sku}</span></AdminLink>
+                </span>}
               </th>
               <td>
                 <span className="catalogue-list-status" data-status={variant.status}>{displayState(variant.status)}</span>
                 <span className="catalogue-list-detail admin-muted">{variant.review}</span>
               </td>
-              <td className="admin-mono">{variant.available}</td>
+              <td className="catalogue-list-stock">
+                <dl>
+                  <div><dt>Available</dt><dd className="admin-mono">{variant.available}</dd></div>
+                  <div><dt>On order</dt><dd><OnOrder summary={onOrder} variantId={variant.id} /></dd></div>
+                </dl>
+              </td>
               <td>
                 <span className="admin-mono">{variant.priceFromPence === null ? "Not set" : formatPence(variant.priceFromPence)}</span>
                 {variant.costStatus !== "recorded" && (

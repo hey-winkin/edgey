@@ -26,7 +26,8 @@ function rowId(row: EditorRow, field: string) {
 
 export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorState; showCosts: boolean; today: string }) {
   const router = useRouter();
-  const [nativeState, action, nativePending] = useActionState(submitDeliveryEditor, initial, "/admin/stock/receive");
+  const permalink = initial.purchase ? `/admin/stock/receive?po=${initial.purchase.id}` : "/admin/stock/receive";
+  const [nativeState, action, nativePending] = useActionState(submitDeliveryEditor, initial, permalink);
   const [enhanced, setEnhanced] = useState<{ base: EditorState; state: EditorState }>();
   const state = enhanced?.base === nativeState ? enhanced.state : nativeState;
   const [live, setLive] = useState<{ state: EditorState; draft: DeliveryDraft }>();
@@ -38,10 +39,11 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
   const pending = useRef(new Set<string>());
   const importing = useRef<HTMLDetailsElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
-  const { review } = state;
+  const { review, purchase } = state;
   const checkedCodes = state.checkedCodes ?? state.matches.map(({ inputCode }) => inputCode);
   const checks = new Map([...liveChecks, ...groupDeliveryMatches(checkedCodes, state.matches)]);
-  const ledgerRows = readDeliveryRows(draft.rows, checks, showCosts);
+  const ledgerRows = readDeliveryRows(draft.rows, checks, showCosts, purchase);
+  const outstanding = new Map(purchase?.lines.map((line) => [line.variantId, line.outstanding]));
   const entered = ledgerRows.filter(({ active }) => active).length;
   const ready = ledgerRows.filter((line) => line.ready);
   const units = ready.reduce((total, { quantity }) => total + (quantity ?? 0), 0);
@@ -114,7 +116,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
     } else if (field === "quantity" && showCosts) {
       document.getElementById(rowId(row, "cost"))?.focus();
     } else if (next) {
-      document.getElementById(rowId(next, "code"))?.focus();
+      document.getElementById(rowId(next, purchase && next.plannedVariantId ? "quantity" : "code"))?.focus();
     } else if (row.code.trim() || row.quantity.trim() || row.unitCost.trim() || event.currentTarget.value.trim()) {
       const button = addButton.current;
       if (button && !button.disabled) button.form?.requestSubmit(button);
@@ -134,7 +136,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
     const importOpen = importing.current?.open ?? state.importOpen;
     const edit = review ? null : editDeliveryRows(submitted, intent);
     if (edit) {
-      setEnhanced({ base: nativeState, state: { matches: state.matches, checkedCodes: state.checkedCodes, importOpen, ...edit } });
+      setEnhanced({ base: nativeState, state: { matches: state.matches, checkedCodes: state.checkedCodes, purchase, importOpen, ...edit } });
       return;
     }
     const file = formData.get("file");
@@ -201,11 +203,13 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
         <section className={styles.sheet} aria-labelledby="receipt-review-heading">
           <div className={styles.sheetHeader}>
             <h2 id="receipt-review-heading" tabIndex={-1}>Review delivery</h2>
-            <p>Check each matched blade name and SKU against the packet, then receive stock to add the listed units.</p>
+            <p>{purchase ? "Check the quantities and any differences below. Only the units listed as received will be added to stock."
+              : "Check each matched blade name and SKU against the packet, then receive stock to add the listed units."}</p>
           </div>
           <dl className={styles.reviewDetails}>
             <div><dt>Delivery reference</dt><dd className="admin-mono">{review.input.reference}</dd></div>
             <div><dt>Date received</dt><dd><time dateTime={review.input.receivedOn}>{displayDate.format(new Date(review.input.receivedOn))}</time></dd></div>
+            {purchase && <div><dt>Purchase order</dt><dd className="admin-mono">{purchase.number}</dd></div>}
             {review.input.note && <div className={styles.note}><dt>Delivery note</dt><dd className="admin-preserve-lines">{review.input.note}</dd></div>}
           </dl>
           <div className={`${styles.columns} ${styles.reviewLine} ${lineClass}`} aria-hidden="true">
@@ -223,6 +227,19 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
             ))}
           </ol>
           <div className={styles.sheetFooter}>
+            {review.variances && (review.variances.length ? (
+              <div className={styles.variance}>
+                <h3>Differences from the purchase order</h3>
+                <ul>
+                  {review.variances.map((variance) => <li key={variance.variantId}>
+                    <strong>{variance.kind === "short" ? "Short" : variance.kind === "over" ? "Over" : "Unexpected"}</strong>
+                    {" · "}<span className="admin-mono">{variance.sku}</span>{" · "}
+                    {number.format(variance.quantity)} {variance.quantity === 1 ? "unit" : "units"}
+                    {variance.kind === "short" ? " still outstanding" : variance.kind === "unexpected" ? " not on the order" : " above the outstanding quantity"}
+                  </li>)}
+                </ul>
+              </div>
+            ) : <p>Quantities match the outstanding purchase order.</p>)}
             <p><strong>{review.lines.length}</strong> {review.lines.length === 1 ? "line" : "lines"} <span className="admin-muted">/</span> <strong>{number.format(reviewedUnits)}</strong> {reviewedUnits === 1 ? "unit" : "units"} to receive</p>
             {(previousDelivery || historyError) && (
               <div className={styles.errorBlock}>
@@ -293,7 +310,8 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
             <div className={`${styles.sheetHeader} ${styles.ledgerHeader}`}>
               <div>
                 <h2 id="receipt-lines-heading">Delivery lines</h2>
-                <p>Enter a SKU or maker code. {live?.state === state && "Press Enter to move to the next field or line."}</p>
+                <p>{purchase ? "Enter what arrived. Leave a planned quantity blank or set it to zero if no units arrived."
+                  : <>Enter a SKU or maker code. {live?.state === state && "Press Enter to move to the next field or line."}</>}</p>
                 {showCosts && <p>Unit cost is optional. Enter landed cost in pounds per blade.</p>}
               </div>
               <dl className={styles.tally}>
@@ -302,7 +320,7 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
               </dl>
             </div>
 
-            <details className={styles.import} ref={importing} open={state.importOpen} suppressHydrationWarning>
+            {!purchase && <details className={styles.import} ref={importing} open={state.importOpen} suppressHydrationWarning>
               <summary>Import lines</summary>
               <div className={styles.importForm}>
                 <p id="receipt-import-help">Paste spreadsheet rows or choose a CSV file. Use columns in this order: code, quantity{showCosts ? ", optional unit cost" : ""}. Up to 200 lines and 128 KB.</p>
@@ -322,31 +340,33 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
                   <a className="textlink" href="/admin/stock/receive/template" download>Download blank CSV</a>
                 </div>
               </div>
-            </details>
+            </details>}
 
             <div className={`${styles.columns} ${lineClass}`} aria-hidden="true">
               <span>No.</span><span>Blade code</span><span>Matched blade</span><span>Quantity</span>{showCosts && <span>Unit cost (£)</span>}
             </div>
             <ol className={styles.lines} role="list" aria-label="Delivery lines">
-              {ledgerRows.map(({ row, match, matches, quantity, invalidCode, invalidMatch, duplicate, invalidCost, active }, index) => {
+              {ledgerRows.map(({ row, match, matches, quantity, invalidCode, invalidMatch, duplicate, invalidCost, active, omitted }, index) => {
                 const label = index + 1;
                 const initialRow = state.draft.rows[index]!;
                 const code = row.code.trim();
                 const codeMessage = (showErrors || code || row.sourceRow ? invalidCode : undefined) || duplicate;
-                const quantityError = active && quantity === null && (showErrors || row.quantity.trim() || row.sourceRow);
+                const quantityError = active && !omitted && quantity === null && (showErrors || row.quantity.trim() || row.sourceRow);
+                const planned = Boolean(purchase && row.plannedVariantId);
                 return (
                   <li className={lineClass} key={row.id}>
                     <input type="hidden" name="row" value={row.id} />
                     {row.sourceRow && <input type="hidden" name={`sourceRow:${row.id}`} value={row.sourceRow} />}
+                    {planned && <input type="hidden" name={`planned:${row.id}`} value={row.plannedVariantId} />}
                     <div className={styles.lineNumber} aria-hidden="true"><span>Line</span> {String(label).padStart(2, "0")}</div>
                     <div className={styles.code}>
                       <label htmlFor={rowId(row, "code")} className={styles.fieldLabel}>Blade code</label>
                       <input id={rowId(row, "code")} name={`code:${row.id}`} aria-label={`Blade code for line ${label}`} defaultValue={initialRow.code} placeholder="SKU or maker code"
-                        autoComplete="off" spellCheck={false} maxLength={MAX_DELIVERY_CODE_LENGTH}
+                        autoComplete="off" spellCheck={false} maxLength={MAX_DELIVERY_CODE_LENGTH} readOnly={planned} tabIndex={planned ? -1 : undefined}
                         aria-invalid={Boolean(codeMessage)} aria-describedby={codeMessage ? rowId(row, "code-error") : undefined}
                         onKeyDown={(event) => advance(event, row, index, "code")} onBlur={(event) => {
                           const value = event.currentTarget.value.trim();
-                          if (!deliveryCodeError(value) && !Array.isArray(checks.get(value))) void checkCodes([value]);
+                          if (!planned && !deliveryCodeError(value) && !Array.isArray(checks.get(value))) void checkCodes([value]);
                         }} />
                       {codeMessage && <p className={styles.error} id={rowId(row, "code-error")}>{codeMessage}</p>}
                       {row.sourceRow && <p className={styles.fieldHint}>Imported row {row.sourceRow}</p>}
@@ -365,7 +385,9 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
                         </>
                       )}
                       <div role="status" className={styles.matchStatus}>
-                        {match ? <><span>{match.bladeName}</span><span className="admin-mono admin-muted">{match.sku}</span></>
+                        {match ? <><span>{match.bladeName}</span><span className="admin-mono admin-muted">
+                          {purchase && outstanding.has(match.variantId) ? `${number.format(outstanding.get(match.variantId)!)} outstanding on PO` : match.sku}
+                        </span></>
                           : invalidMatch ? <p className={styles.error} id={rowId(row, "match-error")}>Multiple matches. Choose the SKU on the packet or type it in the code field.</p>
                           : <span className="admin-muted">{checks.has(code) || !code ? "—" : "Awaiting match"}</span>}
                       </div>
@@ -389,15 +411,18 @@ export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorS
                         {invalidCost && <p className={styles.error} id={rowId(row, "cost-error")}>Use a valid £ amount, e.g. 4.50.</p>}
                       </div>
                     )}
-                    <button className={`${styles.remove} textlink`} type="submit" name="intent" value={`remove:${row.id}`} aria-label={`Remove line ${label}`}>Remove</button>
+                    {!planned && <button className={`${styles.remove} textlink`} type="submit" name="intent" value={`remove:${row.id}`} aria-label={`Remove line ${label}`}>Remove</button>}
                   </li>
                 );
               })}
             </ol>
 
             <div className={styles.addLine}>
-              <button className="secondary" type="submit" name="intent" value="add" ref={addButton} disabled={draft.rows.length >= MAX_DELIVERY_ROWS}><span aria-hidden="true">+</span> Add line</button>
-              <button className="secondary" type="submit" name="intent" value="check">{busy === "check" ? "Checking blade codes…" : "Check blade codes"}</button>
+              <button className="secondary" type="submit" name="intent" value="add" ref={addButton} disabled={draft.rows.length >= MAX_DELIVERY_ROWS}>
+                <span aria-hidden="true">+</span> {purchase ? "Add unexpected line" : "Add line"}
+              </button>
+              {(!purchase || draft.rows.some((row) => !row.plannedVariantId)) &&
+                <button className="secondary" type="submit" name="intent" value="check">{busy === "check" ? "Checking blade codes…" : "Check blade codes"}</button>}
               {draft.rows.length >= MAX_DELIVERY_ROWS && <p className="admin-muted">Maximum of {MAX_DELIVERY_ROWS} lines reached.</p>}
               {state.announcement && <p className="admin-muted" role="status">{state.announcement}</p>}
             </div>

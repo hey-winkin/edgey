@@ -21,6 +21,8 @@ type StaffUnitCost = {
 
 type ReadOnlyTable<Row, Relationships = []> = { Row: Row; Insert: never; Update: never; Relationships: Relationships };
 
+export type StaffPurchaseStatus = "draft" | "sent" | "part_received" | "received" | "closed" | "cancelled";
+
 export type Database = {
   public: {
     Tables: {
@@ -918,7 +920,14 @@ export type Database = {
         actor_id: string;
         line_count: number;
         unit_count: number;
-      }>;
+        purchase_order_id: string | null;
+      }, [{
+        foreignKeyName: "staff_deliveries_purchase_order_id_fkey";
+        columns: ["purchase_order_id"];
+        isOneToOne: false;
+        referencedRelation: "staff_purchase_orders";
+        referencedColumns: ["id"];
+      }]>;
       staff_delivery_lines: ReadOnlyTable<{
         delivery_id: string;
         position: number;
@@ -950,8 +959,123 @@ export type Database = {
           referencedColumns: ["id"];
         },
       ]>;
+      staff_suppliers: ReadOnlyTable<{
+        id: string;
+        name: string;
+        contact_name: string | null;
+        email: string | null;
+        phone: string | null;
+        address: string | null;
+        default_currency: string | null;
+        lead_time_days: number | null;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      staff_purchase_orders: ReadOnlyTable<{
+        id: string;
+        number: string;
+        status: StaffPurchaseStatus;
+        ordered_on: string;
+        expected_on: string | null;
+        revision: number;
+        document_revision: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+      staff_purchase_order_costs: ReadOnlyTable<{
+        purchase_order_id: string;
+        supplier_id: string | null;
+        currency: string;
+        exchange_rate: number | null;
+        shipping_minor: number;
+        duty_minor: number;
+        other_minor: number;
+        import_vat_minor: number;
+        include_import_vat: boolean | null;
+        note: string | null;
+      }, [
+        {
+          foreignKeyName: "staff_purchase_order_costs_purchase_order_id_fkey";
+          columns: ["purchase_order_id"];
+          isOneToOne: true;
+          referencedRelation: "staff_purchase_orders";
+          referencedColumns: ["id"];
+        },
+        {
+          foreignKeyName: "staff_purchase_order_costs_supplier_id_fkey";
+          columns: ["supplier_id"];
+          isOneToOne: false;
+          referencedRelation: "staff_suppliers";
+          referencedColumns: ["id"];
+        },
+      ]>;
+      staff_purchase_order_lines: ReadOnlyTable<{
+        purchase_order_id: string;
+        variant_id: string;
+        position: number;
+        sku: string;
+        blade_name: string;
+        option_label: string | null;
+        quantity: number;
+        received_quantity: number;
+      }, [
+        {
+          foreignKeyName: "staff_purchase_order_lines_purchase_order_id_fkey";
+          columns: ["purchase_order_id"];
+          isOneToOne: false;
+          referencedRelation: "staff_purchase_orders";
+          referencedColumns: ["id"];
+        },
+      ]>;
+      staff_purchase_order_line_costs: ReadOnlyTable<{
+        purchase_order_id: string;
+        variant_id: string;
+        unit_price_minor: number | null;
+        supplier_part_number: string | null;
+        note: string | null;
+        base_unit_pence: number | null;
+        freight_unit_pence: number | null;
+        duty_unit_pence: number | null;
+        other_unit_pence: number | null;
+        vat_unit_pence: number | null;
+        landed_unit_pence: number | null;
+      }, [
+        {
+          foreignKeyName: "purchase_order_line_costs_line_fkey";
+          columns: ["purchase_order_id", "variant_id"];
+          isOneToOne: true;
+          referencedRelation: "staff_purchase_order_lines";
+          referencedColumns: ["purchase_order_id", "variant_id"];
+        },
+      ]>;
+      staff_purchase_order_events: ReadOnlyTable<{
+        id: string;
+        purchase_order_id: string;
+        kind: string;
+        revision: number;
+        actor_id: string;
+        created_at: string;
+      }>;
+      staff_purchase_buyer_settings: ReadOnlyTable<{
+        id: boolean;
+        name: string | null;
+        address: string | null;
+        email: string | null;
+        company_number: string | null;
+        vat_number: string | null;
+      }>;
       staff_variant_costs: ReadOnlyTable<StaffUnitCost>;
       staff_receipt_costs: ReadOnlyTable<StaffUnitCost & { stock_movement_id: number; received_quantity: number }>;
+      staff_purchase_receipt_cost_breakdowns: ReadOnlyTable<{
+        stock_movement_id: number;
+        base_unit_pence: number;
+        freight_unit_pence: number;
+        duty_unit_pence: number;
+        other_unit_pence: number;
+        vat_unit_pence: number;
+        include_import_vat: boolean | null;
+      }>;
       staff_variant_cost_audit: ReadOnlyTable<{
         id: number;
         variant_id: string;
@@ -1525,6 +1649,14 @@ export type Database = {
       };
     };
     Views: {
+      staff_purchase_order_outstanding: {
+        Row: { purchase_order_id: string; number: string; variant_id: string; quantity: number; expected_on: string | null };
+        Relationships: [];
+      };
+      staff_purchase_order_stock: {
+        Row: { variant_id: string; quantity: number; expected_on: string | null; has_undated: boolean };
+        Relationships: [];
+      };
       staff_effective_receipt_costs: {
         Row: StaffUnitCost & { stock_movement_id: number; received_quantity: number };
         Relationships: [];
@@ -1610,6 +1742,27 @@ export type Database = {
       };
     };
     Functions: {
+      save_staff_supplier: { Args: { p_id: string | null; p_supplier: Json }; Returns: string };
+      save_staff_purchase_buyer_settings: { Args: { p_settings: Json }; Returns: boolean };
+      save_staff_purchase_order: {
+        Args: { p_id: string | null; p_expected_revision: number; p_order: Json; p_lines: Json };
+        Returns: string;
+      };
+      transition_staff_purchase_order: {
+        Args: { p_id: string; p_expected_revision: number; p_status: string };
+        Returns: string;
+      };
+      receive_staff_purchase_order: {
+        Args: {
+          p_order_id: string; p_expected_revision: number; p_delivery_id: string;
+          p_reference: string; p_received_on: string; p_note: string | null; p_lines: Json;
+        };
+        Returns: string;
+      };
+      last_staff_purchase_price: {
+        Args: { p_supplier_id: string; p_variant_id: string; p_currency: string };
+        Returns: number | null;
+      };
       add_staff_delivery_line_cost: {
         Args: { p_delivery_id: string; p_position: number; p_unit_cost_pence: number };
         Returns: number;

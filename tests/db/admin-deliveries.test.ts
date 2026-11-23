@@ -170,7 +170,7 @@ describe("staff deliveries", () => {
     expect(await asStaff(actor, create)).toBe(id);
     expect(await one("select * from public.staff_deliveries where id = $1", [id])).toEqual({
       id, reference, received_on: expect.any(Date), received_at: expect.any(Date), note: "Packed separately.",
-      actor_id: actor.id, line_count: 2, unit_count: "6",
+      actor_id: actor.id, line_count: 2, unit_count: "6", purchase_order_id: null,
     });
     expect(await stock(draft.id)).toEqual({ stock_on_hand: 11, stock_reserved: 2, publication_status: "draft" });
     expect(await stock(published.id)).toEqual({ stock_on_hand: 2, stock_reserved: 0, publication_status: "published" });

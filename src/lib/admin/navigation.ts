@@ -15,7 +15,8 @@ const areas: {
     { label: "Order history", href: "/admin/warehouse?view=history", roles: ["warehouse"] },
   ] },
   { title: "Purchases", links: [
-    // EDGE-38: insert Purchase orders (with the due task), then Suppliers here.
+    { label: "Purchase orders", href: "/admin/purchase-orders", roles: ["warehouse", "catalogue", "finance"] },
+    { label: "Suppliers", href: "/admin/purchase-orders/suppliers", roles: ["catalogue", "finance"] },
     { label: "Receive a delivery", href: "/admin/stock/receive", roles: ["warehouse"] },
     { label: "Stock and adjustments", href: "/admin/stock", roles: ["warehouse"], task: "outOfStock", taskHref: stockOutOfStockHref },
     { label: "Delivery history", href: "/admin/stock/deliveries", roles: ["warehouse", "catalogue", "finance"] },

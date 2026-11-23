@@ -521,6 +521,10 @@ test.describe("staff shell", () => {
         await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
         const allowedDeskLinks = await main.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
         expect(allowedDeskLinks).toContain("/admin/requests");
+        const purchaseLinks = main.getByRole("region", { name: "Purchases" }).locator(".admin-desk-links").getByRole("link");
+        await expect(purchaseLinks.first()).toHaveText("Purchase orders");
+        await expect(purchaseLinks.filter({ hasText: /^Suppliers$/ })).toHaveCount(role === "warehouse" ? 0 : 1);
+        if (role !== "warehouse") await expect(purchaseLinks.nth(1)).toHaveText("Suppliers");
         if (role !== "warehouse") {
           expect(allowedDeskLinks).not.toContain("/admin/warehouse");
           expect(allowedDeskLinks).not.toContain("/admin/stock?view=out-of-stock");
@@ -529,7 +533,9 @@ test.describe("staff shell", () => {
         await staffMenu(page).click();
         const areas = {
           Orders: role === "warehouse" ? ["Pick and dispatch", "Customer requests", "Order history"] : ["Customer requests"],
-          Purchases: role === "warehouse" ? ["Receive a delivery", "Stock and adjustments", "Delivery history"] : ["Delivery history"],
+          Purchases: role === "warehouse"
+            ? ["Purchase orders", "Receive a delivery", "Stock and adjustments", "Delivery history"]
+            : ["Purchase orders", "Suppliers", "Delivery history"],
           Admin: role === "warehouse" ? ["Delivery settings", "Sales reports", "Shop performance"] :
             ["Catalogue", "Sales reports", ...(role === "finance" ? ["Finance and trade accounts"] : [])],
         };
@@ -707,11 +713,14 @@ test.describe("staff shell", () => {
             }
             await shortages.click();
             await expect(page.getByRole("heading", { level: 1, name: "Out of stock" })).toBeVisible();
-            const rows = page.getByRole("table", { name: "Variant balances" }).locator("tbody tr");
+            const table = page.getByRole("table", { name: "Variant balances" });
+            const availableColumn = await table.getByRole("columnheader", { name: "Available", exact: true })
+              .evaluate((cell) => (cell as HTMLTableCellElement).cellIndex);
+            const rows = table.locator("tbody tr");
             await expect(rows.first()).toBeVisible();
             for (const row of await rows.all()) {
               await expect(row.getByRole("cell").nth(2)).toHaveText("Published");
-              await expect(row.getByRole("cell").last()).toHaveText("0");
+              await expect(row.getByRole("cell").nth(availableColumn)).toHaveText("0");
             }
             await page.getByRole("link", { name: "Show all stock" }).click();
             await expect(page.getByRole("heading", { level: 1, name: "Stock" })).toBeVisible();

@@ -11,6 +11,8 @@
   --editor-save-clearance: calc(var(--edgey-primary-min-height) + 4.5em);
 }
 
+.purchaseAction > a { display: inline-flex; min-block-size: 44px; align-items: center; }
+
 .editor :global(.admin-heading) {
   margin-block: 24px 18px;
 }
