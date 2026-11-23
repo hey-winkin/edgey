@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { extractText, getDocumentProxy } from "unpdf";
 import { describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/admin/purchase-orders/[id]/export/pdf/route";
@@ -11,6 +12,7 @@ import {
 vi.mock("@/lib/admin/auth", () => ({ staffSession: vi.fn() }));
 vi.mock("@/lib/admin/purchase-document-data", () => ({ readPurchaseDocument: vi.fn() }));
 vi.mock("server-only", () => ({}));
+vi.mock("node:fs/promises", { spy: true });
 
 const line = {
   variantId: "PRIVATE-VARIANT-KEY",
@@ -40,6 +42,23 @@ function pdfText(bytes: ArrayBuffer) {
 const oneLine = (text: string) => text.replace(/\s+/g, " ");
 
 describe("purchase order PDF", () => {
+  it("retries a failed first asset read without poisoning concurrent or later exports", async () => {
+    vi.resetModules();
+    const { purchaseDocumentPdf: freshRenderer } = await import("@/lib/admin/purchase-document-pdf");
+    const error = new Error("Temporary asset read failure");
+    vi.mocked(readFile).mockClear().mockRejectedValueOnce(error);
+    const first = await Promise.allSettled([freshRenderer(order), freshRenderer(order)]);
+    expect(first).toEqual([{ status: "rejected", reason: error }, { status: "rejected", reason: error }]);
+    expect(readFile).toHaveBeenCalledTimes(5);
+
+    const [one, two] = await Promise.all([freshRenderer(order), freshRenderer({ ...order, number: "PO-0123" })]);
+    expect(readFile).toHaveBeenCalledTimes(10);
+    const [oneText, twoText] = await Promise.all([pdfText(one), pdfText(two)]);
+    expect(oneText.text[0]).toContain("PO-0987");
+    expect(twoText.text[0]).toContain("PO-0123");
+    expect(twoText.text[0]).not.toContain("PO-0987");
+  });
+
   it("renders the supplier-facing field list, exact currency amounts and A4 paper", async () => {
     const bytes = await purchaseDocumentPdf(order);
     const structure = new TextDecoder().decode(bytes);

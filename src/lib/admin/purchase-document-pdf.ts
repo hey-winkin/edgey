@@ -23,14 +23,15 @@ const fonts = [
   { family: mono, style: "bold", name: "IBMPlexMono-Bold", subset: "EDGEAD" },
 ] as const;
 
-function readAssets() {
-  return Promise.all([
+async function readAssets() {
+  const [logo, ...fontBytes] = await Promise.all([
     readFile(join(process.cwd(), "src/lib/admin/purchase-wordmark.png")),
     readFile(join(process.cwd(), "src/lib/admin/purchase-fonts/inter/Inter-Regular.ttf")),
     readFile(join(process.cwd(), "src/lib/admin/purchase-fonts/inter/Inter-Bold.ttf")),
     readFile(join(process.cwd(), "src/lib/admin/purchase-fonts/ibm-plex-mono/IBMPlexMono-Regular.ttf")),
     readFile(join(process.cwd(), "src/lib/admin/purchase-fonts/ibm-plex-mono/IBMPlexMono-Bold.ttf")),
   ] as const);
+  return { logo, fontData: fontBytes.map((bytes) => bytes.toString("base64")) };
 }
 
 let assets: ReturnType<typeof readAssets> | undefined;
@@ -38,12 +39,15 @@ let assets: ReturnType<typeof readAssets> | undefined;
 export class UnsupportedPurchaseDocumentTextError extends Error {}
 
 export async function purchaseDocumentPdf(order: PurchaseDocument) {
-  const [logo, ...fontBytes] = await (assets ??= readAssets());
+  const { logo, fontData } = await (assets ??= readAssets().catch((error: unknown) => {
+    assets = undefined;
+    throw error;
+  }));
   const doc = new jsPDF({ unit: "pt", format: "a4", compress: true, putOnlyUsedFonts: true }) as
     jsPDF & { lastAutoTable?: Table };
   fonts.forEach(({ family, style, name }, index) => {
     const file = `${name}.ttf`;
-    doc.addFileToVFS(file, fontBytes[index]!.toString("base64"));
+    doc.addFileToVFS(file, fontData[index]!);
     doc.addFont(file, family, style, undefined, "Identity-H");
   });
   const glyphs = {
