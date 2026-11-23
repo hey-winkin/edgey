@@ -59,6 +59,7 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   await page.getByLabel("Tracking number").fill("SHIP-TEST-001");
   await page.getByRole("button", { name: "Record dispatch" }).click();
   await expect(page.getByText("SHIP-TEST-001", { exact: true })).toBeVisible();
+  await expect(page.getByText("Dispatch email", { exact: true }).locator("+ dd")).toHaveText("Queued");
   expect(submissions).toBe(2);
   const after = await stock();
   expect(after.data).toEqual({
@@ -68,6 +69,9 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   const movements = await db.from("stock_movements").select("on_hand_delta")
     .eq("order_id", order.id).eq("kind", "dispatch");
   expect(movements.data).toEqual([{ on_hand_delta: -order.quantity }]);
+  const dispatchMail = await db.from("order_outbox").select("state")
+    .eq("order_id", order.id).eq("message_key", "order_dispatched");
+  expect(dispatchMail.data).toEqual([{ state: "pending" }]);
 
   await page.unrouteAll({ behavior: "wait" });
   await page.getByLabel("Dispatched line").selectOption(order.variant.id);

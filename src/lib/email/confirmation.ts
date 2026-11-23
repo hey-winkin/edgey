@@ -22,7 +22,7 @@ const percent = new Intl.NumberFormat("en-GB", { style: "percent", maximumFracti
 const entities: Record<string, string> = {
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 };
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => entities[character]!);
+export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => entities[character]!);
 
 export function hostedStripeInvoice(value: string | null | undefined) {
   if (!value) return null;

@@ -365,6 +365,15 @@ test("Isolation and trials", async ({ db, page, browser, request }) => {
   expect(notices.filter(({ subject }) => subject.includes("approved"))).toHaveLength(1);
   expect(notices.filter(({ text }) => text.includes("Tracking number: ACCEPTANCE-TRIAL"))).toHaveLength(1);
   expect(notices.filter(({ text }) => text.includes("Confirmed matching holder."))).toHaveLength(0);
+  const trialNotice = notices.find(({ subject }) => subject === `Edgey trial pack dispatched: ${trialId}`)!;
+  expect(trialNotice.text).toContain("EDG-Z1");
+  expect(trialNotice.text).toContain("Delivery service: Tracked service\nCarrier: Fixture Carrier\nTracking number: ACCEPTANCE-TRIAL");
+  expect(trialNotice.text).toContain("10 Sample Street\nLondon\nSW1A 1AA");
+  expect(trialNotice.text).not.toContain("Track your parcel:");
+  expect(trialNotice.html).toContain("<h1>Trial pack dispatched</h1>");
+  await page.reload();
+  await expect(page.getByRole("table", { name: "Trial email status" }).getByRole("row")
+    .filter({ has: page.getByRole("rowheader", { name: "Dispatch", exact: true }) })).toContainText("Sent");
 
   const customer = await browser.newPage();
   try {
@@ -444,7 +453,10 @@ test("Delivery promises", async ({ browser, page, request }) => {
 
 test("Weekend staging — exact packet to confirmation and dispatch; only one buyer can buy the last blade", async ({ page, browser, db, request }) => {
   const sku = "EDG-MIM-A45";
+  const carrier = "Fixture Tracked Carrier";
   await db.query("update public.variants set stock_on_hand=1 where sku=$1", [sku]);
+  await db.query("insert into public.delivery_tracking_patterns (carrier, url_pattern) values ($1, $2)",
+    [carrier, "https://carrier.example.test/track?ref={tracking}"]);
   const other = await browser.newPage();
   try {
     await Promise.all([page, other].map(async (buyer) => {
@@ -471,7 +483,8 @@ test("Weekend staging — exact packet to confirmation and dispatch; only one bu
     await drainEmails(request);
     await visitSuccess(buyer, session);
     const reference = await receiptReference(buyer);
-    expect((await confirmation(won === 0 ? emailA : emailB)).text).toContain(`${sku} — 45°: 1 × £11.95`);
+    const recipient = won === 0 ? emailA : emailB;
+    expect((await confirmation(recipient)).text).toContain(`${sku} — 45°: 1 × £11.95`);
     await pickList(buyer, session.client_reference_id, reference);
     const lines = buyer.getByRole("table", { name: "Pick lines" });
     await expect(lines.getByRole("cell", { name: sku, exact: true })).toHaveCount(2);
@@ -479,8 +492,8 @@ test("Weekend staging — exact packet to confirmation and dispatch; only one bu
     await buyer.getByRole("link", { name: "Back to order" }).click();
     await buyer.getByRole("button", { name: "Start picking" }).click();
     await buyer.getByLabel("Carrier choice").selectOption({ label: "Other" });
-    await buyer.getByLabel("Carrier", { exact: true }).fill("Fixture Carrier");
-    const tracking = "ACCEPTANCE-" + randomUUID().slice(0, 8);
+    await buyer.getByLabel("Carrier", { exact: true }).fill(carrier);
+    const tracking = "ACCEPTANCE / " + randomUUID().slice(0, 8);
     await buyer.getByLabel("Tracking number").fill(tracking);
     await buyer.getByRole("button", { name: "Record dispatch" }).click();
     await expect(buyer.getByText(tracking, { exact: true })).toBeVisible();
@@ -491,8 +504,23 @@ test("Weekend staging — exact packet to confirmation and dispatch; only one bu
       where o.email in ($1,$2)
     `, [emailA, emailB]);
     expect(result.rows).toEqual([{ fulfilment_status: "dispatched", tracking_number: tracking, sku, on_hand_delta: -1, reserved_delta: -1 }]);
+    const mailStatus = buyer.getByText("Dispatch email", { exact: true }).locator("+ dd");
+    await expect(mailStatus).toHaveText("Queued");
+    await Promise.all([drainEmails(request), drainEmails(request)]);
+    await drainEmails(request);
+    await buyer.reload();
+    await expect(mailStatus).toHaveText("Sent");
+    const notices = await messagesTo(recipient);
+    expect(notices).toHaveLength(2);
+    const dispatch = notices.find(({ subject }) => subject === `Edgey order dispatched: ${reference}`)!;
+    const trackingLink = `https://carrier.example.test/track?ref=${encodeURIComponent(tracking)}`;
+    expect(dispatch.text).toContain(`${sku} — 45°: 1`);
+    expect(dispatch.text).toContain(`Delivery service: Next working day\nCarrier: ${carrier}\nTracking number: ${tracking}\nTrack your parcel: ${trackingLink}`);
+    expect(dispatch.text).toContain("Delivery address:\nAlex Morgan\n10 Sample Street\nLondon\nSW1A 1AA\nGB");
+    expect(dispatch.html).toContain(`<a href="${trackingLink}">Track your parcel</a>`);
   } finally {
     await other.close();
+    await db.query("delete from public.delivery_tracking_patterns where carrier = $1", [carrier]);
   }
 });
 

@@ -300,6 +300,23 @@ export type Database = {
                 Relationships: [
                 ];
             };
+            "delivery_tracking_patterns": {
+                Row: {
+                    "carrier": string;
+                    "url_pattern": string;
+                };
+                ComputedFields: never;
+                Insert: {
+                    "carrier": string;
+                    "url_pattern": string;
+                };
+                Update: {
+                    "carrier"?: string;
+                    "url_pattern"?: string;
+                };
+                Relationships: [
+                ];
+            };
             "enquiries": {
                 Row: {
                     "created_at": string;
@@ -541,6 +558,7 @@ export type Database = {
                     "attempt_count": number;
                     "created_at": string;
                     "delivery_uncertain": boolean;
+                    "dispatch_lines": Json | null;
                     "enquiry_id": string | null;
                     "id": string;
                     "last_error": string | null;
@@ -567,6 +585,7 @@ export type Database = {
                     "attempt_count"?: number;
                     "created_at"?: string;
                     "delivery_uncertain"?: boolean;
+                    "dispatch_lines"?: Json | null;
                     "enquiry_id"?: string | null;
                     "id"?: string;
                     "last_error"?: string | null;
@@ -592,6 +611,7 @@ export type Database = {
                     "attempt_count"?: number;
                     "created_at"?: string;
                     "delivery_uncertain"?: boolean;
+                    "dispatch_lines"?: Json | null;
                     "enquiry_id"?: string | null;
                     "id"?: string;
                     "last_error"?: string | null;
@@ -2757,6 +2777,16 @@ export type Database = {
                 };
                 Returns: string;
             };
+            "admin_order_mail_status": {
+                Args: {
+                    "p_order_id": string;
+                };
+                Returns: {
+                    "delivery_uncertain": boolean;
+                    "message_key": string;
+                    "state": Database["public"]['Enums']["order_message_state"];
+                }[];
+            };
             "admin_sales_report": {
                 Args: {
                     "p_from": string;
@@ -2953,6 +2983,7 @@ export type Database = {
                     "attempt_count": number;
                     "created_at": string;
                     "delivery_uncertain": boolean;
+                    "dispatch_lines": Json | null;
                     "enquiry_id": string | null;
                     "id": string;
                     "last_error": string | null;
@@ -3360,6 +3391,7 @@ export type Database = {
                     "attempt_count": number;
                     "created_at": string;
                     "delivery_uncertain": boolean;
+                    "dispatch_lines": Json | null;
                     "enquiry_id": string | null;
                     "id": string;
                     "last_error": string | null;
@@ -3943,6 +3975,7 @@ export type Database = {
                     "attempt_count": number;
                     "created_at": string;
                     "delivery_uncertain": boolean;
+                    "dispatch_lines": Json | null;
                     "enquiry_id": string | null;
                     "id": string;
                     "last_error": string | null;
@@ -3997,6 +4030,7 @@ export type Database = {
                     "attempt_count": number;
                     "created_at": string;
                     "delivery_uncertain": boolean;
+                    "dispatch_lines": Json | null;
                     "enquiry_id": string | null;
                     "id": string;
                     "last_error": string | null;

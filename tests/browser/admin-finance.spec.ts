@@ -1,10 +1,12 @@
-import { openStaffMenu } from "../helpers/navigation";
+import { openStaffMenu, switchTheme } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { formatGbp } from "../../src/lib/commerce";
 import { deleteStripeEventFixtures } from "../fixtures/stripe-events";
+import { scanAccessibility } from "../helpers/accessibility";
 import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
 
 test("finance sees cancellation without a refund and the separate flagged payment review", async ({ page }) => {
@@ -101,8 +103,8 @@ test("finance queues failed Stripe events and confirmations for the scheduled wo
     await signInStaff(page, await createLocalAdminUser("finance"));
     await page.goto("/admin/finance");
     const event = page.getByRole("table", { name: "Failed provider events" }).getByRole("row").filter({ hasText: id });
-    const message = page.getByRole("table", { name: "Confirmation outbox" }).getByRole("row").filter({ hasText: order.id });
-    await expect(message).toContainText(data.order_reference);
+    const message = page.getByRole("table", { name: "Order email outbox" }).getByRole("row").filter({ hasText: data.order_reference });
+    await expect(message).toContainText("Confirmation");
     await event.getByRole("button", { name: "Reprocess event" }).click();
     await expect(event).toContainText("Retry queued.");
     await message.getByRole("button", { name: "Resend confirmation" }).click();
@@ -113,5 +115,49 @@ test("finance queues failed Stripe events and confirmations for the scheduled wo
     await expect(message.getByRole("cell", { name: "Failed", exact: true })).toBeVisible();
   } finally {
     await deleteStripeEventFixtures([id], order.id);
+  }
+});
+
+test("dispatch mail status and Finance outbox remain usable across widths and themes", async ({ page }) => {
+  test.setTimeout(90_000);
+  const db = localAdminClient();
+  const staff = await createLocalAdminUser("warehouse");
+  const order = await seedPaidAdminOrder({ sku: "EDG-Z50" });
+  const roles = await db.from("staff_members").insert({ user_id: staff.id, role: "finance" });
+  if (roles.error) throw roles.error;
+  const operation = { p_order_id: order.id, p_actor_id: staff.id };
+  const picking = await db.rpc("start_picking", { ...operation, p_operation_key: randomUUID() });
+  if (picking.error) throw picking.error;
+  const dispatch = await db.rpc("dispatch_order", {
+    ...operation, p_operation_key: randomUUID(), p_carrier: "Fixture Carrier", p_tracking_number: "FIXTURE-TRACK-281",
+  });
+  if (dispatch.error) throw dispatch.error;
+  await signInStaff(page, staff);
+  const renders = process.env.EDGEY_DISPATCH_RENDERS;
+  if (renders) await mkdir(renders, { recursive: true });
+  for (const [path, view, label] of [
+    [`/admin/warehouse/${order.id}`, "warehouse", "Order status"],
+    ["/admin/finance", "finance", "Order email outbox"],
+  ] as const) {
+    await page.goto(path);
+    const section = page.getByRole("heading", { name: label, exact: true }).locator("..");
+    if (view === "finance") {
+      const rows = section.getByRole("row").filter({ hasText: order.reference });
+      await expect(rows).toHaveCount(2);
+      const dispatch = rows.filter({ has: page.getByRole("cell", { name: "Dispatch", exact: true }) });
+      await expect(dispatch).toContainText("Queued");
+      await expect(dispatch.getByRole("button")).toHaveCount(0);
+    } else {
+      await expect(section.getByText("Dispatch email", { exact: true }).locator("+ dd")).toHaveText("Queued");
+    }
+    for (const theme of ["light", "dark"] as const) {
+      await switchTheme(page, theme);
+      for (const width of [1440, 1280, 390, 320]) {
+        await page.setViewportSize({ width, height: width === 1440 ? 900 : 800 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+        await scanAccessibility(page, theme);
+        if (renders) await section.screenshot({ path: join(renders, `${view}-${theme}-${width}.png`) });
+      }
+    }
   }
 });

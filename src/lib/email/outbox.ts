@@ -4,13 +4,14 @@ import { getOrder, getOrderItems, paymentStore } from "@/lib/payments/store";
 import { getStripe } from "@/lib/payments/stripe";
 import type { Database } from "@/lib/supabase/database.types";
 import { hostedStripeInvoice, renderConfirmation } from "./confirmation";
+import { dispatchLines, renderDispatch } from "./dispatch";
 import { getEmailProvider, type SendResult } from "./provider";
 import {
   hasStaffDestination, requestEmailSource, requestFollowUp, requestReceipt, requestStaffEmail, requestStaffNotice,
 } from "./request-email";
 
 type Claim = Database["public"]["Tables"]["order_outbox"]["Row"];
-type EmailQueue = "order_confirmation" | "confirmation" | "staff_notification" | "request_follow_up";
+type EmailQueue = "order_confirmation" | "order_dispatched" | "confirmation" | "staff_notification" | "request_follow_up";
 type Outcome = SendResult["status"] | "defer_invoice" | "preparation_failed" | "configuration_error";
 
 type DeliveryStatus = "sent" | "failed" | "pending";
@@ -55,18 +56,38 @@ async function deliver(claim: Claim): Promise<DeliveryStatus> {
     const from = process.env.EMAIL_FROM?.trim();
     if (!from || /[\r\n]/.test(from)) return finish("configuration_error");
 
+    async function trackingPattern(carrier: string) {
+      const { data, error } = await db.from("delivery_tracking_patterns")
+        .select("url_pattern").eq("carrier", carrier).maybeSingle();
+      if (error) throw error;
+      return data?.url_pattern;
+    }
+
     if (claim.order_id) {
       const order = await getOrder(claim.order_id);
       if (!order) return finish("preparation_failed");
-      const invoice = order.payment_method === "card" ? await invoiceLink(order.provider_invoice_id) : null;
-      if (order.payment_method === "card" && !invoice && Date.now() - Date.parse(claim.created_at) < invoiceGraceMs) {
-        return finish("defer_invoice");
-      }
-      const items = await getOrderItems(order.id);
-      try {
-        payload = JSON.stringify(renderConfirmation(order, items, from, invoice));
-      } catch {
-        return finish("preparation_failed");
+      if (claim.message_key === "order_dispatched") {
+        if (!order.dispatched_at || !order.carrier || !order.tracking_number) return finish("preparation_failed");
+        const [items, pattern] = await Promise.all([getOrderItems(order.id), trackingPattern(order.carrier)]);
+        try {
+          payload = JSON.stringify(renderDispatch({
+            ...order, service: order.delivery_service, carrier: order.carrier,
+            tracking: order.tracking_number, reference: order.order_reference, kind: "order",
+          }, items, from, pattern));
+        } catch {
+          return finish("preparation_failed");
+        }
+      } else {
+        const invoice = order.payment_method === "card" ? await invoiceLink(order.provider_invoice_id) : null;
+        if (order.payment_method === "card" && !invoice && Date.now() - Date.parse(claim.created_at) < invoiceGraceMs) {
+          return finish("defer_invoice");
+        }
+        const items = await getOrderItems(order.id);
+        try {
+          payload = JSON.stringify(renderConfirmation(order, items, from, invoice));
+        } catch {
+          return finish("preparation_failed");
+        }
       }
     } else {
       const source = requestEmailSource(claim);
@@ -81,6 +102,23 @@ async function deliver(claim: Claim): Promise<DeliveryStatus> {
           const receipt = requestReceipt(from, data.email);
           if (!receipt) return finish("preparation_failed");
           ({ payload, recipientFingerprint } = receipt);
+        } else if (claim.message_key === "trial_dispatched" && claim.dispatch_lines != null) {
+          const lines = dispatchLines.safeParse(claim.dispatch_lines);
+          if (!lines.success) return finish("preparation_failed");
+          const { data: trial, error: trialError } = await db.from("trial_fulfilments")
+            .select("recipient_name,address_line1,address_line2,address_town,address_region,address_postcode,address_country,carrier,carrier_service,tracking_number")
+            .eq("trial_request_id", source.id).eq("state", "dispatched").maybeSingle();
+          if (trialError) throw trialError;
+          if (!trial?.tracking_number) return finish("preparation_failed");
+          const pattern = await trackingPattern(trial.carrier);
+          try {
+            payload = JSON.stringify(renderDispatch({
+              ...trial, email: data.email, service: trial.carrier_service, tracking: trial.tracking_number,
+              reference: source.id, kind: "trial",
+            }, lines.data, from, pattern));
+          } catch {
+            return finish("preparation_failed");
+          }
         } else {
           const followUp = requestFollowUp(from, data.email, claim.message_subject, claim.message_body);
           if (!followUp) return finish("preparation_failed");
@@ -108,6 +146,9 @@ async function claimEmail(queue: EmailQueue, orderId?: string, expectedVersion?:
   const { data, error } = await paymentStore().rpc("claim_outbox_email", {
     p_message_key: queue, p_replay_order_id: orderId, p_expected_updated_at: expectedVersion,
   });
+  if (queue === "order_dispatched" && error?.code === "22023" && error.message === "invalid_outbox_email_queue") {
+    return undefined;
+  }
   if (error) throw error;
   return data?.[0];
 }
@@ -126,7 +167,7 @@ async function processEmails(queues: EmailQueue[]) {
 }
 
 export function processOrderConfirmations() {
-  return processEmails(["order_confirmation"]);
+  return processEmails(["order_confirmation", "order_dispatched"]);
 }
 
 export function processRequestEmails() {

@@ -30,10 +30,10 @@ export async function financeOverview(db: SupabaseClient<Database>, pages: {
     db.from("provider_events").select("provider,event_id,event_type,state,last_error,updated_at")
       .eq("state", "failed").order("updated_at", { ascending: false }).order("provider").order("event_id")
       .range(...adminRange(pages.events)),
-    db.from("order_outbox").select("order_id,orders(order_reference),message_key,state,last_error,updated_at")
-      .eq("message_key", "order_confirmation").not("order_id", "is", null)
+    db.from("order_outbox").select("id,order_id,orders(order_reference),message_key,state,delivery_uncertain,last_error,updated_at")
+      .in("message_key", ["order_confirmation", "order_dispatched"]).not("order_id", "is", null)
       .in("state", ["pending", "failed"])
-      .order("state", { ascending: false }).order("updated_at", { ascending: false }).order("order_id")
+      .order("state", { ascending: false }).order("updated_at", { ascending: false }).order("id")
       .range(...adminRange(pages.outbox)),
     db.from("trade_accounts").select("id,buyer_name,status,credit_limit_pence,trade_applications(company)")
       .order("created_at", { ascending: false }).order("id").range(...adminRange(pages.accounts)),
@@ -56,7 +56,8 @@ export async function financeOverview(db: SupabaseClient<Database>, pages: {
   const [queued, contacts] = await Promise.all([
     listFinanceRetryRequests(db, [
       ...events.data.filter((event) => event.provider === "stripe").map((event) => event.event_id),
-      ...outbox.data.flatMap((message) => message.order_id && message.state === "failed" ? [message.order_id] : []),
+      ...outbox.data.flatMap((message) => message.message_key === "order_confirmation" &&
+        message.order_id && message.state === "failed" ? [message.order_id] : []),
     ]),
     overdueIds.length ? db.from("trade_accounts").select("id,trade_applications(company,email)").in("id", overdueIds) : null,
   ]);
