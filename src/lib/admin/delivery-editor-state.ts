@@ -3,6 +3,7 @@ import {
   MAX_DELIVERY_ROWS, parseDeliveryCost, parseDeliveryQuantity,
   type DeliveryCommitInput, type DeliveryMatch,
 } from "./deliveries";
+import type { PurchaseReceiptTarget, PurchaseVariance } from "./purchase-orders";
 
 export type EditorRow = {
   id: number;
@@ -11,6 +12,7 @@ export type EditorRow = {
   unitCost: string;
   sourceRow?: number;
   selectedId?: string;
+  plannedVariantId?: string;
 };
 export type DeliveryDraft = {
   id: string;
@@ -26,7 +28,8 @@ export type EditorState = {
   draft: DeliveryDraft;
   matches: DeliveryMatch[];
   checkedCodes?: string[];
-  review?: { input: DeliveryCommitInput; lines: ReviewedLine[]; previous: RecentDelivery };
+  purchase?: PurchaseReceiptTarget;
+  review?: { input: DeliveryCommitInput; lines: ReviewedLine[]; previous: RecentDelivery; variances?: PurchaseVariance[] };
   error?: string;
   errorAt?: string;
   retryOnly?: boolean;
@@ -42,6 +45,16 @@ export function blankDeliveryRow(id: number): EditorRow {
 
 export function makeDeliveryEditorState(id: string, today: string): EditorState {
   return { draft: { id, reference: "", receivedOn: today, note: "", paste: "", rows: [blankDeliveryRow(1)] }, matches: [] };
+}
+
+export function makePurchaseReceiptState(id: string, today: string, order: PurchaseReceiptTarget): EditorState {
+  const state = makeDeliveryEditorState(id, today);
+  const outstanding = order.lines.filter((line) => line.outstanding > 0);
+  state.purchase = order;
+  state.draft.rows = outstanding.length ? outstanding.map((line, index) => ({
+    id: index + 1, code: line.sku, quantity: String(line.outstanding), unitCost: "", plannedVariantId: line.variantId,
+  })) : state.draft.rows;
+  return state;
 }
 
 export function deliveryRowIds(rows: readonly EditorRow[]) {
@@ -99,16 +112,23 @@ export function groupDeliveryMatches(codes: string[], matches: DeliveryMatch[]) 
   return grouped;
 }
 
-export function readDeliveryRows(rows: EditorRow[], checks: Map<string, Check>, showCosts: boolean) {
+export function readDeliveryRows(rows: EditorRow[], checks: Map<string, Check>, showCosts: boolean, purchase?: PurchaseReceiptTarget) {
   const seen = new Map<string, number>();
+  const planned = new Map(purchase?.lines.map((line) => [line.variantId, line]));
   return rows.map((row, index) => {
     const code = row.code.trim();
     const active = Boolean(row.sourceRow || code || row.quantity.trim() || (showCosts && row.unitCost.trim()));
-    const check = checks.get(code);
+    const plannedLine = row.plannedVariantId && planned.get(row.plannedVariantId);
+    const check = plannedLine
+      ? plannedLine.sku === code
+        ? [{ inputCode: code, sku: code, variantId: plannedLine.variantId, bladeName: plannedLine.bladeName }]
+        : { error: "This purchase order line changed. Reopen the order before receiving it." }
+      : checks.get(code);
     const matches = Array.isArray(check) ? check : [];
     const match = matches.length === 1 ? matches[0] : matches.find(({ variantId }) => variantId === row.selectedId);
-    const earlier = match && seen.get(match.variantId);
-    if (match && earlier === undefined) seen.set(match.variantId, index + 1);
+    const omitted = Boolean(plannedLine && match && /^(?:0+)?$/.test(row.quantity.trim()));
+    const earlier = !omitted && match ? seen.get(match.variantId) : undefined;
+    if (!omitted && match && earlier === undefined) seen.set(match.variantId, index + 1);
     const quantity = parseDeliveryQuantity(row.quantity);
     const unitCostPence = showCosts ? parseDeliveryCost(row.unitCost) : null;
     const invalidCode = active && (deliveryCodeError(code)
@@ -118,7 +138,7 @@ export function readDeliveryRows(rows: EditorRow[], checks: Map<string, Check>, 
     const duplicate = earlier ? `Same blade as line ${earlier}. Combine the quantities and remove this line.` : undefined;
     const invalidCost = showCosts && Boolean(row.unitCost.trim()) && unitCostPence === null;
     const ready = Boolean(active && match && !invalidCode && !duplicate && quantity !== null && !invalidCost);
-    return { row, active, match, matches, quantity, unitCostPence, invalidCode, invalidMatch, duplicate, invalidCost, ready };
+    return { row, active, match, matches, quantity, unitCostPence, invalidCode, invalidMatch, duplicate, invalidCost, ready, omitted };
   });
 }
 
@@ -138,6 +158,7 @@ export function readDeliveryDraft(form: FormData, showCosts: boolean): DeliveryD
       quantity: text(`quantity:${id}`, MAX_DELIVERY_CODE_LENGTH),
       unitCost: showCosts ? text(`unitCost:${id}`, MAX_DELIVERY_CODE_LENGTH) : "",
       sourceRow: /^[1-9]\d{0,5}$/.test(sourceRow) ? Number(sourceRow) : undefined,
+      plannedVariantId: text(`planned:${id}`, 36) || undefined,
       selectedId: text(`selectedCode:${id}`, MAX_DELIVERY_CODE_LENGTH) === code.trim()
         ? text(`selectedId:${id}`, 36) || undefined : undefined,
     };

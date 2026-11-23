@@ -8,6 +8,7 @@ import {
   MAX_DELIVERY_IMPORT_BYTES, MAX_DELIVERY_ROWS, type DeliveryCommitInput, type DeliveryMatch,
 } from "@/lib/admin/deliveries";
 import { parseDeliveryTable } from "@/lib/admin/delivery-import";
+import type { PurchaseReceiptTarget } from "@/lib/admin/purchase-orders";
 import { canManageCosts, stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 
 const referenceSchema = z.string().trim().min(1).max(MAX_DELIVERY_CODE_LENGTH)
@@ -127,5 +128,38 @@ export async function commitDelivery(input: DeliveryCommitInput) {
   }
   revalidatePath("/admin/stock");
   revalidatePath("/admin/stock/deliveries");
+  return { ok: true, id: data } as const;
+}
+
+export async function commitPurchaseDelivery(target: Pick<PurchaseReceiptTarget, "id" | "revision">, input: DeliveryCommitInput) {
+  const refused = (message: string, retryOnly = false) => ({ ...fail(message), retryOnly });
+  const staff = await staffSession();
+  if (!staff?.roles.includes("warehouse")) return refused("Warehouse access is required to receive a delivery.", true);
+  const parsed = commitSchema.safeParse(input);
+  if (!z.guid().safeParse(target?.id).success || !Number.isInteger(target?.revision) || target.revision < 1 ||
+      !parsed.success || parsed.data.lines.some(({ unitCostPence }) => unitCostPence !== null)) {
+    return refused("Check the purchase order and the quantities received.");
+  }
+  const { id, reference, receivedOn, note, lines } = parsed.data;
+  const { data, error } = await staff.db.rpc("receive_staff_purchase_order", {
+    p_order_id: target.id, p_expected_revision: target.revision, p_delivery_id: id, p_reference: reference,
+    p_received_on: receivedOn, p_note: note, p_lines: lines.map(({ variantId, quantity }) => ({ variant_id: variantId, quantity })),
+  });
+  if (error) {
+    if (error.message === "purchase_order_stale") return refused("The purchase order changed. Reopen it to check what is still outstanding before receiving stock.");
+    if (error.message === "purchase_order_not_receivable") return refused("This purchase order is no longer open for receiving.");
+    if (error.message === "operation_key_conflict") return refused("This delivery may already be recorded. Check delivery history before trying again.", true);
+    if (error.message === "delivery_stock_overflow") return refused("A quantity would put a blade over its stock limit. Check the quantities.");
+    if (error.message === "delivery_variant_unavailable") return refused("A blade is no longer available to receive. Set its quantity to zero or ask the buyer to review the order.");
+    if (error.code === "42501") return refused("Your staff access has changed. Check your roles before trying again.", true);
+    if (stockSchemaUnavailable(error)) return refused("Purchase-order receiving is not available yet. No stock was received.");
+    if (error.code === "22023") return refused("No stock was received. Check the purchase order and the delivery lines.");
+    return refused("Could not confirm that stock was received. Retry this review or check delivery history before starting again.", true);
+  }
+  revalidatePath("/admin/stock");
+  revalidatePath("/admin/stock/deliveries");
+  revalidatePath("/admin/purchase-orders");
+  revalidatePath(`/admin/purchase-orders/${target.id}`);
+  revalidatePath("/admin/catalogue");
   return { ok: true, id: data } as const;
 }

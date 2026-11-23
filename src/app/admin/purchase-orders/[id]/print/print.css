@@ -1,0 +1,134 @@
+.po-document {
+  margin-block: 24px;
+  border: 1px solid var(--line);
+  padding: clamp(16px, 4vw, 48px);
+  overflow-wrap: anywhere;
+}
+
+.po-document .admin-heading {
+  margin-top: 0;
+}
+
+.po-document h2 {
+  margin-block: 0 12px;
+  font: .83rem/1.5 var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.po-document-reference {
+  max-width: 36rem;
+}
+
+.po-document-warning {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  font-weight: 650;
+}
+
+.po-document-parties {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 18px;
+  margin-block: 24px;
+}
+
+.po-document .po-document-table {
+  min-width: 40rem;
+}
+
+.po-document-table th:nth-child(n + 4),
+.po-document-table td:nth-child(n + 4) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.po-document-table th:nth-child(4) {
+  min-width: 0;
+}
+
+.po-document-line-note {
+  margin-block-start: 6px;
+}
+
+.po-document-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  margin-block-start: 16px;
+  border-block-start: 1px solid var(--line);
+  padding-block-start: 12px;
+}
+
+.po-document-summary p {
+  margin: 0;
+}
+
+.po-document-summary p:nth-child(2) {
+  text-align: right;
+}
+
+.po-document-terms {
+  grid-column: 1 / -1;
+}
+
+@page purchase-order {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  body:has(.po-document) > :not(.po-document, :has(.po-document)),
+  body :has(.po-document) > :not(.po-document, :has(.po-document)) {
+    display: none !important;
+  }
+
+  body:has(.po-document),
+  body :has(.po-document),
+  .po-document {
+    display: block;
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    background: white;
+    color: black;
+  }
+
+  .po-document {
+    page: purchase-order;
+    --line: #777;
+  }
+
+  .po-document * {
+    background: transparent !important;
+    color: black !important;
+    overflow: visible;
+  }
+
+  .po-document .admin-heading h1 {
+    font-size: 24pt;
+  }
+
+  .po-document .po-document-table,
+  .po-document .po-document-table th {
+    min-width: 0;
+  }
+
+  .po-document .po-document-table :is(th, td) {
+    padding: 5px;
+  }
+
+  .po-document thead {
+    display: table-header-group;
+  }
+
+  .po-document tr,
+  .po-document-party,
+  .po-document-summary {
+    break-inside: avoid;
+  }
+}

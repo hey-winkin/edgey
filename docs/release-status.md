@@ -12,6 +12,8 @@ The admin extension adds GBP tier editing with VAT, staff-only supplier and land
 
 Staff desk → Sales adds period comparisons, booked product revenue, estimated margin for finance, refund and credit totals, and stock cover. Daily and product CSVs use the same staff permissions. Apply the additive Sales migration during a quiet window for the order and stock indexes; the dashboard shows an unavailable notice if the app deploys first. Sales reporting and the demo dataset have not been verified on hosted staging.
 
+LUK-85 adds staff purchase orders and a private supplier register. Supplier identity and contact details live on the purchasing side; standalone receipt cost and stock movement records still do not store them. Mark a PO as sent to release the final copy, then print or export it and send it yourself. Prices and merchandise totals exclude VAT, and import VAT is tracked separately for landed cost. The copy uses current supplier and buyer contact details, so keep the exact copy sent to the supplier. Apply both purchase migrations in order before verifying on hosted staging.
+
 ## Hosted staging evidence (21 November 2026)
 
 `edgey-staging` runs on Vercel Pro from [GitHub `main`](https://github.com/hey-winkin/edgey/tree/main), on Node `24.x` pinned by `engines.node`. It uses the committed `vercel.json` and native one-minute Vercel Cron. All Deployments protection is on. Automatic deploys from `main` are enabled, but the first automatic deploy has not yet been observed. Pull request previews are disabled. The apex `edgey.site` and `www.edgey.site` are reserved for the live shop.

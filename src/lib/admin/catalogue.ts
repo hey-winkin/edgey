@@ -108,7 +108,7 @@ export async function getAdminCatalogueVariant(id: string) {
 
 export async function getAdminCataloguePricing(id: string) {
   const { data, error } = await serviceClient().from("variants")
-    .select("sku, option_label, price_1_4_pence, price_5_9_pence, price_10_plus_pence, products(name)")
+    .select("sku, option_label, publication_status, price_1_4_pence, price_5_9_pence, price_10_plus_pence, products(name)")
     .eq("id", id).maybeSingle();
   if (error) throw new Error("Could not load the variant prices.");
   return data;
