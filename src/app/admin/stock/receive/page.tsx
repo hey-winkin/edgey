@@ -41,7 +41,7 @@ export default async function ReceiveDeliveryPage({ searchParams }: { searchPara
             : "Record the blades that arrived together. Stock changes only after you review and receive the delivery."}
         />
         <nav className={styles.navigation} aria-label="Stock navigation">
-          <AdminLink href="/admin/stock">{staffDestinationLabels.stockLevels}</AdminLink>
+          <AdminLink href="/admin/stock">{staffDestinationLabels.adjustStock}</AdminLink>
           <AdminLink href="/admin/stock/deliveries">{staffDestinationLabels.deliveryHistory}</AdminLink>
           {po && <AdminLink href={`/admin/purchase-orders/${po}`}>Purchase order</AdminLink>}
         </nav>
@@ -51,7 +51,7 @@ export default async function ReceiveDeliveryPage({ searchParams }: { searchPara
         : target?.kind === "unavailable"
           ? <AdminNotice>Purchase-order receiving is not available yet.</AdminNotice>
         : error
-        ? <AdminNotice>Delivery receiving is not available yet. Use {staffDestinationLabels.stockLevels} to receive individual blades.</AdminNotice>
+        ? <AdminNotice>Delivery receiving is not available yet. Use {staffDestinationLabels.adjustStock} to receive individual blades.</AdminNotice>
         : <>
             <script dangerouslySetInnerHTML={{ __html: captureEarlyDeliveryText }} />
             <DeliveryEditor initial={initial} showCosts={showCosts && !purchase} today={today} />

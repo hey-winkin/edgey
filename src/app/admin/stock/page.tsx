@@ -13,7 +13,7 @@ type StockProps = { searchParams: Promise<{ page?: string; view?: string }> };
 const outOfStockTitle = "Out of stock";
 
 export async function generateMetadata({ searchParams }: StockProps) {
-  return { title: (await searchParams).view === "out-of-stock" ? outOfStockTitle : labels.stockLevels };
+  return { title: (await searchParams).view === "out-of-stock" ? outOfStockTitle : labels.adjustStock };
 }
 
 export default async function StockPage({ searchParams }: StockProps) {
@@ -28,14 +28,15 @@ export default async function StockPage({ searchParams }: StockProps) {
   return (
     <>
       <AdminHeading
-        title={outOfStock ? outOfStockTitle : labels.stockLevels}
+        title={outOfStock ? outOfStockTitle : labels.adjustStock}
         eyebrow="Warehouse"
         description={outOfStock ? "Published blade variants with no units available." :
           "Check what’s available and what’s on order. Choose a blade to adjust stock or see its movements."}
       />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         {showOrderStock && <OrderStockLink />}
-        {outOfStock && <AdminLink href="/admin/stock">Show all stock</AdminLink>}
+        {outOfStock && <AdminLink href="/admin/stock">{labels.adjustStock}</AdminLink>}
+        {hasPurchasingRole(roles) && <AdminLink href="/admin/catalogue">{labels.stock}</AdminLink>}
         <AdminLink href="/admin/stock/receive">{labels.bookInDelivery}</AdminLink>
         <AdminLink href="/admin/purchase-orders">{labels.purchaseOrders}</AdminLink>
         <AdminLink href="/admin/stock/deliveries">{labels.deliveryHistory}</AdminLink>

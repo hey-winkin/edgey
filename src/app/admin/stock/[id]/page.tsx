@@ -5,6 +5,7 @@ import { CostFields } from "@/app/admin/cost-fields";
 import { requireStaff } from "@/lib/admin/auth";
 import { formatSupplierCost, isStockAdjustmentReason, stockAdjustmentReasons } from "@/lib/admin/stock-cost";
 import { canManageCosts, getStaffReceiptCosts } from "@/lib/admin/stock-cost-data";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { getStockVariant } from "@/lib/admin/warehouse";
 import { runWarehouseAction } from "@/lib/admin/warehouse-actions";
 import { isWarehouseId, movementTime, warehouseLabel, warehousePage } from "@/lib/admin/warehouse-format";
@@ -35,7 +36,7 @@ export default async function StockVariantPage({ params, searchParams }: {
   return (
     <>
       <AdminHeading title={variant.sku} eyebrow="Stock variant" description={variant.option_label || variant.tool || undefined} />
-      <div><AdminLink href="/admin/stock">All variant balances</AdminLink></div>
+      <div><AdminLink href="/admin/stock">{staffDestinationLabels.adjustStock}</AdminLink></div>
       <AdminSection title="Current balance">
         <dl className="admin-spec">
           <dt>On hand</dt><dd className="admin-mono">{variant.stock_on_hand}</dd>

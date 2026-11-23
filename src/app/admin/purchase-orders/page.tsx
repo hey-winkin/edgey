@@ -48,9 +48,9 @@ export default async function PurchaseOrders({ searchParams }: PurchaseOrdersPro
         {blade.option_label && <span>{blade.option_label}</span>}</p>}
       <nav className={styles.links} aria-label="Purchase order navigation">
         {showCosts && !orders.error && <OrderStockLink variant={variantId ? { id: variantId } : undefined} />}
-        {blade ? <AdminLink href="/admin/catalogue">{labels.productsAndPrices}</AdminLink>
+        {blade ? <AdminLink href="/admin/catalogue">{labels.stock}</AdminLink>
           : <>
-              {roles.includes("warehouse") && <AdminLink href="/admin/stock">{labels.stockLevels}</AdminLink>}
+              {roles.includes("warehouse") && <AdminLink href="/admin/stock">{labels.adjustStock}</AdminLink>}
               {showCosts && !orders.error && <>
                 <AdminLink href={`${pathname}/suppliers`}>{labels.suppliers}</AdminLink>
                 <AdminLink href={`${pathname}/settings`}>Buyer settings</AdminLink>

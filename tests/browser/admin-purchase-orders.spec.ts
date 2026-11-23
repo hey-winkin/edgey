@@ -87,7 +87,7 @@ test("stock ordering is available to warehouse staff who can manage purchase ord
         await expect(selected).toContainText(label);
 
         await page.goto("/admin/stock");
-        await expect(heading(page, "Stock levels")).toBeVisible();
+        await expect(heading(page, "Adjust stock")).toBeVisible();
         await expect(page.getByRole("link", { name: /^Order stock(?: for .+)?$/ })).toHaveCount(0);
         await db.query("delete from public.staff_members where user_id = $1 and role = $2", [staff.id, role]);
       });

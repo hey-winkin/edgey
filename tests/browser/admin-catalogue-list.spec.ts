@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { createLocalAdminUser } from "../../scripts/seed-admin";
+import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { connectAccountDb } from "../helpers/account-fixture";
 import { setVerifiedStaffSession } from "./admin-fixtures";
 
@@ -42,13 +42,13 @@ test("staff can search the catalogue and page through the filtered variant summa
 
     await setVerifiedStaffSession(page, staff, baseURL);
     await page.goto("/admin/catalogue");
-    const filters = page.getByRole("search", { name: "Catalogue filters" });
+    const filters = page.getByRole("search", { name: "Stock filters" });
     await filters.getByLabel("Search by code").fill(partCode.replace("-", "").toUpperCase());
     await filters.getByLabel("Status").selectOption("draft");
     await filters.getByLabel("Brand").selectOption("zund");
     await filters.getByRole("button", { name: "Apply filters" }).click();
 
-    const table = page.getByRole("table", { name: "Catalogue variants" });
+    const table = page.getByRole("table", { name: "Stock variants" });
     const first = table.getByRole("row").filter({ hasText: sku("01") });
     await expect(table.getByRole("row")).toHaveCount(51);
     await expect(first).toHaveCount(1);
@@ -57,7 +57,26 @@ test("staff can search the catalogue and page through the filtered variant summa
     }
     for (const index of ["00", "51", "52"]) await expect(table.getByText(sku(index))).toHaveCount(0);
 
-    await page.getByRole("link", { name: "Next page" }).click();
+    const selectFirst = table.getByRole("checkbox", { name: `Select ${sku("01")}`, exact: true });
+    const selectLast = table.getByRole("checkbox", { name: `Select ${sku("51")}`, exact: true });
+    const nextPage = page.getByRole("button", { name: "Next page", exact: true });
+    const previousPage = page.getByRole("button", { name: "Previous page", exact: true });
+    const selectedCount = (count: number) => page.getByText(`${count} ${count === 1 ? "blade" : "blades"} selected`, { exact: true });
+    await page.getByRole("button", { name: "Select all matching blades", exact: true }).click();
+    await expect(selectFirst).toBeChecked();
+    await expect(selectedCount(51)).toBeVisible();
+    await nextPage.click();
+    await expect(selectLast).toBeChecked();
+    await expect(selectedCount(51)).toBeVisible();
+    await page.getByRole("button", { name: "Clear selection", exact: true }).click();
+    await expect(page).not.toHaveURL(/selected=/);
+    await previousPage.click();
+    await expect(selectFirst).not.toBeChecked();
+    await selectFirst.focus();
+    await page.keyboard.press("Space");
+    await expect(selectFirst).toBeChecked();
+    await expect(selectedCount(1)).toBeVisible();
+    await nextPage.click();
     await expect(table.getByRole("row")).toHaveCount(2);
     const last = table.getByRole("row").filter({ hasText: sku("51") });
     await expect(last.getByText("Not set")).toBeVisible();
@@ -65,17 +84,25 @@ test("staff can search the catalogue and page through the filtered variant summa
     await expect(last).not.toContainText("£9.87");
     await expect(filters.getByLabel("Status")).toHaveValue("draft");
     await expect(filters.getByLabel("Brand")).toHaveValue("zund");
-    await expect(page.getByRole("link", { name: "Next page" })).toHaveCount(0);
-    await page.getByRole("link", { name: "Previous page" }).click();
+    await expect(nextPage).toHaveCount(0);
+    await expect(selectedCount(1)).toBeVisible();
+    await selectLast.check();
+    await expect(selectedCount(2)).toBeVisible();
+    await previousPage.click();
     await expect(first).toBeVisible();
+    await expect(selectFirst).toBeChecked();
+    await expect(selectedCount(2)).toBeVisible();
 
     await filters.getByLabel("Search by code").fill(sku("01").toLowerCase().replaceAll("-", " "));
     await filters.getByLabel("Brand").selectOption("summa");
     await filters.getByRole("button", { name: "Apply filters" }).click();
     await expect(page.getByText("No catalogue variants match these filters.")).toBeVisible();
+    await expect(selectedCount(2)).toBeVisible();
     await filters.getByLabel("Brand").selectOption("zund");
     await filters.getByRole("button", { name: "Apply filters" }).click();
     await expect(first).toBeVisible();
+    await expect(selectFirst).toBeChecked();
+    await expect(selectedCount(2)).toBeVisible();
 
     const directory = process.env.EDGEY_CATALOGUE_LIST_RENDERS;
     const lightTheme = page.getByRole("switch", { name: "Light theme" });
@@ -92,10 +119,13 @@ test("staff can search the catalogue and page through the filtered variant summa
         if (directory) await page.screenshot({ path: join(directory, `catalogue-list-${width}-${theme}.png`) });
       }
     }
-    await page.getByRole("link", { name: "Clear filters" }).click();
+    await page.getByRole("button", { name: "Clear filters" }).click();
     await expect(filters.getByLabel("Search by code")).toHaveValue("");
     await expect(filters.getByLabel("Status")).toHaveValue("");
     await expect(filters.getByLabel("Brand")).toHaveValue("");
+    await expect(selectedCount(2)).toBeVisible();
+    await page.getByRole("button", { name: "Clear selection", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Order stock", exact: true })).toBeHidden();
   } finally {
     try {
       await db.query(`delete from public.staff_variant_costs where variant_id in
@@ -104,6 +134,47 @@ test("staff can search the catalogue and page through the filtered variant summa
       await db.query("delete from public.products where id = $1", [id]);
     } finally {
       await db.end();
+      await localAdminClient().auth.admin.deleteUser(staff.id);
+    }
+  }
+});
+
+test("select all matching uses the current filters and preserves the prior selection at the line limit", async ({ page, baseURL }) => {
+  const db = await connectAccountDb();
+  const id = randomUUID();
+  const prefix = `ZZ-BULK-${id.slice(0, 8).toUpperCase()}`;
+  const staff = await createLocalAdminUser("catalogue");
+  try {
+    await db.query(`
+      with family as (
+        insert into public.products (id, family_code, slug, name, tool_category)
+        values ($1, $2, lower($2), 'Bulk stock fixture', 'drag') returning id
+      )
+      insert into public.variants (product_id, sku)
+      select family.id, $2 || '-' || lpad(n::text, 3, '0')
+      from family cross join generate_series(1, 201) as n
+    `, [id, prefix]);
+    await setVerifiedStaffSession(page, staff, baseURL);
+    await page.goto(`/admin/catalogue?q=${prefix}`);
+    const match = page.getByRole("button", { name: "Select all matching blades", exact: true });
+    const first = page.getByRole("checkbox", { name: `Select ${prefix}-001`, exact: true });
+    await first.check();
+    await match.click();
+    await expect(page.getByRole("status").filter({ hasText: "would exceed the 200-blade limit" })).toBeVisible();
+    await expect(first).toBeChecked();
+    await expect(page.getByText("1 blade selected", { exact: true })).toBeVisible();
+    await page.getByRole("searchbox", { name: "Search by code" }).fill(`${prefix}-201`);
+    await match.click();
+    await expect(page.getByRole("checkbox", { name: `Select ${prefix}-201`, exact: true })).toBeChecked();
+    await expect(first).toHaveCount(0);
+    await expect(page.getByText("2 blades selected", { exact: true })).toBeVisible();
+  } finally {
+    try {
+      await db.query("delete from public.variants where product_id = $1", [id]);
+      await db.query("delete from public.products where id = $1", [id]);
+    } finally {
+      await db.end();
+      await localAdminClient().auth.admin.deleteUser(staff.id);
     }
   }
 });

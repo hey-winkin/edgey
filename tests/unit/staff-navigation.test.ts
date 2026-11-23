@@ -33,12 +33,12 @@ test("staff destinations are ordered by job without exposing their role or task 
     { title: "Purchasing", links: [
       { label: "Purchase orders", href: "/admin/purchase-orders" },
       { label: "Suppliers", href: "/admin/purchase-orders/suppliers" },
+      { label: "Stock", href: "/admin/catalogue" },
       { label: "Book in a delivery", href: "/admin/stock/receive" },
-      { label: "Stock levels", href: "/admin/stock" },
+      { label: "Adjust stock", href: "/admin/stock" },
       { label: "Delivery history", href: "/admin/stock/deliveries" },
     ] },
     { title: "Admin", links: [
-      { label: "Products and prices", href: "/admin/catalogue" },
       { label: "Customer delivery settings", href: "/admin/delivery" },
       { label: "Sales reports", href: "/admin/sales" },
       { label: "Finance and trade accounts", href: "/admin/finance" },
@@ -52,14 +52,14 @@ test("groups retain the route permissions and suppress an empty group", () => {
     Object.fromEntries(staffNavigation(roles).map(({ title, links }) => [title, links.map(({ label }) => label)]));
   expect(labels(["warehouse"])).toEqual({
     "Sales orders": ["New sales orders", "Customer enquiries", "Past sales orders"],
-    Purchasing: ["Purchase orders", "Book in a delivery", "Stock levels", "Delivery history"],
+    Purchasing: ["Purchase orders", "Book in a delivery", "Adjust stock", "Delivery history"],
     Admin: ["Customer delivery settings", "Sales reports", "Shop performance"],
   });
   expect(labels(["catalogue"])).toEqual({
-    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Delivery history"], Admin: ["Products and prices", "Sales reports"],
+    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Sales reports"],
   });
   expect(labels(["finance"])).toEqual({
-    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Delivery history"], Admin: ["Products and prices", "Sales reports", "Finance and trade accounts"],
+    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Sales reports", "Finance and trade accounts"],
   });
   expect(labels([])).toEqual({ "Sales orders": ["Customer enquiries"], Admin: ["Sales reports"] });
 });
@@ -72,6 +72,10 @@ test("history and record paths select exactly one permitted destination", () => 
     .toEqual({ title: "Sales orders", href: "/admin/warehouse", state: "location" });
   expect(staffLocation(groups, "/admin/stock/receive", null))
     .toEqual({ title: "Purchasing", href: "/admin/stock/receive", state: "page" });
+  expect(staffLocation(groups, "/admin/catalogue/id", null))
+    .toEqual({ title: "Purchasing", href: "/admin/catalogue", state: "location" });
+  expect(staffLocation(groups, "/admin/stock", "out-of-stock"))
+    .toEqual({ title: "Purchasing", href: "/admin/stock", state: "page" });
   expect(staffLocation(groups, "/admin/stock/deliveries/id", null))
     .toEqual({ title: "Purchasing", href: "/admin/stock/deliveries", state: "location" });
   expect(staffLocation(groups, "/admin/purchase-orders/id/print", null))
