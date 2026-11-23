@@ -67,7 +67,7 @@ test("staff need an independently approved authenticator and private pages prohi
   expect(stockRedirect?.headers()).toMatchObject({
     "x-frame-options": "DENY",
     "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    "referrer-policy": "same-origin",
     "permissions-policy": expect.stringContaining("microphone=()"),
     "content-security-policy": expect.stringContaining("frame-ancestors 'none'"),
     "cache-control": expect.stringContaining("no-store"),

@@ -161,8 +161,9 @@ test("warehouse releases a fully refunded allocation without changing its paymen
     await page.goto("/admin/warehouse?view=blocked");
     await page.getByRole("link", { name: order.reference, exact: true }).click();
     await expect(page.getByRole("button", { name: "Start picking" })).toHaveCount(0);
+    await page.locator("summary").filter({ hasText: /^Cancel and release allocation$/ }).click();
     await page.getByLabel("I confirm the order has not left the warehouse").check();
-    await page.getByRole("button", { name: "Cancel and release allocation" }).click();
+    await page.getByRole("button", { name: "Confirm cancel and release allocation" }).click();
     await expect(page.getByText("Fulfilment cancelled and the allocation released.", { exact: false })).toBeVisible();
     expect((await db.query(`select o.payment_status, o.fulfilment_status, o.refunded_pence = o.gross_pence as fully_refunded,
       (select count(*)::int from public.stock_movements where order_id = o.id and kind = 'release') as releases

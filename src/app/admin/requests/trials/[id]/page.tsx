@@ -114,8 +114,11 @@ export default async function TrialPage({ params, searchParams }: {
           </AdminForm> : <AdminNotice>No published variants currently have available stock.</AdminNotice>}
       </AdminSection>
       <AdminSection title="Decline">
-        <AdminForm action={handleTrial.bind(null, { kind: "declined", id, version: trial.updated_at })} submit="Decline trial">
-          <p>Record why this trial isn’t eligible. The reason stays with staff; the customer gets a neutral notice.</p>
+        <AdminForm action={handleTrial.bind(null, { kind: "declined", id, version: trial.updated_at })} submit="Decline trial"
+          confirmation={{
+            description: "This ends the trial request and queues a notice to the customer. The reason stays with staff.",
+            label: "I confirm this trial request should be declined.",
+          }}>
           <AdminField label="Decline reason"><RequestTextarea name="reason" rows={3} /></AdminField>
         </AdminForm>
       </AdminSection>
@@ -160,23 +163,22 @@ export default async function TrialPage({ params, searchParams }: {
         </AdminForm>
       </AdminSection>
       <AdminSection title="Cancel before dispatch">
-        <AdminForm action={handleTrial.bind(null, { kind: "cancel", id })} submit="Cancel trial">
-          <p>Cancellation releases both units back into available stock.</p>
-          <label className="admin-check"><input type="checkbox" name="confirm" value="yes" required /> Confirm cancellation</label>
-        </AdminForm>
+        <AdminForm action={handleTrial.bind(null, { kind: "cancel", id })} submit="Cancel trial"
+          confirmation={{
+            description: "This cancels the trial and releases both units back into available stock.",
+            label: "I confirm this trial should be cancelled and its units released.",
+          }} />
       </AdminSection>
     </div>}
     {fulfilment?.subsequent_order_id && <AdminSection title="Linked order">
       <AdminLink href={`/admin/warehouse/${fulfilment.subsequent_order_id}`}>{references.get(fulfilment.subsequent_order_id) ?? "View linked order"}</AdminLink>
-      <details className="admin-panel admin-narrow mt-3">
-        <summary>Correct an order link</summary>
-        <div className="mt-3">
-          <AdminForm action={handleTrial.bind(null, { kind: "unlink", id, orderId: fulfilment.subsequent_order_id })} submit="Remove order link">
-            <p>Removing this link updates the trial purchase count. It does not change the order or the trial dispatch.</p>
-            <label className="admin-check"><input type="checkbox" name="confirm" value="yes" required /> Confirm link removal</label>
-          </AdminForm>
-        </div>
-      </details>
+      <div className="admin-narrow">
+        <AdminForm action={handleTrial.bind(null, { kind: "unlink", id, orderId: fulfilment.subsequent_order_id })} submit="Remove order link"
+          confirmation={{
+            description: "Removing this link updates the trial purchase count. It does not change the order or the trial dispatch.",
+            label: "I confirm this trial and order should no longer be linked.",
+          }} />
+      </div>
     </AdminSection>}
     {linking && <AdminSection title="Link a subsequent order">
       <p className="admin-muted mb-3">Confirm the buyer and that the order followed this trial. A matching email is only a lead, even on an order placed by a signed-in buyer.</p>

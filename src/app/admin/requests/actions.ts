@@ -86,6 +86,7 @@ export async function handleTrial(action: TrialAction, _previous: AdminResult | 
   switch (action.kind) {
     case "eligible":
     case "declined": {
+      if (action.kind === "declined" && field(form, "confirm") !== "yes") return refused("Confirm that you want to decline this trial.");
       const reason = field(form, "reason");
       if (!reason || reason.length > 2000) return refused("Enter a decision reason of up to 2,000 characters.");
       const ids = action.kind === "eligible" ? [field(form, "unit1"), field(form, "unit2")] : [];
@@ -204,6 +205,7 @@ export async function handleEnquiry(action: EnquiryAction, _previous: AdminResul
       break;
     }
     case "close":
+      if (field(form, "confirm") !== "yes") return refused("Confirm that you want to close this enquiry.");
       message = "Enquiry closed.";
       break;
     default:

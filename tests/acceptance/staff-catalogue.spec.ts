@@ -45,8 +45,14 @@ test("costs stay out of buyer surfaces and retiring a SKU preserves its paid ord
     await event(request, "checkout.session.completed", session.id);
 
     await staffPage.getByText("Retire this variant", { exact: true }).click();
+    const retire = staffPage.getByRole("button", { name: "Confirm retire this variant" });
+    await retire.evaluate((button: HTMLButtonElement) => { button.formNoValidate = true; });
+    await retire.click();
+    await expect(staffPage.getByRole("alert").filter({ hasText: "Confirm retirement before continuing." })).toBeVisible();
+    expect((await db.query("select publication_status from public.variants where id = $1", [available.id])).rows)
+      .toEqual([{ publication_status: "published" }]);
     await staffPage.getByRole("checkbox", { name: /permanently retire/i }).check();
-    await staffPage.getByRole("button", { name: "Archive variant" }).click();
+    await retire.click();
     await expect(staffPage.getByText("Archived", { exact: true })).toBeVisible();
     await page.goto(`/blades?q=${available.sku}`);
     await expect(result).toHaveCount(0);

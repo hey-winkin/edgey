@@ -15,9 +15,13 @@ export const metadata = { title: "Finance" };
 
 function CardRefundForm({ id, intentId, verifyOnly = false }: { id: string; intentId: string | null; verifyOnly?: boolean }) {
   return <AdminForm action={refundFinanceCard.bind(null, id, !verifyOnly)}
-    submit={verifyOnly ? "Verify recorded refund" : "Verify or refund remaining capture"}>
+    submit={verifyOnly ? "Verify recorded refund" : "Verify or refund remaining capture"}
+    confirmation={verifyOnly ? undefined : {
+      description: "If Stripe shows an unrefunded balance, this issues a refund for the full remaining capture.",
+      label: "I confirm the remaining capture can be refunded.",
+      submit: "Verify payment and refund if due",
+    }}>
     {intentId && <a className="textlink" href={`https://dashboard.stripe.com/test/payments/${encodeURIComponent(intentId)}`}>Stripe payment</a>}
-    {!verifyOnly && <label className="admin-check"><input type="checkbox" name="confirm" value="yes" required /> Confirm full remaining refund</label>}
   </AdminForm>;
 }
 
@@ -55,7 +59,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             {overview.accounts.slice(0, adminPageSize).map((account) => <tr key={account.id}>
               <td><AdminLink href={`/admin/finance/accounts/${account.id}`}>{account.trade_applications?.company ?? account.buyer_name}</AdminLink></td>
               <td>{account.buyer_name}</td><td>{displayState(account.status)}</td>
-              <td className="admin-mono">{formatGbp(account.credit_limit_pence)}</td>
+              <td className="admin-mono admin-money">{formatGbp(account.credit_limit_pence)}</td>
             </tr>)}
           </AdminTable>
         ) : <AdminNotice>No trade accounts on this page.</AdminNotice>}
@@ -91,9 +95,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                 <td className="admin-mono">{formatGbp(order.paid_pence - order.refunded_pence)}</td>
                 <td>
                   {order.provider_invoice_id && <a className="textlink" href={`https://dashboard.stripe.com/test/invoices/${encodeURIComponent(order.provider_invoice_id)}`}>Stripe invoice</a>}
-                  {!order.paid_pence && <AdminForm action={reconcileFinanceInvoice.bind(null, order.id, true)} submit="Verify and void invoice">
-                    <label className="admin-check"><input type="checkbox" name="confirm" value="yes" required /> Confirm void is permitted</label>
-                  </AdminForm>}
+                  {!order.paid_pence && <AdminForm action={reconcileFinanceInvoice.bind(null, order.id, true)} submit="Verify and void invoice"
+                    confirmation={{
+                      description: "This closes the invoice in Stripe if it is unpaid. The buyer can no longer pay a voided invoice.",
+                      label: "I confirm our finance policy permits voiding this invoice.",
+                      submit: "Verify and void if unpaid",
+                    }} />}
                   <AdminForm action={reconcileFinanceInvoice.bind(null, order.id, false)} submit="Verify Stripe adjustments" />
                 </td>
               </tr>)}

@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "no-referrer" },
         ],
       })),
-      ...["/admin/sign-in", "/account"].map((source) => ({
+      ...["/admin/:path*", "/account"].map((source) => ({
         source,
         headers: [{ key: "Referrer-Policy", value: "same-origin" }],
       })),

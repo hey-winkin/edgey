@@ -98,6 +98,9 @@ export async function editCatalogueVariant(id: string, _previous: State | null, 
       return finish(id, result, "Selling data saved.");
     }
     if (operation === "approve" || operation === "reject") {
+      if (operation === "reject" && data.get("confirmReject") !== "yes") {
+        return { ok: false, message: "Confirm the consequence before recording a rejection." };
+      }
       const mappingId = field(data, "mappingId", 36);
       if (mappingId && !catalogueId.test(mappingId)) return { ok: false, message: "This compatibility reference does not exist." };
       const source = field(data, "source", 240);
@@ -121,6 +124,9 @@ export async function editCatalogueVariant(id: string, _previous: State | null, 
       return finish(id, result, operation === "approve" ? "Approval recorded." : "Rejection recorded.");
     }
     if (operation === "publish" || operation === "unpublish") {
+      if (operation === "unpublish" && data.get("confirm") !== "yes") {
+        return { ok: false, message: "Confirm that this SKU should return to draft." };
+      }
       const result = await mutateAdminCatalogue("admin_catalogue_set_publication", { ...args, p_publish: operation === "publish" });
       return finish(id, result, operation === "publish" ? "Variant published." : "Variant unpublished.");
     }

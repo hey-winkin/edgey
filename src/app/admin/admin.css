@@ -45,6 +45,26 @@
 
 .admin-form { display: grid; gap: 12px; align-content: start; }
 .admin-form button:disabled { opacity: .7; cursor: wait; }
+.admin-confirmation { margin-block: 8px; }
+.admin-confirmation > form {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+.admin-danger {
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--edgey-primary-min-height);
+  border: 1px solid var(--edgey-control-border);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: .92rem;
+  font-weight: 520;
+  cursor: pointer;
+}
+.admin-danger:hover { background: var(--panel); }
+.admin-danger svg { display: inline-block; vertical-align: -.16em; margin-inline: 2px 7px; }
 .admin-field { display: grid; gap: 5px; min-width: 0; font-size: .92rem; }
 .admin :is(input:not([type=checkbox]):not([type=radio]), select, textarea) {
   min-height: var(--edgey-field-height);
@@ -61,6 +81,7 @@
 .admin textarea { resize: vertical; }
 .admin .staff-sign-in-fields :is(input:not([type=hidden]), select) { border-color: var(--edgey-control-border); }
 .admin-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.admin-money { white-space: nowrap; }
 .admin-muted { color: var(--muted); }
 .admin-table-scroll { overflow-x: auto; border: 1px solid var(--line); }
 .admin-table { width: 100%; border-collapse: collapse; font-size: .92rem; }

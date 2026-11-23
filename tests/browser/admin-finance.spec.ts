@@ -23,7 +23,7 @@ test("finance sees cancellation without a refund and the separate flagged paymen
     const captures = page.getByRole("table", { name: "Outstanding captures" });
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })).toContainText(formatGbp(cancelled.gross));
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })
-      .getByRole("button", { name: "Verify or refund remaining capture" })).toBeVisible();
+      .locator("summary").filter({ hasText: /^Verify or refund remaining capture$/ })).toBeVisible();
     const reasons = page.getByRole("table", { name: "Payment review" });
     await expect(reasons.getByRole("row").filter({ hasText: mismatch.reference })).toContainText("Payment amount or currency mismatch");
     const orders = page.getByRole("table", { name: "Orders and payment status" });
@@ -61,13 +61,22 @@ test("warehouse separates releasing an allocation from a card refund", async ({ 
     if (process.env.EDGEY_NET30_RENDERS) {
       await page.screenshot({ path: join(process.env.EDGEY_NET30_RENDERS, "warehouse-payment-block.png"), fullPage: true });
     }
+    await page.getByRole("link", { name: order.reference, exact: true }).click();
+    const release = page.locator("summary").filter({ hasText: /^Cancel and release allocation$/ });
+    await release.click();
+    await page.getByLabel("I confirm the order has not left the warehouse").check();
+    await page.getByRole("button", { name: "Confirm cancel and release allocation" }).click();
+    await expect(page.getByText("Fulfilment cancelled and the allocation released.", { exact: false })).toBeVisible();
+    const { data, error } = await db.from("orders").select("fulfilment_status,payment_status").eq("id", order.id).single();
+    if (error) throw error;
+    expect(data).toEqual({ fulfilment_status: "cancelled", payment_status: "refunded" });
   } finally {
     const cancel = await db.rpc("cancel_order", {
       p_actor_id: warehouse.id, p_order_id: order.id, p_operation_key: randomUUID(),
     });
     if (cancel.error) throw cancel.error;
   }
-  await page.reload();
+  await page.goto("/admin/warehouse?view=blocked");
   await expect(page.getByRole("link", { name: order.reference })).toHaveCount(0);
   await page.getByRole("link", { name: "Dispatch and cancellation history" }).click();
   await expect(page.getByRole("row").filter({ hasText: order.reference })).toContainText("Not dispatched");

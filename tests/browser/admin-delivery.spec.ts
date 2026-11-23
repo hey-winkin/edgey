@@ -20,7 +20,8 @@ test("warehouse staff save and remove a configured district service", async ({ p
   await expect(page.getByRole("heading", { name: "Edit SW99 district rule" })).toBeVisible();
   await expect(page.getByLabel("Service name")).toHaveValue("Fixture three-day service");
   await expect(page.getByLabel("Agreed price ex VAT (£)")).toHaveValue("9.95");
-  await page.getByRole("checkbox", { name: /Remove this rule/ }).check();
-  await page.getByRole("button", { name: "Remove rule" }).click();
+  await page.locator("summary").filter({ hasText: /^Remove rule$/ }).click();
+  await page.getByRole("checkbox", { name: "I confirm the delivery rule for SW99 should be removed." }).check();
+  await page.getByRole("button", { name: "Remove delivery rule" }).click();
   await expect(rule).toHaveCount(0);
 });

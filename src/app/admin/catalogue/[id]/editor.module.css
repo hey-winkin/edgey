@@ -1,0 +1,304 @@
+.editor {
+  --editor-save-clearance: 0px;
+  max-inline-size: 72rem;
+}
+
+.editor:has(.saveBar) {
+  --editor-save-clearance: calc(var(--edgey-primary-min-height) + 20px);
+}
+
+.editor:has(.saveBar .saveResult) {
+  --editor-save-clearance: calc(var(--edgey-primary-min-height) + 4.5em);
+}
+
+.editor :global(.admin-heading) {
+  margin-block: 24px 18px;
+}
+
+.sectionNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 14px;
+}
+
+.sectionNav a {
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding: 7px 12px;
+  border: 1px solid var(--edgey-control-border);
+  background: var(--edgey-product-card);
+  font-size: .9rem;
+}
+
+.sectionNav a:hover {
+  background: var(--panel);
+  text-decoration: underline;
+}
+
+.saveBar {
+  position: sticky;
+  inset-block-start: var(--mast-height);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 9px 12px;
+  border-block: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.saveControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.saveState,
+.saveResult {
+  font-size: .85rem;
+}
+
+.saveState {
+  color: var(--muted);
+}
+
+.saveResult {
+  margin: 0;
+  max-inline-size: 54ch;
+}
+
+.saveResult[role="alert"] {
+  font-weight: 650;
+}
+
+.editor :is(.section, input, textarea, select, button, summary, a) {
+  scroll-margin-block-start: var(--editor-save-clearance);
+}
+
+.section {
+  margin-block: 28px;
+  padding-block-start: 20px;
+  border-block-start: 1px solid var(--line);
+}
+
+.editor h3 {
+  font-size: 1.1rem;
+  font-weight: 630;
+}
+
+.overview,
+.pricing,
+.artworkGrid,
+.specGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview {
+  align-items: start;
+}
+
+.overview > div,
+.artworkGrid,
+.fields,
+.references {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-inline-size: 0;
+}
+
+.artwork {
+  margin-block-start: 12px;
+}
+
+.artworkGrid {
+  grid-template-columns: repeat(2, minmax(0, 18rem));
+  margin-block-start: 12px;
+}
+
+.pricing {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.pricePanel,
+.costPanel {
+  display: grid;
+  gap: 10px;
+  min-inline-size: 0;
+  padding: clamp(12px, 2vw, 20px);
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+
+.costPanel :global(.admin-grid) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+}
+
+.costPanel details > summary {
+  cursor: pointer;
+}
+
+.costPanel details[open] > summary {
+  margin-block-end: 12px;
+}
+
+.costBasis {
+  padding-block: 4px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+.tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.tiers > div {
+  padding: 10px;
+  background: var(--edgey-field);
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.editor :global(.admin-field) :is(input:not([type="hidden"]), select, textarea) {
+  border-color: var(--edgey-control-border);
+}
+
+.specGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.section > .fields,
+.section > .references,
+.materials {
+  margin-block-start: 12px;
+}
+
+.materials {
+  min-inline-size: 0;
+}
+
+.materials > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+.materials label {
+  align-items: center;
+  min-block-size: 42px;
+  cursor: pointer;
+}
+
+.materials input {
+  margin: 0;
+  accent-color: var(--edgey-primary-fill);
+}
+
+.references summary,
+.artwork summary {
+  cursor: pointer;
+}
+
+.references details[open] > summary {
+  margin-block-end: 12px;
+}
+
+.references form {
+  margin-block-start: 12px;
+}
+
+.reviewConfirmation {
+  display: none;
+  margin-block-start: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--edgey-control-border);
+}
+
+.reviewConfirmation label {
+  margin-block-start: 8px;
+}
+
+.reviewDecision:has(option[value="reject"]:checked) .reviewConfirmation {
+  display: block;
+}
+
+.editor :global(.admin-form):has(.reviewDecision option[value="reject"]:checked) :global(.primary) {
+  padding-inline: 12px;
+  border-color: var(--edgey-control-border);
+  background: transparent;
+  color: var(--ink);
+}
+
+.editor :global(.admin-form):has(.reviewDecision option[value="reject"]:checked) :global(.primary):hover {
+  background: var(--panel);
+}
+
+.editor :global(.admin-form):has(.reviewDecision option[value="reject"]:checked) :global(.primary)::before {
+  display: none;
+}
+
+.staffOnly {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding-inline: 5px;
+  border: 1px solid var(--edgey-control-border);
+  font: .75rem/1.5 var(--mono);
+}
+
+.family {
+  padding: clamp(14px, 3vw, 24px);
+  border: 1px dashed var(--edgey-control-border);
+  background: var(--panel);
+}
+
+@media (max-width: 920px) {
+  .pricing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sectionNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview,
+  .tiers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .materials > div,
+  .specGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .saveBar {
+    padding-inline: 6px;
+  }
+
+  .saveBar .saveControls {
+    flex-wrap: nowrap;
+  }
+
+  .saveBar .saveControls button {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .saveControls :global(.primary) {
+    padding-inline: 10px 31px;
+  }
+}

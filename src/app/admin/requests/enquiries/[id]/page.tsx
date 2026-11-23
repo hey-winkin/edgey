@@ -76,9 +76,11 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
       </div> : <AdminNotice>No replies have been recorded.</AdminNotice>}
     </AdminSection>
     {!closed && <AdminSection title="Close enquiry">
-      <AdminForm action={handleEnquiry.bind(null, { ...actionTarget, kind: "close" })} submit="Close enquiry">
-        <p>Close this enquiry once no further action is needed. Closing does not send an email.</p>
-      </AdminForm>
+      <AdminForm action={handleEnquiry.bind(null, { ...actionTarget, kind: "close" })} submit="Close enquiry"
+        confirmation={{
+          description: "Staff can no longer reply or record a match once this enquiry is closed. Closing does not send an email.",
+          label: "I confirm no further action is needed on this enquiry.",
+        }} />
     </AdminSection>}
   </>;
 }
