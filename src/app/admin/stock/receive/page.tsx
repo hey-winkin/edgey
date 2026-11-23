@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import { AdminHeading, AdminLink, AdminNotice } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { makeDeliveryEditorState } from "@/lib/admin/delivery-editor-state";
 import { deliveryToday } from "@/lib/admin/deliveries";
 import { canManageCosts, stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { DeliveryEditor } from "./delivery-editor";
@@ -12,6 +14,7 @@ export default async function ReceiveDeliveryPage() {
   const { db, roles } = await requireStaff("warehouse");
   const { error } = await db.from("staff_deliveries").select("id").limit(1);
   if (error && !stockSchemaUnavailable(error)) throw new Error("Could not open delivery receiving.");
+  const today = deliveryToday();
 
   return (
     <>
@@ -28,7 +31,7 @@ export default async function ReceiveDeliveryPage() {
       </div>
       {error
         ? <AdminNotice>Delivery receiving is not available yet. Use Stock balances to receive individual blades.</AdminNotice>
-        : <DeliveryEditor showCosts={canManageCosts(roles)} today={deliveryToday()} />}
+        : <DeliveryEditor initial={makeDeliveryEditorState(randomUUID(), today)} showCosts={canManageCosts(roles)} today={today} />}
     </>
   );
 }
