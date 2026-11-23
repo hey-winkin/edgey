@@ -120,7 +120,7 @@
 }
 
 @media print {
-  body:has(.po-document) > :not(.po-document, :has(.po-document)),
+  body:has(.po-document) > :not(.po-document, :has(.po-document), svg:has(#edgey)),
   body :has(.po-document) > :not(.po-document, :has(.po-document)) {
     display: none !important;
   }

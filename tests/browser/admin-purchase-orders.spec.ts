@@ -320,6 +320,7 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await page.emulateMedia({ media: "print" });
     await expect(page.getByRole("link", { name: "Back to order" })).toBeHidden();
     await expect(sheet).toBeVisible();
+    await expect(page.locator("svg:has(#edgey)")).not.toHaveCSS("display", "none");
     await page.emulateMedia({ media: "screen" });
     const csv = await page.request.get(orderPath + "/export");
     expect(csv.ok()).toBe(true);

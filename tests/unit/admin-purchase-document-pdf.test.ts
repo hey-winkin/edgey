@@ -100,6 +100,8 @@ describe("purchase order PDF", () => {
     }));
     expect(totalPages).toBeGreaterThan(1);
     expect(text[0]).toContain("Cancelled — do not fulfil");
+    expect(text.at(-1)).toContain("Cancelled — do not fulfil");
+    expect(text.at(-1)).toContain("Revision 2 / EUR");
     expect(text.join(" ").match(/N-\d{2}/g)).toEqual(noteLines);
     expect(text.join(" ")).toContain("€46,116,860,141,324,206.09");
   });
@@ -139,5 +141,22 @@ describe("purchase order PDF download", () => {
     expect((await request("not-an-id")).status).toBe(404);
     expect(readPurchaseDocument).not.toHaveBeenCalled();
     expect((await request()).status).toBe(404);
+  });
+
+  it("offers the Unicode-capable printable copy and CSV instead of altering supplier text", async () => {
+    vi.mocked(staffSession).mockResolvedValue({ db, roles: ["finance"] } as NonNullable<Awaited<ReturnType<typeof staffSession>>>);
+    vi.mocked(readPurchaseDocument).mockResolvedValue({
+      ...order, supplier: [{ label: "Address", value: "Łódź / 仮の住所" }],
+    });
+    const response = await request();
+    expect(response.status).toBe(422);
+    expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.has("Content-Disposition")).toBe(false);
+    const html = await response.text();
+    expect(html).toContain("Save as PDF");
+    const base = `http://localhost/admin/purchase-orders/${id}`;
+    expect([...html.matchAll(/href="([^"]+)"/g)].map(([, href]) => new URL(href!, base + "/export/pdf").href))
+      .toEqual([base + "/print", base + "/export"]);
+    expect(html).not.toMatch(/Łódź|仮の住所/);
   });
 });

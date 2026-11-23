@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { staffSession } from "@/lib/admin/auth";
 import { readPurchaseDocument } from "@/lib/admin/purchase-document-data";
-import { purchaseDocumentPdf } from "@/lib/admin/purchase-document-pdf";
+import { purchaseDocumentPdf, UnsupportedPurchaseDocumentTextError } from "@/lib/admin/purchase-document-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +28,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         "Content-Disposition": `attachment; filename="${name}.pdf"`,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof UnsupportedPurchaseDocumentTextError) {
+      return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Purchase order PDF unavailable</title>
+<h1>Purchase order PDF unavailable</h1>
+<p>This order contains characters the PDF fonts cannot display. No PDF was generated, so your supplier details stay intact.</p>
+<p><a href="../print">Open the printable PO</a> and choose Save as PDF in your browser’s print dialog, or <a href="../export">download CSV</a>.</p></html>`,
+      { status: 422, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" } });
+    }
     return new Response("Could not export the purchase order.", { status: 500, headers });
   }
 }

@@ -14,9 +14,14 @@ const muted = "#5B605E";
 const rule = "#D1D3CD";
 const margin = 40;
 
+export class UnsupportedPurchaseDocumentTextError extends Error {}
+
 function printText(value: string) {
-  return value.normalize("NFC").replace(/\r\n?/g, "\n").replaceAll("\t", " ")
-    .replace(/[^\n\x20-\x7e\xa0-\xff€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/gu, "?");
+  const text = value.normalize("NFC").replace(/\r\n?/g, "\n").replaceAll("\t", " ");
+  if (/[^\n\x20-\x7e\xa0-\xff€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/u.test(text)) {
+    throw new UnsupportedPurchaseDocumentTextError("The PDF fonts cannot display all the characters in this order.");
+  }
+  return text;
 }
 
 export async function purchaseDocumentPdf(order: PurchaseDocument) {
@@ -78,10 +83,10 @@ export async function purchaseDocumentPdf(order: PurchaseDocument) {
 
   const total = totalMerchandiseMinor(order.lines);
   const skuWidth = 78;
-  const partWidth = 88;
-  const quantityWidth = 47;
-  const priceWidth = 74;
-  const lineTotalWidth = 84;
+  const partWidth = 83;
+  const quantityWidth = 42;
+  const priceWidth = 70;
+  const lineTotalWidth = 111;
   const columnWidths = [skuWidth, width - skuWidth - partWidth - quantityWidth - priceWidth - lineTotalWidth, partWidth,
     quantityWidth, priceWidth, lineTotalWidth];
   const monoCell = (content: string, cellWidth: number, minFontSize = 0) => ({
@@ -127,7 +132,10 @@ export async function purchaseDocumentPdf(order: PurchaseDocument) {
       doc.addImage(logo, "PNG", margin, 33, 82, 82 * 141 / 400, "edgey");
       doc.setTextColor(ink).setFont("helvetica", "normal").setFontSize(13);
       doc.text(`Purchase order / ${printText(order.number)}`, right, 53, { align: "right" });
-      doc.line(margin, 69, right, 69);
+      doc.setTextColor(muted).setFont("courier", "normal").setFontSize(9);
+      doc.text(`Revision ${order.revision} / ${order.currency}`, right, 67, { align: "right" });
+      if (warning) doc.setTextColor(ink).setFont("courier", "bold").text(warning, margin, 67);
+      doc.line(margin, 76, right, 76);
     }
     doc.line(margin, bottom - 13, right, bottom - 13);
     doc.setTextColor(muted).setFont("courier", "normal").setFontSize(9);
