@@ -41,6 +41,19 @@ export function persistSelectionChange(write: () => void) {
   else persist();
 }
 
+export async function persistSelectionChangeIf(write: () => boolean) {
+  function persist() {
+    try {
+      if (!write()) return false;
+    } catch {
+      return false;
+    }
+    try { localStorage.removeItem(markerKey); } catch {}
+    return true;
+  }
+  return navigator.locks ? (await withSelectionLock(persist)) === true : persist();
+}
+
 export async function captureCheckoutSelection(lines: readonly LineRequest[]): Promise<string | null> {
   if (lines.length === 0) return null;
   return await withSelectionLock(() => {

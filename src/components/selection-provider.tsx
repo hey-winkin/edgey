@@ -1,29 +1,36 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { persistSelectionChange } from "@/app/(shop)/checkout/success/selection-handoff";
+import { persistSelectionChange, persistSelectionChangeIf } from "@/app/(shop)/checkout/success/selection-handoff";
 import { forgetCheckoutAttempt } from "@/lib/checkout/attempt-token";
+import { MAX_BASKET_LINES, MAX_ORDER_INTEGER } from "@/lib/checkout/validation";
 import type { LineRequest } from "@/lib/commerce";
 
 const storageKey = "edgey-storefront-selection-v1";
 const uuid = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i;
 const empty: LineRequest[] = [];
 
-function restore(): LineRequest[] {
+function restore(): LineRequest[] | null {
+  let text: string | null;
+  try { text = localStorage.getItem(storageKey); } catch { return null; }
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+    const stored: unknown = JSON.parse(text ?? "{}");
     if (!stored || typeof stored !== "object" || Array.isArray(stored)) return empty;
     const quantities = new Map<string, number>();
     for (const [id, quantity] of Object.entries(stored)) {
-      if (uuid.test(id) && Number.isInteger(quantity) && quantity > 0 && quantity <= 2_147_483_647) {
+      if (uuid.test(id) && Number.isInteger(quantity) && quantity > 0 && quantity <= MAX_ORDER_INTEGER) {
         quantities.set(id.toLowerCase(), quantity);
-        if (quantities.size === 100) break;
+        if (quantities.size === MAX_BASKET_LINES) break;
       }
     }
     return [...quantities].map(([variantId, quantity]) => ({ variantId, quantity }));
   } catch {
     return empty;
   }
+}
+
+function save(lines: LineRequest[]) {
+  localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(lines.map(({ variantId, quantity }) => [variantId, quantity]))));
 }
 
 function sameLines(previous: LineRequest[], next: LineRequest[]) {
@@ -37,6 +44,7 @@ type Selection = {
   hydrated: boolean;
   revision: number;
   replace: (lines: LineRequest[]) => void;
+  replaceIfUnchanged: (lines: LineRequest[], expectedRevision: number) => Promise<boolean>;
   clearIf: (matches: (lines: readonly LineRequest[]) => boolean) => boolean;
   setQuantity: (variantId: string, quantity: number) => void;
   add: (variantId: string, quantity: number) => void;
@@ -55,7 +63,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      const restored = { lines: restore(), revision: 0 };
+      const restored = { lines: restore() ?? empty, revision: 0 };
       current.current = restored;
       setStored(restored);
     });
@@ -63,7 +71,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
       if (event.key !== storageKey && event.key !== null) return;
       const now = current.current;
       const lines = restore();
-      if (!now || sameLines(now.lines, lines)) return;
+      if (!now || !lines || sameLines(now.lines, lines)) return;
       const next = { lines, revision: now.revision + 1 };
       forgetCheckoutAttempt();
       current.current = next;
@@ -86,7 +94,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     current.current = next;
     setStored(next);
     persistSelectionChange(() => {
-      localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(lines.map(({ variantId, quantity }) => [variantId, quantity]))));
+      save(lines);
       if (latestWrite.current === next && current.current && current.current !== next) {
         const synced = { lines, revision: current.current.revision + 1 };
         current.current = synced;
@@ -95,9 +103,25 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  function replaceIfUnchanged(lines: LineRequest[], expectedRevision: number) {
+    return persistSelectionChangeIf(() => {
+      const now = current.current;
+      const saved = restore();
+      if (!now || now.revision !== expectedRevision || (saved && !sameLines(now.lines, saved))) return false;
+      if (saved) save(lines);
+      const next = { lines, revision: now.revision + 1 };
+      latestWrite.current = next;
+      forgetCheckoutAttempt();
+      current.current = next;
+      setStored(next);
+      return true;
+    });
+  }
+
   function clearIf(matches: (lines: readonly LineRequest[]) => boolean) {
     const now = current.current;
-    if (!now || now !== stored || !matches(now.lines) || !matches(restore())) return false;
+    const saved = restore();
+    if (!now || !saved || now !== stored || !matches(now.lines) || !matches(saved)) return false;
     localStorage.removeItem(storageKey);
     const next = { lines: empty, revision: now.revision + 1 };
     current.current = next;
@@ -119,11 +143,12 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
       hydrated: !!stored,
       revision: stored?.revision ?? 0,
       replace,
+      replaceIfUnchanged,
       clearIf,
       setQuantity,
       add: (variantId, quantity) => {
         const previous = current.current?.lines.find((line) => line.variantId === variantId)?.quantity ?? 0;
-        setQuantity(variantId, Math.min(2_147_483_647, previous + quantity));
+        setQuantity(variantId, Math.min(MAX_ORDER_INTEGER, previous + quantity));
       },
       opened,
       open: (from) => setOpened({ from }),

@@ -5,6 +5,7 @@ import {
   captureCheckoutSelection,
   clearConfirmedCheckoutSelection,
   persistSelectionChange,
+  persistSelectionChangeIf,
   rememberCheckoutSelection,
 } from "@/app/(shop)/checkout/success/selection-handoff";
 
@@ -86,6 +87,14 @@ describe("checkout selection handoff", () => {
     const clear = vi.fn(() => true);
     await clearConfirmedCheckoutSelection(scope, lines, clear);
     expect(clear).not.toHaveBeenCalled();
+  });
+
+  it("preserves the checkout marker when a guarded bulk update is stale", async () => {
+    await markCheckout();
+    expect(await persistSelectionChangeIf(() => false)).toBe(false);
+    const clear = vi.fn(() => true);
+    await clearConfirmedCheckoutSelection(scope, lines, clear);
+    expect(clear).toHaveBeenCalledOnce();
   });
 
   it("preserves an earlier session when another submission fails before reaching Stripe", async () => {
