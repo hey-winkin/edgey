@@ -1,8 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
 import { saveThemeBeforeLoad, scanAccessibility, themes } from "../helpers/accessibility";
+import { resetBrowserQuoteBudget } from "../helpers/quote-budget";
 
 const sample = "EDG-Z10\t2\n391 0301,3\nSPB 0030 1\nEDG-SUM-DRG-60 1\nNO-SUCH-PART 4\nEDG-Z46 1";
+
+test.beforeEach("reset the local browser's shared quote budget", async () => {
+  const db = await connectAccountDb();
+  try {
+    await resetBrowserQuoteBudget(db);
+  } finally {
+    await db.end();
+  }
+});
 
 test("the shop menu and basket both lead to quick order", async ({ page }) => {
   await page.goto("/blades");
