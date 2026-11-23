@@ -142,15 +142,17 @@
 .importForm {
   display: grid;
   gap: 12px;
-  max-width: 42rem;
+  max-width: 54rem;
   padding-block: 2px 16px;
 }
 
 .importForm > p { color: var(--muted); font-size: .9rem; }
-.importModes { display: flex; flex-wrap: wrap; gap: 5px; }
-.importModes :global(.secondary)[aria-pressed="true"] {
-  background: var(--edgey-primary-fill);
-  color: var(--edgey-primary-text);
+
+.importFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px 20px;
 }
 
 .line {
@@ -242,12 +244,12 @@
 
 .errorBlock a { display: inline-flex; align-items: center; min-height: 44px; }
 
-:global(.admin) .editor :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+:global(.admin) .editor :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea, select) {
   min-height: 44px;
   border-color: var(--edgey-control-border);
 }
 
-:global(.admin) .editor :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select)[aria-invalid="true"] {
+:global(.admin) .editor :is(input, textarea, select)[aria-invalid="true"] {
   border-color: var(--ledger-error);
 }
 
@@ -324,6 +326,7 @@
 
 @media (max-width: 49rem) {
   .columns { display: none; }
+  .importFields { grid-template-columns: minmax(0, 1fr); }
   :global(.admin) .editor .metadata textarea { min-height: 62px; }
   .line,
   .line.withCost {

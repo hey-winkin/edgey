@@ -1,128 +1,68 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { AdminField } from "@/app/admin/ui";
 import {
-  DELIVERY_QUANTITY_MAX,
-  MAX_DELIVERY_CODE_LENGTH,
-  MAX_DELIVERY_IMPORT_BYTES,
-  MAX_DELIVERY_ROWS,
-  hasDeliveryControlCharacters,
-  isDeliveryDate,
-  parseDeliveryCost,
-  parseDeliveryQuantity,
-  type DeliveryCommitInput,
-  type DeliveryMatch,
-  type ImportedDeliveryRow,
+  DELIVERY_QUANTITY_MAX, MAX_DELIVERY_CODE_LENGTH, MAX_DELIVERY_IMPORT_BYTES, MAX_DELIVERY_ROWS,
 } from "@/lib/admin/deliveries";
+import {
+  deliveryCodeError, deliveryHeaderErrors, editDeliveryRows, groupDeliveryMatches, readDeliveryDraft, readDeliveryRows,
+  type DeliveryDraft, type EditorRow, type EditorState,
+} from "@/lib/admin/delivery-editor-state";
 import { formatGbp } from "@/lib/commerce/money";
-import { commitDelivery, findRecentDelivery, importDeliveryLines, lookupDeliveryCodes } from "./actions";
+import { lookupDeliveryCodes } from "./actions";
+import { runDeliveryEditor, submitDeliveryEditor } from "./editor-action";
+import { restoreEarlyDeliveryText } from "./early-text";
 import styles from "./delivery-editor.module.css";
-
-type Row = Omit<ImportedDeliveryRow, "sourceRow"> & { id: number; sourceRow?: number; selectedId?: string };
-type CodeCheck = DeliveryMatch[] | { error: string };
-type Checks = Map<string, CodeCheck>;
-type ReviewedLine = DeliveryCommitInput["lines"][number] & Pick<DeliveryMatch, "bladeName" | "sku">;
-type Review = {
-  input: DeliveryCommitInput;
-  lines: ReviewedLine[];
-  previous: Awaited<ReturnType<typeof findRecentDelivery>>;
-};
-type CommitError = { error: string; retryOnly: boolean };
 
 const quantityMax = DELIVERY_QUANTITY_MAX.toLocaleString("en-GB");
 const displayDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "UTC" });
 const number = new Intl.NumberFormat("en-GB");
 
-function rowId(row: Row, field: string) {
+function rowId(row: EditorRow, field: string) {
   return `receipt-${row.id}-${field}`;
 }
 
-function blankRow(id: number): Row {
-  return { id, code: "", quantity: "", unitCost: "" };
-}
-
-function codeError(code: string) {
-  if (!code) return "Enter a blade code.";
-  if (code.length > MAX_DELIVERY_CODE_LENGTH || hasDeliveryControlCharacters(code)) {
-    return "Use a single blade code of up to 120 characters.";
-  }
-  if (!/[a-z0-9]/i.test(code)) return "Include a letter or number from the blade code.";
-}
-
-function groupMatches(codes: string[], matches: DeliveryMatch[]): Checks {
-  const grouped = new Map<string, DeliveryMatch[]>(codes.map((code) => [code, []]));
-  for (const match of matches) {
-    grouped.get(match.inputCode)?.push(match);
-  }
-  return grouped;
-}
-
-function readRows(rows: Row[], checks: Checks, showCosts: boolean) {
-  const seen = new Map<string, number>();
-  return rows.map((row, index) => {
-    const code = row.code.trim();
-    const active = Boolean(row.sourceRow || code || row.quantity.trim() || (showCosts && row.unitCost.trim()));
-    const check = checks.get(code);
-    const matches = Array.isArray(check) ? check : [];
-    const match = matches.length === 1 ? matches[0] : matches.find(({ variantId }) => variantId === row.selectedId);
-    const earlier = match && seen.get(match.variantId);
-    if (match && earlier === undefined) seen.set(match.variantId, index + 1);
-    const quantity = parseDeliveryQuantity(row.quantity);
-    const unitCostPence = showCosts ? parseDeliveryCost(row.unitCost) : null;
-    const invalidCode = active && (codeError(code)
-      || (check && !Array.isArray(check) ? check.error : undefined)
-      || (check && matches.length === 0 ? "No match. Check the code or enter the exact SKU." : undefined));
-    const invalidMatch = matches.length > 1 && !match;
-    const duplicate = earlier ? `Same blade as line ${earlier}. Combine the quantities and remove this line.` : undefined;
-    const invalidCost = showCosts && Boolean(row.unitCost.trim()) && unitCostPence === null;
-    const ready = Boolean(active && match && !invalidCode && !duplicate && quantity !== null && !invalidCost);
-    return { row, active, match, matches, quantity, unitCostPence, invalidCode, invalidMatch, duplicate, invalidCost, ready };
-  });
-}
-
-export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today: string }) {
+export function DeliveryEditor({ initial, showCosts, today }: { initial: EditorState; showCosts: boolean; today: string }) {
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>([blankRow(1)]);
-  const [checks, setChecks] = useState<Checks>(() => new Map());
-  const [reference, setReference] = useState("");
-  const [receivedOn, setReceivedOn] = useState(today);
-  const [note, setNote] = useState("");
-  const [showErrors, setShowErrors] = useState(false);
-  const [review, setReview] = useState<Review | null>(null);
-  const [busy, setBusy] = useState<"import" | "review" | "commit" | null>(null);
-  const [reviewError, setReviewError] = useState("");
-  const [commitError, setCommitError] = useState<CommitError | null>(null);
-  const [importType, setImportType] = useState<"paste" | "file">("paste");
-  const [paste, setPaste] = useState("");
-  const [importError, setImportError] = useState("");
-  const [announcement, setAnnouncement] = useState("");
-  const [focus, setFocus] = useState<{ id: string }>();
-  const nextRow = useRef(2);
-  const deliveryId = useRef<string | null>(null);
-  const pending = useRef(new Map<string, Promise<Checks>>());
-  const importing = useRef<HTMLDetailsElement>(null);
+  const [nativeState, action, nativePending] = useActionState(submitDeliveryEditor, initial, "/admin/stock/receive");
+  const [enhanced, setEnhanced] = useState<{ base: EditorState; state: EditorState }>();
+  const state = enhanced?.base === nativeState ? enhanced.state : nativeState;
+  const [live, setLive] = useState<{ state: EditorState; draft: DeliveryDraft }>();
+  const draft = live?.state === state ? live.draft : state.draft;
+  const [liveChecks, setLiveChecks] = useState<ReturnType<typeof groupDeliveryMatches>>(() => new Map());
+  const [busy, setBusy] = useState<string | null>(null);
   const operation = useRef(false);
-  const ledgerRows = readRows(rows, checks, showCosts);
+  const focusedState = useRef<EditorState>(undefined);
+  const pending = useRef(new Set<string>());
+  const importing = useRef<HTMLDetailsElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const { review } = state;
+  const checkedCodes = state.checkedCodes ?? state.matches.map(({ inputCode }) => inputCode);
+  const checks = new Map([...liveChecks, ...groupDeliveryMatches(checkedCodes, state.matches)]);
+  const ledgerRows = readDeliveryRows(draft.rows, checks, showCosts);
   const entered = ledgerRows.filter(({ active }) => active).length;
   const ready = ledgerRows.filter((line) => line.ready);
   const units = ready.reduce((total, { quantity }) => total + (quantity ?? 0), 0);
   const reviewedUnits = review?.lines.reduce((total, line) => total + line.quantity, 0) ?? 0;
   const previousDelivery = review?.previous.ok ? review.previous.record : null;
   const historyError = review && !review.previous.ok ? review.previous.error : null;
-  const referenceError = !reference.trim() ? "Enter a delivery reference."
-    : reference.trim().length > MAX_DELIVERY_CODE_LENGTH || hasDeliveryControlCharacters(reference.trim())
-      ? "Use a single reference of up to 120 characters." : undefined;
-  const dateError = !isDeliveryDate(receivedOn) || receivedOn > today ? "Enter a received date of today or earlier." : undefined;
-  const noteError = note.length > 500 || note.includes("\0") ? "Use a note of up to 500 characters." : undefined;
+  const showErrors = Boolean(state.error && state.errorAt !== "receipt-import-error");
+  const headerErrors = showErrors ? deliveryHeaderErrors(draft) : undefined;
+  const importError = state.errorAt === "receipt-import-error" ? state.error : undefined;
+  const waiting = busy !== null || nativePending;
   const lineClass = `${styles.line} ${showCosts ? styles.withCost : ""}`;
 
   useEffect(() => {
-    if (focus) document.getElementById(focus.id)?.focus();
-  }, [focus]);
+    if (focusedState.current === state) return;
+    const firstMount = focusedState.current === undefined;
+    focusedState.current = state;
+    if (firstMount && document.activeElement?.closest("#receipt-editor")) return;
+    if (state.errorAt) document.getElementById(state.errorAt)?.focus();
+  }, [state]);
 
-  const warnOnUnload = busy === "commit" || Boolean(commitError?.retryOnly);
+  const warnOnUnload = busy === "commit" || Boolean(state.retryOnly);
   useEffect(() => {
     if (!warnOnUnload) return;
     function warn(event: BeforeUnloadEvent) {
@@ -133,190 +73,126 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
     return () => window.removeEventListener("beforeunload", warn);
   }, [warnOnUnload]);
 
-  async function checkCodes(codes: string[]) {
-    const fresh = codes.filter((code) => !pending.current.has(code));
-    if (fresh.length) {
-      const request = lookupDeliveryCodes(fresh)
-        .catch(() => ({ ok: false as const, error: "Could not check blade codes. Try reviewing again." }))
-        .then((result): Checks => {
-          const next = result.ok ? groupMatches(fresh, result.matches) : new Map(fresh.map((code) => [code, { error: result.error }]));
-          setChecks((previous) => new Map([...previous, ...next]));
-          return next;
-        })
-        .finally(() => {
-          fresh.forEach((code) => pending.current.delete(code));
-        });
-      fresh.forEach((code) => pending.current.set(code, request));
+  const checkCodes = useCallback(async (codes: string[]) => {
+    const fresh = [...new Set(codes)].filter((code) => !pending.current.has(code));
+    if (!fresh.length) return;
+    fresh.forEach((code) => pending.current.add(code));
+    try {
+      const result = await lookupDeliveryCodes(fresh)
+        .catch(() => ({ ok: false as const, error: "Could not check blade codes. Try reviewing again." }));
+      const next = result.ok ? groupDeliveryMatches(fresh, result.matches) : fresh.map((code) => [code, { error: result.error }] as const);
+      setLiveChecks((previous) => new Map([...previous, ...next]));
+    } finally {
+      fresh.forEach((code) => pending.current.delete(code));
     }
+  }, []);
 
-    const batches = new Set(codes.map((code) => pending.current.get(code)));
-    const results = await Promise.all(batches);
-    return new Map(results.flatMap((result) => result ? [...result] : []));
+  const attachForm = useCallback((form: HTMLFormElement | null) => {
+    if (!form) return;
+    restoreEarlyDeliveryText(form);
+    if (state.review) return;
+    const current = readDeliveryDraft(new FormData(form), showCosts);
+    setLive({ state, draft: current });
+    const renderedCodes = new Map(state.draft.rows.map(({ id, code }) => [id, code.trim()]));
+    const newCodes = current.rows.flatMap(({ id, code }) => {
+      const value = code.trim();
+      return value !== renderedCodes.get(id) && !deliveryCodeError(value) ? [value] : [];
+    });
+    if (newCodes.length) void checkCodes(newCodes);
+  }, [checkCodes, showCosts, state]);
+
+  function syncDraft(event: FormEvent<HTMLFormElement>) {
+    setLive({ state, draft: readDeliveryDraft(new FormData(event.currentTarget), showCosts) });
   }
 
-  function editRow(row: Row, field: "code" | "quantity" | "unitCost" | "selectedId", value: string) {
-    setReviewError("");
-    setRows((previous) => previous.map((item) => item.id === row.id
-      ? { ...item, [field]: value, ...(field === "code" && value.trim() !== item.code.trim() ? { selectedId: undefined } : {}) }
-      : item));
-  }
-
-  function addLine() {
-    if (rows.length >= MAX_DELIVERY_ROWS) return;
-    const row = blankRow(nextRow.current++);
-    setRows((previous) => [...previous, row]);
-    setFocus({ id: rowId(row, "code") });
-  }
-
-  function removeLine(index: number) {
-    const remaining = rows.filter((_, rowIndex) => index !== rowIndex);
-    if (!remaining.length) remaining.push(blankRow(nextRow.current++));
-    setRows(remaining);
-    setReviewError("");
-    setAnnouncement(`Line ${index + 1} removed.`);
-    setFocus({ id: rowId(remaining[Math.min(index, remaining.length - 1)]!, "code") });
-  }
-
-  function advance(event: KeyboardEvent<HTMLInputElement>, row: Row, index: number, field: "code" | "quantity" | "unitCost") {
+  function advance(event: KeyboardEvent<HTMLInputElement>, row: EditorRow, index: number, field: "code" | "quantity" | "unitCost") {
     if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    const next = rows[index + 1];
+    const next = draft.rows[index + 1];
     if (field === "code") {
       document.getElementById(rowId(row, "quantity"))?.focus();
     } else if (field === "quantity" && showCosts) {
       document.getElementById(rowId(row, "cost"))?.focus();
     } else if (next) {
       document.getElementById(rowId(next, "code"))?.focus();
-    } else if (row.code.trim() || row.quantity.trim() || row.unitCost.trim()) {
-      addLine();
+    } else if (row.code.trim() || row.quantity.trim() || row.unitCost.trim() || event.currentTarget.value.trim()) {
+      const button = addButton.current;
+      if (button && !button.disabled) button.form?.requestSubmit(button);
     }
   }
 
-  async function importLines(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (operation.current) return;
-    const form = new FormData(event.currentTarget);
-    const file = form.get("file");
-    const size = file instanceof File ? file.size : new TextEncoder().encode(paste).byteLength;
-    if (importType === "file" ? !size : !paste.trim()) {
-      setImportError(importType === "file" ? "Choose a CSV file." : "Paste at least one row from your spreadsheet.");
-      setFocus({ id: `receipt-${importType}` });
-      return;
-    }
-    if (size > MAX_DELIVERY_IMPORT_BYTES) {
-      setImportError("Use a file or pasted table no larger than 128 KB.");
-      setFocus({ id: `receipt-${importType}` });
-      return;
-    }
+    if (operation.current || nativePending) return;
 
-    operation.current = true;
-    setImportError("");
-    setBusy("import");
-    try {
-      const result = await importDeliveryLines(form);
-      if (!result.ok) {
-        setImportError(result.error);
-        setFocus({ id: `receipt-${importType}` });
-        return;
-      }
-      const existing = ledgerRows.filter(({ active }) => active).map(({ row }) => row);
-      if (existing.length + result.rows.length > MAX_DELIVERY_ROWS) {
-        setImportError(`A delivery can have up to ${MAX_DELIVERY_ROWS} lines. Remove existing lines or import a smaller table.`);
-        setFocus({ id: "receipt-import-error" });
-        return;
-      }
-      const added = result.rows.map((row) => ({ ...row, unitCost: showCosts ? row.unitCost : "", id: nextRow.current++ }));
-      const first = added[0];
-      if (!first) return;
-      setChecks((previous) => new Map([...previous, ...groupMatches(added.map(({ code }) => code.trim()), result.matches)]));
-      setRows([...existing, ...added]);
-      setPaste("");
-      setReviewError("");
-      setAnnouncement(`${added.length} ${added.length === 1 ? "line" : "lines"} imported. Check the matched blades and quantities.`);
-      if (importing.current) importing.current.open = false;
-      setFocus({ id: rowId(first, "code") });
-    } catch {
-      setImportError("Could not import the table. Try again.");
-      setFocus({ id: "receipt-import-error" });
-    } finally {
-      operation.current = false;
-      setBusy(null);
-    }
-  }
-
-  async function reviewDelivery() {
-    if (operation.current) return;
-    setShowErrors(true);
-    setReviewError("");
-    const invalidDetail = referenceError ? "reference" : dateError ? "date" : noteError ? "note" : null;
-    if (invalidDetail) {
-      setFocus({ id: `receipt-${invalidDetail}` });
+    const form = event.currentTarget;
+    const formData = new FormData(form, (event.nativeEvent as SubmitEvent).submitter);
+    const intent = formData.get("intent") ?? "review";
+    if (typeof intent !== "string") return;
+    formData.set("intent", intent);
+    const submitted = review ? state.draft : readDeliveryDraft(formData, showCosts);
+    const importOpen = importing.current?.open ?? state.importOpen;
+    const edit = review ? null : editDeliveryRows(submitted, intent);
+    if (edit) {
+      setEnhanced({ base: nativeState, state: { matches: state.matches, checkedCodes: state.checkedCodes, importOpen, ...edit } });
       return;
     }
-    if (!entered) {
-      setReviewError("Add at least one delivery line.");
-      setFocus({ id: rowId(rows[0]!, "code") });
-      return;
-    }
-
-    operation.current = true;
-    setBusy("review");
-    try {
-      const codes = [...new Set(rows.map(({ code }) => code.trim()).filter((code) => !codeError(code)))];
-      const verified = await checkCodes(codes);
-      const lines: ReviewedLine[] = [];
-      for (const line of readRows(rows, verified, showCosts)) {
-        if (!line.active) continue;
-        const { row, match, quantity, unitCostPence, invalidCost, invalidCode, invalidMatch, duplicate } = line;
-        if (!match || quantity === null || invalidCost || invalidCode || duplicate) {
-          setReviewError("Check the marked lines before reviewing this delivery.");
-          const field = invalidMatch ? "match" : invalidCode || duplicate || !match ? "code" : quantity === null ? "quantity" : "cost";
-          setFocus({ id: rowId(row, field) });
-          return;
-        }
-        lines.push({ variantId: match.variantId, sku: match.sku, bladeName: match.bladeName, quantity, unitCostPence });
-      }
-      const previous = await findRecentDelivery(reference)
-        .catch(() => ({ ok: false as const, error: "Could not check Delivery history for this reference. Check history before receiving stock." }));
-      deliveryId.current ??= crypto.randomUUID();
-      setReview({ lines, previous, input: {
-        id: deliveryId.current,
-        reference: reference.trim(),
-        receivedOn,
-        note: note.trim(),
-        lines: lines.map(({ variantId, quantity, unitCostPence }) => ({ variantId, quantity, unitCostPence })),
+    const file = formData.get("file");
+    if (intent === "review" && file instanceof File && file.size) {
+      setEnhanced({ base: nativeState, state: {
+        ...state, draft: submitted, error: "Add the CSV lines or clear the chosen file before reviewing the delivery.",
+        errorAt: "receipt-import-error", importOpen: true,
       } });
-      setFocus({ id: "receipt-review-heading" });
-    } catch {
-      setReviewError("Could not prepare the review. Try again.");
-      setFocus({ id: "receipt-review-error" });
-    } finally {
-      operation.current = false;
-      setBusy(null);
+      return;
     }
-  }
-
-  async function receiveStock() {
-    if (!review || operation.current) return;
-    operation.current = true;
-    setBusy("commit");
-    try {
-      const result = await commitDelivery(review.input);
-      if (result.ok) {
-        router.replace(`/admin/stock/deliveries/${result.id}`);
+    if (intent === "import") {
+      if ((file instanceof File && file.size > MAX_DELIVERY_IMPORT_BYTES) ||
+          new TextEncoder().encode(String(formData.get("paste") ?? "")).byteLength > MAX_DELIVERY_IMPORT_BYTES) {
+        setEnhanced({ base: nativeState, state: {
+          ...state, draft: submitted, error: "Use a file or pasted table no larger than 128 KB.", errorAt: "receipt-import-error", importOpen: true,
+        } });
         return;
       }
-      setCommitError(result);
+    } else {
+      formData.delete("file");
+    }
+
+    operation.current = true;
+    setBusy(intent);
+    try {
+      const next = await runDeliveryEditor(state, formData);
+      if ("recordedId" in next) {
+        router.replace(`/admin/stock/deliveries/${next.recordedId}`);
+        return;
+      }
+      if (intent === "import" && !next.error) {
+        const paste = form.elements.namedItem("paste");
+        const file = form.elements.namedItem("file");
+        if (paste instanceof HTMLTextAreaElement) paste.value = "";
+        if (file instanceof HTMLInputElement) file.value = "";
+        if (importing.current) importing.current.open = false;
+      }
+      setEnhanced({ base: nativeState, state: { ...next, importOpen: next.importOpen ?? (intent === "import" ? false : importOpen) } });
     } catch {
-      setCommitError({ error: "Could not confirm the receipt. Retry this review or check delivery history before starting again.", retryOnly: true });
+      setEnhanced({ base: nativeState, state: {
+        ...state,
+        draft: submitted,
+        error: intent === "commit"
+          ? "Could not confirm the receipt. Retry this review or check delivery history before starting again."
+          : intent === "import" ? "Could not import the table. Try again." : "Could not update the delivery. Try again.",
+        errorAt: intent === "commit" ? "receipt-commit-error" : intent === "import" ? "receipt-import-error" : "receipt-review-error",
+        retryOnly: intent === "commit" || state.retryOnly,
+        importOpen: intent === "import" || importOpen,
+      } });
     }
     operation.current = false;
     setBusy(null);
-    setFocus({ id: "receipt-commit-error" });
   }
 
   return (
-    <div className={styles.editor}>
+    <form className={styles.editor} id="receipt-editor" ref={attachForm} action={action} onSubmit={submit}
+      onInput={syncDraft} noValidate aria-busy={waiting || undefined}>
+      <input type="hidden" name="deliveryId" value={state.draft.id} />
       <ol className={styles.steps} role="list" aria-label="Receive delivery steps">
         <li aria-current={!review ? "step" : undefined}><span aria-hidden="true">01</span> Enter delivery</li>
         <li aria-current={review ? "step" : undefined}><span aria-hidden="true">02</span> Review and receive</li>
@@ -359,10 +235,10 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                 </a>
               </div>
             )}
-            {commitError && busy !== "commit" && (
+            {state.error && busy !== "commit" && (
               <div className={styles.errorBlock} id="receipt-commit-error" tabIndex={-1} role="alert">
-                <p>{commitError.error}</p>
-                {commitError.retryOnly && (
+                <p>{state.error}</p>
+                {state.retryOnly && (
                   <a className="textlink" href="/admin/stock/deliveries" target="_blank" rel="noopener">
                     Check delivery history (opens in a new tab)
                   </a>
@@ -370,21 +246,18 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
               </div>
             )}
             <div className={styles.actions}>
-              {!commitError?.retryOnly && <button className="secondary" type="button" disabled={busy === "commit"} onClick={() => {
-                setCommitError(null);
-                setReview(null);
-                setFocus({ id: "receipt-review" });
-              }}>Back to edit</button>}
-              <button className="primary" type="button" disabled={busy === "commit"} onClick={receiveStock}>
-                {busy === "commit" ? "Receiving stock…" : commitError ? "Retry receiving stock" : "Receive stock"}
+              {!state.retryOnly && <button className="secondary" type="submit" name="intent" value="back" disabled={waiting}>Back to edit</button>}
+              <button className="primary" type="submit" name="intent" value="commit" disabled={waiting}>
+                {busy === "commit" ? "Receiving stock…" : state.error ? "Retry receiving stock" : "Receive stock"}
               </button>
             </div>
             {busy === "commit" && <p className="sr" role="status">Receiving stock. Please wait.</p>}
           </div>
         </section>
       ) : (
-        <fieldset className={styles.editing} disabled={busy !== null}>
+        <fieldset className={styles.editing} disabled={waiting}>
           <legend className="sr">Enter delivery</legend>
+          <button type="submit" name="intent" value="review" hidden>Review delivery</button>
           <section className={styles.sheet} aria-labelledby="receipt-details-heading">
             <div className={styles.sheetHeader}>
               <h2 id="receipt-details-heading">Delivery details</h2>
@@ -393,26 +266,25 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
             <div className={styles.metadata}>
               <div>
                 <AdminField label="Delivery reference">
-                  <input id="receipt-reference" value={reference} maxLength={MAX_DELIVERY_CODE_LENGTH} required autoComplete="off"
-                    aria-invalid={showErrors && Boolean(referenceError)} aria-describedby={showErrors && referenceError ? "receipt-reference-error" : undefined}
-                    onChange={(event) => setReference(event.target.value)} />
+                  <input id="receipt-reference" name="reference" defaultValue={state.draft.reference} maxLength={MAX_DELIVERY_CODE_LENGTH}
+                    required autoComplete="off" aria-invalid={Boolean(headerErrors?.reference)}
+                    aria-describedby={headerErrors?.reference ? "receipt-reference-error" : undefined} />
                 </AdminField>
-                {showErrors && referenceError && <p className={styles.error} id="receipt-reference-error">{referenceError}</p>}
+                {headerErrors?.reference && <p className={styles.error} id="receipt-reference-error">{headerErrors.reference}</p>}
               </div>
               <div>
                 <AdminField label="Date received">
-                  <input id="receipt-date" type="date" required max={today} value={receivedOn}
-                    aria-invalid={showErrors && Boolean(dateError)} aria-describedby={showErrors && dateError ? "receipt-date-error" : undefined}
-                    onChange={(event) => setReceivedOn(event.target.value)} />
+                  <input id="receipt-date" name="receivedOn" type="date" required max={today} defaultValue={state.draft.receivedOn}
+                    aria-invalid={Boolean(headerErrors?.date)} aria-describedby={headerErrors?.date ? "receipt-date-error" : undefined} />
                 </AdminField>
-                {showErrors && dateError && <p className={styles.error} id="receipt-date-error">{dateError}</p>}
+                {headerErrors?.date && <p className={styles.error} id="receipt-date-error">{headerErrors.date}</p>}
               </div>
               <div className={styles.note}>
                 <AdminField label="Delivery note (optional)">
-                  <textarea id="receipt-note" rows={1} maxLength={500} value={note} onChange={(event) => setNote(event.target.value)}
-                    aria-invalid={showErrors && Boolean(noteError)} aria-describedby={showErrors && noteError ? "receipt-note-error" : undefined} />
+                  <textarea id="receipt-note" name="note" rows={1} maxLength={500} defaultValue={state.draft.note}
+                    aria-invalid={Boolean(headerErrors?.note)} aria-describedby={headerErrors?.note ? "receipt-note-error" : undefined} />
                 </AdminField>
-                {showErrors && noteError && <p className={styles.error} id="receipt-note-error">{noteError}</p>}
+                {headerErrors?.note && <p className={styles.error} id="receipt-note-error">{headerErrors.note}</p>}
               </div>
             </div>
           </section>
@@ -421,7 +293,7 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
             <div className={`${styles.sheetHeader} ${styles.ledgerHeader}`}>
               <div>
                 <h2 id="receipt-lines-heading">Delivery lines</h2>
-                <p>Enter a SKU or maker code. Press Enter to move to the next field or line.</p>
+                <p>Enter a SKU or maker code. {live?.state === state && "Press Enter to move to the next field or line."}</p>
                 {showCosts && <p>Unit cost is optional. Enter landed cost in pounds per blade.</p>}
               </div>
               <dl className={styles.tally}>
@@ -430,35 +302,26 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
               </dl>
             </div>
 
-            <details className={styles.import} ref={importing}>
+            <details className={styles.import} ref={importing} open={state.importOpen} suppressHydrationWarning>
               <summary>Import lines</summary>
-              <form className={styles.importForm} onSubmit={importLines} noValidate>
-                <div className={styles.importModes} aria-label="Import method" role="group">
-                  {[["paste", "Paste table"], ["file", "Upload CSV"]].map(([type, label]) => (
-                    <button key={type} type="button" className="secondary" aria-pressed={importType === type} onClick={() => {
-                      setImportType(type === "paste" ? "paste" : "file");
-                      setImportError("");
-                    }}>{label}</button>
-                  ))}
-                </div>
-                <p id="receipt-import-help">Use columns in this order: code, quantity{showCosts ? ", optional unit cost" : ""}. Up to 200 lines and 128 KB.</p>
-                {importType === "paste" ? (
+              <div className={styles.importForm}>
+                <p id="receipt-import-help">Paste spreadsheet rows or choose a CSV file. Use columns in this order: code, quantity{showCosts ? ", optional unit cost" : ""}. Up to 200 lines and 128 KB.</p>
+                <div className={styles.importFields}>
                   <AdminField label="Spreadsheet rows">
-                    <textarea id="receipt-paste" name="paste" rows={4} value={paste} onChange={(event) => { setPaste(event.target.value); setImportError(""); }}
+                    <textarea id="receipt-paste" name="paste" rows={4} maxLength={MAX_DELIVERY_IMPORT_BYTES + 1} defaultValue={state.draft.paste}
                       aria-describedby={importError ? "receipt-import-help receipt-import-error" : "receipt-import-help"} />
                   </AdminField>
-                ) : (
                   <AdminField label="CSV file">
-                    <input id="receipt-file" type="file" name="file" accept=".csv,text/csv" onChange={() => setImportError("")}
+                    <input id="receipt-file" type="file" name="file" accept=".csv,text/csv"
                       aria-describedby={importError ? "receipt-import-help receipt-import-error" : "receipt-import-help"} />
                   </AdminField>
-                )}
+                </div>
                 {importError && <p className={styles.error} id="receipt-import-error" tabIndex={-1} role="alert">{importError}</p>}
                 <div className={styles.actions}>
-                  <button type="submit" className="secondary">{busy === "import" ? "Importing lines…" : "Add imported lines"}</button>
+                  <button type="submit" name="intent" value="import" className="secondary">{busy === "import" ? "Importing lines…" : "Add imported lines"}</button>
                   <a className="textlink" href="/admin/stock/receive/template" download>Download blank CSV</a>
                 </div>
-              </form>
+              </div>
             </details>
 
             <div className={`${styles.columns} ${lineClass}`} aria-hidden="true">
@@ -467,21 +330,23 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
             <ol className={styles.lines} role="list" aria-label="Delivery lines">
               {ledgerRows.map(({ row, match, matches, quantity, invalidCode, invalidMatch, duplicate, invalidCost, active }, index) => {
                 const label = index + 1;
+                const initialRow = state.draft.rows[index]!;
                 const code = row.code.trim();
                 const codeMessage = (showErrors || code || row.sourceRow ? invalidCode : undefined) || duplicate;
                 const quantityError = active && quantity === null && (showErrors || row.quantity.trim() || row.sourceRow);
                 return (
                   <li className={lineClass} key={row.id}>
+                    <input type="hidden" name="row" value={row.id} />
+                    {row.sourceRow && <input type="hidden" name={`sourceRow:${row.id}`} value={row.sourceRow} />}
                     <div className={styles.lineNumber} aria-hidden="true"><span>Line</span> {String(label).padStart(2, "0")}</div>
                     <div className={styles.code}>
                       <label htmlFor={rowId(row, "code")} className={styles.fieldLabel}>Blade code</label>
-                      <input id={rowId(row, "code")} aria-label={`Blade code for line ${label}`} value={row.code} placeholder="SKU or maker code"
+                      <input id={rowId(row, "code")} name={`code:${row.id}`} aria-label={`Blade code for line ${label}`} defaultValue={initialRow.code} placeholder="SKU or maker code"
                         autoComplete="off" spellCheck={false} maxLength={MAX_DELIVERY_CODE_LENGTH}
                         aria-invalid={Boolean(codeMessage)} aria-describedby={codeMessage ? rowId(row, "code-error") : undefined}
-                        onChange={(event) => editRow(row, "code", event.target.value)}
                         onKeyDown={(event) => advance(event, row, index, "code")} onBlur={(event) => {
                           const value = event.currentTarget.value.trim();
-                          if (!codeError(value) && !Array.isArray(checks.get(value))) void checkCodes([value]);
+                          if (!deliveryCodeError(value) && !Array.isArray(checks.get(value))) void checkCodes([value]);
                         }} />
                       {codeMessage && <p className={styles.error} id={rowId(row, "code-error")}>{codeMessage}</p>}
                       {row.sourceRow && <p className={styles.fieldHint}>Imported row {row.sourceRow}</p>}
@@ -490,9 +355,10 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                       {matches.length > 1 && (
                         <>
                           <label htmlFor={rowId(row, "match")} className={styles.fieldHint}>Choose the exact SKU</label>
-                          <select id={rowId(row, "match")} aria-label={`Choose the exact SKU for line ${label}`} value={match?.variantId ?? ""}
-                            aria-invalid={invalidMatch} aria-describedby={invalidMatch ? rowId(row, "match-error") : undefined}
-                            onChange={(event) => editRow(row, "selectedId", event.target.value)}>
+                          <input type="hidden" name={`selectedCode:${row.id}`} value={code} />
+                          <select key={code} id={rowId(row, "match")} name={`selectedId:${row.id}`}
+                            aria-label={`Choose the exact SKU for line ${label}`} defaultValue={match?.variantId ?? ""}
+                            aria-invalid={invalidMatch} aria-describedby={invalidMatch ? rowId(row, "match-error") : undefined}>
                             <option value="">Choose a blade</option>
                             {matches.map(({ variantId, sku, bladeName }) => <option key={variantId} value={variantId}>{sku} · {bladeName}</option>)}
                           </select>
@@ -506,10 +372,10 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                     </div>
                     <div className={styles.quantity}>
                       <label htmlFor={rowId(row, "quantity")} className={styles.fieldLabel}>Quantity</label>
-                      <input id={rowId(row, "quantity")} aria-label={`Quantity for line ${label}`} inputMode="numeric" value={row.quantity}
+                      <input id={rowId(row, "quantity")} name={`quantity:${row.id}`} aria-label={`Quantity for line ${label}`} inputMode="numeric" defaultValue={initialRow.quantity}
                         aria-invalid={Boolean(quantityError)} aria-describedby={quantityError ? rowId(row, "quantity-error") : undefined}
                         maxLength={MAX_DELIVERY_CODE_LENGTH}
-                        onChange={(event) => editRow(row, "quantity", event.target.value)} onKeyDown={(event) => advance(event, row, index, "quantity")} />
+                        onKeyDown={(event) => advance(event, row, index, "quantity")} />
                       {quantityError && <p className={styles.error} id={rowId(row, "quantity-error")}>
                         {row.quantity.trim() ? `Use a whole number from 1 to ${quantityMax}.` : "Enter a quantity."}
                       </p>}
@@ -517,28 +383,29 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                     {showCosts && (
                       <div className={styles.cost}>
                         <label htmlFor={rowId(row, "cost")} className={styles.fieldLabel}>Unit cost (£)</label>
-                        <input id={rowId(row, "cost")} aria-label={`Unit cost (£) for line ${label}`} inputMode="decimal" value={row.unitCost} placeholder="Optional"
+                        <input id={rowId(row, "cost")} name={`unitCost:${row.id}`} aria-label={`Unit cost (£) for line ${label}`} inputMode="decimal" defaultValue={initialRow.unitCost} placeholder="Optional"
                           aria-invalid={invalidCost} aria-describedby={invalidCost ? rowId(row, "cost-error") : undefined} maxLength={MAX_DELIVERY_CODE_LENGTH}
-                          onChange={(event) => editRow(row, "unitCost", event.target.value)} onKeyDown={(event) => advance(event, row, index, "unitCost")} />
+                          onKeyDown={(event) => advance(event, row, index, "unitCost")} />
                         {invalidCost && <p className={styles.error} id={rowId(row, "cost-error")}>Use a valid £ amount, e.g. 4.50.</p>}
                       </div>
                     )}
-                    <button className={`${styles.remove} textlink`} type="button" aria-label={`Remove line ${label}`} onClick={() => removeLine(index)}>Remove</button>
+                    <button className={`${styles.remove} textlink`} type="submit" name="intent" value={`remove:${row.id}`} aria-label={`Remove line ${label}`}>Remove</button>
                   </li>
                 );
               })}
             </ol>
 
             <div className={styles.addLine}>
-              <button className="secondary" type="button" disabled={rows.length >= MAX_DELIVERY_ROWS} onClick={addLine}><span aria-hidden="true">+</span> Add line</button>
-              {rows.length >= MAX_DELIVERY_ROWS && <p className="admin-muted">Maximum of {MAX_DELIVERY_ROWS} lines reached.</p>}
-              <p className="admin-muted" role="status">{announcement}</p>
+              <button className="secondary" type="submit" name="intent" value="add" ref={addButton} disabled={draft.rows.length >= MAX_DELIVERY_ROWS}><span aria-hidden="true">+</span> Add line</button>
+              <button className="secondary" type="submit" name="intent" value="check">{busy === "check" ? "Checking blade codes…" : "Check blade codes"}</button>
+              {draft.rows.length >= MAX_DELIVERY_ROWS && <p className="admin-muted">Maximum of {MAX_DELIVERY_ROWS} lines reached.</p>}
+              {state.announcement && <p className="admin-muted" role="status">{state.announcement}</p>}
             </div>
           </section>
           <div className={styles.submitArea}>
-            {reviewError && <p className={styles.errorBlock} id="receipt-review-error" role="alert" tabIndex={-1}>{reviewError}</p>}
+            {state.error && !importError && <p className={styles.errorBlock} id="receipt-review-error" role="alert" tabIndex={-1}>{state.error}</p>}
             <div className={styles.actions}>
-              <button className="primary" type="button" id="receipt-review" onClick={reviewDelivery}>
+              <button className="primary" type="submit" name="intent" value="review" id="receipt-review">
                 {busy === "review" ? "Checking delivery…" : "Review delivery"}
               </button>
               <p className="admin-muted">You’ll review the delivery before any stock is added.</p>
@@ -548,6 +415,6 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
           </div>
         </fieldset>
       )}
-    </div>
+    </form>
   );
 }
