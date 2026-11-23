@@ -5,8 +5,8 @@ import { loadPurchaseEditor } from "./editor-load";
 export const metadata = { title: "New purchase order" };
 
 export default async function NewPurchaseOrderPage({ searchParams }: PageProps<"/admin/purchase-orders/new">) {
-  const { variant } = await searchParams;
-  const editor = await loadPurchaseEditor(undefined, typeof variant === "string" ? variant : undefined);
+  const { variant, variants } = await searchParams;
+  const editor = await loadPurchaseEditor(undefined, typeof variant === "string" ? variant : undefined, variants);
 
   return <>
     <AdminHeading title="New purchase order"

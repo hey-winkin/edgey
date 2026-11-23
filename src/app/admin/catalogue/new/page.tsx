@@ -15,7 +15,7 @@ export default async function NewVariantPage() {
 
   return <>
     <AdminHeading title="Add draft variant" description="Add a distinct, unstocked SKU to an existing product family. It will not appear in the storefront." />
-    <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
+    <AdminLink href="/admin/catalogue">{staffDestinationLabels.stock}</AdminLink>
     <AdminSection title="Variant details">
       <AdminForm action={createDraftVariant} submit="Create draft">
         <AdminField label="Product family">

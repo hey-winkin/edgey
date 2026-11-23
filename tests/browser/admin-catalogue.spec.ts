@@ -63,7 +63,7 @@ test("a catalogue operator can save specifications before setting a draft's pric
 test("a catalogue operator approves and publishes a draft for public search", async ({ page }) => {
   const staff = await createLocalAdminUser("catalogue");
   await signInStaff(page, staff);
-  await (await openStaffMenu(page)).getByRole("link", { name: "Products and prices" }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock", exact: true }).click();
   await page.getByRole("link", { name: "EDG-Z11", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Tight-corner drag blade" })).toBeVisible();
   const variantPath = new URL(page.url()).pathname;

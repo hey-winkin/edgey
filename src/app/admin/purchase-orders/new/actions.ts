@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/admin/auth";
+import { purchaseRoles } from "@/lib/admin/roles";
 import {
   getPurchaseVariants, matchPurchaseCatalogueCodes, purchaseCatalogueMaxPage, searchPurchaseCatalogue,
   type PurchaseVariant,
@@ -10,7 +11,7 @@ import {
 import {
   importRowCode, maxCodeLength, maxImportBytes, maxNoteLength, maxOrderNoteLength, maxPartNumberLength,
   maxPurchaseLines, newPurchaseLine, parsePurchaseImport, previewPurchaseImport, priceInput, purchaseCurrency,
-  purchaseId, purchasePayload, type PurchaseEditorState, type PurchaseLine,
+  purchaseId, purchasePayload, readPurchaseLinePrice, type PurchaseEditorState, type PurchaseLine,
 } from "./editor-data";
 
 type StaffDb = Awaited<ReturnType<typeof requireStaff>>["db"];
@@ -48,7 +49,7 @@ function saveError(error: { code: string; message: string }, revision: number) {
 }
 
 export async function submitPurchaseEditor(previous: PurchaseEditorState, form: FormData): Promise<PurchaseEditorState> {
-  const { db } = await requireStaff("catalogue", "finance");
+  const { db } = await requireStaff(...purchaseRoles);
   const intent = field(form, "intent", 48);
   const id = field(form, "order_id", 36);
   const revisionText = field(form, "revision", 10);
@@ -58,6 +59,7 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
     return { ...previous, error: { message: "This editor is out of date. Reopen the purchase order to continue." } };
   }
   const currency = field(form, "currency", 3);
+  const orderCurrency = purchaseCurrency(currency) ? currency : previous.header.currency;
   const supplier = field(form, "supplier_id", 36);
   const samePriceScope = supplier === previous.header.supplier && currency === previous.header.currency;
   const query = field(form, "q", maxCodeLength).trim().slice(0, maxCodeLength);
@@ -70,15 +72,21 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
   const known = new Map(previous.lines.map((line) => [line.product.id, line]));
   const seen = new Set<string>();
   const lines: PurchaseLine[] = [];
+  let clearedPrefill = false;
   for (const variant of posted.slice(0, maxPurchaseLines)) {
     if (typeof variant !== "string" || !purchaseId.test(variant) || seen.has(variant)) continue;
     const line = known.get(variant);
     if (!line) continue;
     seen.add(variant);
+    const { unitPrice, prefilledPrice, cleared } = readPurchaseLinePrice(
+      line, field(form, `price:${variant}`, 11), orderCurrency, form.get(`prefill_cleared:${variant}`) === "1",
+    );
+    clearedPrefill ||= cleared;
     lines.push({
       product: line.product, received: line.received,
+      ...(line.receivedPrice && { receivedPrice: line.receivedPrice, prefilledPrice }),
       quantity: field(form, `quantity:${variant}`, 10),
-      unitPrice: field(form, `price:${variant}`, 11),
+      unitPrice,
       supplierPart: field(form, `part:${variant}`, maxPartNumberLength),
       note: field(form, `note:${variant}`, maxNoteLength),
     });
@@ -87,7 +95,7 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
     id, revision, status: previous.status, response: previous.response + 1,
     header: {
       supplier, ordered: field(form, "ordered_on", 10), expected: field(form, "expected_on", 10),
-      currency: purchaseCurrency(currency) ? currency : previous.header.currency,
+      currency: orderCurrency,
       exchange: field(form, "exchange_rate", 16),
       shipping: field(form, "shipping_minor", 11), duty: field(form, "duty_minor", 11),
       other: field(form, "other_minor", 11), vat: field(form, "import_vat_minor", 11),
@@ -100,6 +108,7 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       const price = previous.suggestions[product.id];
       return !unitPrice.trim() && typeof price === "number" && Number.isSafeInteger(price) && price >= 0 ? [[product.id, price]] : [];
     })) : {},
+    notice: clearedPrefill && intent !== "save" ? "Prefilled prices in a different currency were cleared. Review the line prices." : undefined,
   };
   function refuse(message: string, field?: string, area?: NonNullable<PurchaseEditorState["error"]>["area"]) {
     return { ...state, error: { message, field, area }, focus: area ? `po-${area}-error` : "po-save-error" };
@@ -125,6 +134,7 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
     }
   }
   if (intent === "save") {
+    if (clearedPrefill) return refuse("Prefilled prices in a different currency were cleared. Review the line prices, then save again.");
     if (state.paste.trim() || file) return refuse("Import the staged table or clear it before saving.", "paste", "import");
     const payload = purchasePayload(state.header, state.lines, state.status);
     if (!payload.ok) return refuse(payload.message, payload.field);

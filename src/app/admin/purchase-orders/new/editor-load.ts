@@ -5,17 +5,40 @@ import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/admin/auth";
 import { getPurchaseVariants, purchaseCatalogueBrands, searchPurchaseCatalogue } from "@/lib/admin/purchase-catalogue";
 import type { PurchaseVariant } from "@/lib/admin/purchase-catalogue";
+import { purchaseRoles } from "@/lib/admin/roles";
 import { stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
+import { decodeStockSelection } from "@/lib/admin/stock-selection";
 import {
   blankPurchaseHeader, editablePurchaseStatus, maxPurchaseLines, newPurchaseLine, priceInput,
-  purchaseCurrency, purchaseId, type PurchaseCurrency, type PurchaseEditorState,
+  purchaseCurrency, purchaseId, stockPurchasePrefill, type PurchaseCurrency, type PurchaseEditorState, type ReceivedPrice,
 } from "./editor-data";
 
 export type PurchaseSupplierOption = { id: string; name: string; default_currency: PurchaseCurrency | null };
 export type PurchaseBrand = { slug: string; name: string };
 
-export async function loadPurchaseEditor(id?: string, prefill?: string) {
-  const { db, roles } = await requireStaff("catalogue", "finance");
+type StaffDb = Awaited<ReturnType<typeof requireStaff>>["db"];
+
+async function latestReceivedPrices(db: StaffDb, products: PurchaseVariant[]) {
+  if (!products.length) return new Map<string, ReceivedPrice>();
+  const ids = products.map(({ id }) => id);
+  const batches = await Promise.all(Array.from({ length: Math.ceil(ids.length / 40) }, (_, i) =>
+    db.from("staff_current_variant_costs").select("variant_id, supplier_unit_minor, currency")
+      .eq("source", "receipt").in("variant_id", ids.slice(i * 40, (i + 1) * 40))));
+  if (batches.some(({ error }) => error)) {
+    console.error("Could not load last received purchase prices.");
+    return null;
+  }
+  const prices = new Map<string, ReceivedPrice>();
+  for (const { data } of batches) {
+    for (const { variant_id, supplier_unit_minor, currency } of data ?? []) {
+      if (purchaseCurrency(currency)) prices.set(variant_id, { unitMinor: supplier_unit_minor, currency });
+    }
+  }
+  return prices;
+}
+
+export async function loadPurchaseEditor(id?: string, prefill?: string, stockSelection?: unknown) {
+  const { db, roles } = await requireStaff(...purchaseRoles);
   if (id && !purchaseId.test(id)) notFound();
   const order = id ? await db.from("staff_purchase_orders").select(`
     number, status, revision, ordered_on, expected_on,
@@ -32,8 +55,10 @@ export async function loadPurchaseEditor(id?: string, prefill?: string) {
   const costs = record?.staff_purchase_order_costs;
   if (record && (!costs || !purchaseCurrency(costs.currency))) throw new Error("Could not load the purchase-order costs.");
   const savedLines = record?.staff_purchase_order_lines ?? [];
-  const prefillId = prefill && purchaseId.test(prefill) && status === "draft" ? prefill.toLowerCase() : undefined;
-  const neededIds = [...new Set([...savedLines.map(({ variant_id }) => variant_id), ...(prefillId ? [prefillId] : [])])];
+  const fromStock = !id && stockSelection !== undefined;
+  const stockIds = fromStock ? decodeStockSelection(stockSelection) : [];
+  const prefillId = !fromStock && prefill && purchaseId.test(prefill) && status === "draft" ? prefill.toLowerCase() : undefined;
+  const neededIds = [...new Set([...savedLines.map(({ variant_id }) => variant_id), ...stockIds, ...(prefillId ? [prefillId] : [])])];
   const [suppliers, brands, products, picker] = await Promise.all([
     db.from("staff_suppliers").select("id, name, default_currency").order("name").order("id"),
     purchaseCatalogueBrands(),
@@ -69,7 +94,24 @@ export async function loadPurchaseEditor(id?: string, prefill?: string) {
     }),
     query: "", brand: "", page: 1, ...picker, exact: "", paste: "", suggestions: {},
   };
-  if (prefill !== undefined) {
+  if (fromStock) {
+    const selected = stockIds.flatMap((id) => {
+      const product = products.get(id);
+      return product && product.status !== "archived" ? [product] : [];
+    });
+    const prices = await latestReceivedPrices(db, selected);
+    const { currency, lines } = stockPurchasePrefill(selected, prices ?? new Map());
+    initial.header.currency = currency;
+    initial.lines = lines;
+    const first = lines[0];
+    if (first) initial.focus = `quantity:${first.product.id}`;
+    const skipped = stockIds.length - selected.length;
+    const added = lines.length ? `Added ${lines.length} ${lines.length === 1 ? "blade" : "blades"}. Enter quantities, then save a draft.` : "";
+    const unavailable = skipped ? `Skipped ${skipped} ${skipped === 1 ? "blade that is" : "blades that are"} archived or no longer available.` : "";
+    initial.notice = stockIds.length
+      ? [added, unavailable, prices ? "" : "Could not load last received prices. Enter the supplier prices manually."].filter(Boolean).join(" ")
+      : "This stock selection is invalid or empty. Select blades in Stock and try again.";
+  } else if (prefill !== undefined) {
     const product = prefillId ? products.get(prefillId) : undefined;
     if (status !== "draft") {
       initial.error = { message: "Catalogue shortcuts can only add to a draft. Use the picker to amend this order." };

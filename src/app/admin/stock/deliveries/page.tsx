@@ -26,7 +26,7 @@ export default async function DeliveryHistory({ searchParams }: { searchParams: 
         description="Open a delivery to see the blades and quantities that were received." />
       {warehouse && (
         <nav className={styles.links} aria-label="Stock navigation">
-          <AdminLink href="/admin/stock">{staffDestinationLabels.stockLevels}</AdminLink>
+          <AdminLink href="/admin/stock">{staffDestinationLabels.adjustStock}</AdminLink>
           <AdminLink href="/admin/stock/receive">{staffDestinationLabels.bookInDelivery}</AdminLink>
         </nav>
       )}

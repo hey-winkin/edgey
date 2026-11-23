@@ -551,12 +551,12 @@ test.describe("staff shell", () => {
           Purchasing: [
             ["Purchase orders", "/admin/purchase-orders"],
             ...(role === "warehouse"
-              ? [["Book in a delivery", "/admin/stock/receive"], ["Stock levels", "/admin/stock"]]
-              : [["Suppliers", "/admin/purchase-orders/suppliers"]]),
+              ? [["Book in a delivery", "/admin/stock/receive"], ["Adjust stock", "/admin/stock"]]
+              : [["Suppliers", "/admin/purchase-orders/suppliers"], ["Stock", "/admin/catalogue"]]),
             ["Delivery history", "/admin/stock/deliveries"],
           ],
           Admin: [
-            role === "warehouse" ? ["Customer delivery settings", "/admin/delivery"] : ["Products and prices", "/admin/catalogue"],
+            ...(role === "warehouse" ? [["Customer delivery settings", "/admin/delivery"]] : []),
             ["Sales reports", "/admin/sales"],
             ...(role === "warehouse" ? [["Shop performance", "/admin/commercial"]]
               : role === "finance" ? [["Finance and trade accounts", "/admin/finance"]] : []),
@@ -703,8 +703,9 @@ test.describe("staff shell", () => {
             await expect(orders.getByRole("link", { name: /^[1-9]\d* customer (?:enquiry|enquiries) to answer or review$/ })).toHaveAttribute("href", "/admin/requests");
             const shortages = purchases.getByRole("link", { name: /^[1-9]\d* published blade variants? out of stock$/ });
             await expect(shortages).toHaveAttribute("href", "/admin/stock?view=out-of-stock");
+            await expect(purchases.getByRole("link", { name: "Stock", exact: true })).toHaveCount(roles === "all" ? 1 : 0);
             await expect(adminGroup.getByRole("link")).toHaveText(roles === "all"
-              ? ["Products and prices", "Customer delivery settings", "Sales reports", "Finance and trade accounts", "Shop performance"]
+              ? ["Customer delivery settings", "Sales reports", "Finance and trade accounts", "Shop performance"]
               : ["Customer delivery settings", "Sales reports", "Shop performance"]);
             for (const viewport of staffViewports) {
               await page.setViewportSize(viewport);
@@ -753,8 +754,8 @@ test.describe("staff shell", () => {
               await expect(row.getByRole("cell").nth(2)).toHaveText("Published");
               await expect(row.getByRole("cell").nth(availableColumn)).toHaveText("0");
             }
-            await page.getByRole("link", { name: "Show all stock" }).click();
-            await expect(page.getByRole("heading", { level: 1, name: "Stock levels" })).toBeVisible();
+            await page.getByRole("link", { name: "Adjust stock", exact: true }).click();
+            await expect(page.getByRole("heading", { level: 1, name: "Adjust stock" })).toBeVisible();
           } finally {
             await db.query("delete from public.enquiries where id = $1", [enquiry]);
           }

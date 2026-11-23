@@ -7,6 +7,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { StaffRole } from "./auth";
 import { adminPage, adminRange, adminPageSize } from "./pagination";
 import { stockSchemaUnavailable } from "./stock-cost-data";
+import { stockSelectionLimit } from "./stock-selection";
 
 type CatalogueFunctions = Pick<Database["public"]["Functions"],
   "admin_catalogue_update" | "admin_catalogue_review" | "admin_catalogue_set_publication">;
@@ -22,11 +23,7 @@ export const catalogueStatuses = ["draft", "published", "archived"] as const sat
 export const catalogueCodeMaxLength = 80;
 type CatalogueListQuery = Record<string, string | string[] | undefined>;
 
-export async function listAdminCatalogue(
-  { db, roles }: { db: SupabaseClient<Database>; roles: StaffRole[] },
-  query: CatalogueListQuery,
-) {
-  const page = adminPage(query.page);
+async function catalogueListQuery(roles: StaffRole[], query: CatalogueListQuery) {
   const q = typeof query.q === "string" ? query.q.trim().slice(0, catalogueCodeMaxLength) : "";
   const code = normaliseFinderCode(q);
   const status = catalogueStatuses.find((value) => value === query.status);
@@ -36,7 +33,7 @@ export async function listAdminCatalogue(
   const brand = brands.find(({ slug }) => slug === query.brand)?.slug;
   const filters = { q: q || undefined, status, brand };
 
-  if (q && !code) return { brands, filters, page, length: 0, rows: [] };
+  if (q && !code) return { brands, filters, variants: null };
 
   let variants = service.from("variants")
     .select(`id, sku, option_label, publication_status, approved_at, rejected_at, products(name),
@@ -55,6 +52,24 @@ export async function listAdminCatalogue(
       .eq("brand_matches.verification_state", "approved");
   }
   if (status) variants = variants.eq("publication_status", status);
+  return { brands, filters, variants };
+}
+
+export async function getOrderableCatalogueIds(roles: StaffRole[], query: CatalogueListQuery) {
+  const { variants } = await catalogueListQuery(roles, query);
+  if (!variants) return [];
+  const { data, error } = await variants.neq("publication_status", "archived").limit(stockSelectionLimit + 1);
+  if (error) throw new Error("Could not select the matching blades.");
+  return data.map(({ id }) => id);
+}
+
+export async function listAdminCatalogue(
+  { db, roles }: { db: SupabaseClient<Database>; roles: StaffRole[] },
+  query: CatalogueListQuery,
+) {
+  const page = adminPage(query.page);
+  const { brands, filters, variants } = await catalogueListQuery(roles, query);
+  if (!variants) return { brands, filters, page, length: 0, rows: [] };
   const { data, error } = await variants.range(...adminRange(page));
   if (error) throw new Error("Could not load the staff catalogue.");
 

@@ -1,12 +1,17 @@
-.catalogue-list-heading, .catalogue-list-summary {
+.catalogue-list-heading {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   column-gap: 16px;
 }
 
-.catalogue-list-heading { align-items: center; }
+.catalogue-list-links, .catalogue-list-filter-actions, .catalogue-list-selection, .catalogue-list-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
 
 .catalogue-list-filters {
   display: grid;
@@ -20,13 +25,12 @@
   min-height: 44px;
 }
 
-.catalogue-list-filters .primary { min-height: 44px; }
-.catalogue-list-summary { font-size: .88rem; margin-block: 12px; row-gap: 6px; }
-.catalogue-list-summary p { margin: 0; }
+.catalogue-list-filters .secondary, .catalogue-list-order .primary { min-height: 44px; }
+.catalogue-list-summary { font-size: .88rem; margin-block: 12px; scroll-margin-top: 5rem; }
 .catalogue-list .admin-table th { min-width: 0; }
 .catalogue-list .admin-table tbody th { font: inherit; background: transparent; }
 .catalogue-list .admin-table tbody tr:last-child th { border-bottom: 0; }
-.catalogue-list :is(th, td):nth-child(n+3) { text-align: right; }
+.catalogue-list .admin-table :is(th, td):nth-last-child(-n+2) { text-align: right; }
 .catalogue-list .admin-table td:last-child .admin-mono { white-space: nowrap; }
 .catalogue-list-stock { overflow-wrap: anywhere; }
 .catalogue-list-stock dl, .catalogue-list-stock dd { margin: 0; }
@@ -41,8 +45,100 @@
 .catalogue-list-name { margin-top: 3px; overflow-wrap: anywhere; }
 .catalogue-list-detail { margin-top: 4px; font-size: .8rem; }
 .catalogue-list tbody th .catalogue-list-detail { overflow-wrap: anywhere; }
-.catalogue-list tbody th .catalogue-list-detail > a { display: inline-flex; min-block-size: 24px; align-items: center; }
 .catalogue-list-detail[data-cost-status="missing"] { color: var(--ink); font-weight: 600; }
+
+.catalogue-list-selection {
+  justify-content: space-between;
+  border-block-start: 1px solid var(--line);
+  padding-block: 8px;
+}
+
+.catalogue-list-order { margin-inline-start: auto; }
+.catalogue-list-order p { margin: 0; font-size: .88rem; }
+.catalogue-list-form:not([data-off-page]):not(:has(input[name="variant"]:checked)) .catalogue-list-order button { display: none; }
+.catalogue-list-form:not([data-enhanced]):has(input[name="variant"][checked]:not(:checked), input[name="variant"]:checked:not([checked])) .catalogue-list-order p {
+  display: none;
+}
+
+.catalogue-list-text-button {
+  min-block-size: 44px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--edgey-control-border);
+  text-underline-offset: .2em;
+}
+
+.catalogue-list-text-button:hover { text-decoration-color: currentColor; }
+.catalogue-list .admin-table:has(.catalogue-list-checkbox) thead th:first-child { text-align: center; }
+.catalogue-list .admin-table .catalogue-list-checkbox { inline-size: 1%; padding: 0; text-align: center; vertical-align: middle; }
+
+.catalogue-list-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  cursor: pointer;
+}
+
+.catalogue-list-master { padding-inline: 8px; font-size: .88rem; }
+
+.catalogue-list-check input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  inline-size: 19px;
+  block-size: 19px;
+  margin: 0;
+  border: 1px solid var(--edgey-control-border);
+  border-radius: 50%;
+  background: var(--edgey-field);
+  cursor: inherit;
+}
+
+.catalogue-list-check input:is(:checked, :indeterminate) {
+  border-color: var(--edgey-primary-fill);
+  background: var(--edgey-primary-fill);
+  color: var(--edgey-primary-text);
+}
+
+.catalogue-list-check input:checked::before {
+  content: "";
+  inline-size: 9px;
+  block-size: 5px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.catalogue-list-check input:indeterminate::before {
+  content: "";
+  inline-size: 9px;
+  border-block-start: 2px solid currentColor;
+}
+
+.catalogue-list-check:has(input:focus-visible) {
+  outline: var(--edgey-focus-width) solid var(--edgey-focus);
+  outline-offset: -2px;
+}
+
+.catalogue-list-check input:focus-visible { outline: none; }
+
+@media (forced-colors: active) {
+  .catalogue-list-check input[type="checkbox"] {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .catalogue-list-check input:is(:checked, :indeterminate) {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .catalogue-list-check:has(input:focus-visible) { outline-color: Highlight; }
+}
 
 .catalogue-list-status {
   display: inline-block;
@@ -62,6 +158,23 @@
   .catalogue-list-heading .admin-heading { margin-bottom: 8px; }
   .catalogue-list-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalogue-list-filters > :first-child { grid-column: 1 / -1; }
-  .catalogue-list-filters .primary { grid-column: 1 / -1; justify-self: start; }
+  .catalogue-list-filter-actions { grid-column: 1 / -1; }
   .catalogue-list .admin-table :is(th, td) { padding-inline: 6px; }
+}
+
+@media (max-width: 440px) {
+  .catalogue-list-selection { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; }
+  .catalogue-list-master { justify-self: start; padding-inline: 0; }
+  .catalogue-list-selection > .catalogue-list-text-button { justify-self: start; }
+  .catalogue-list-select-matching { grid-row: 3; grid-column: 1 / -1; }
+  .catalogue-list-order { display: contents; }
+  .catalogue-list-order p { grid-area: 2 / 1; }
+  .catalogue-list-order .catalogue-list-text-button { grid-area: 1 / 2; justify-self: end; }
+  .catalogue-list-order .primary { grid-area: 2 / 2; }
+}
+
+@media (max-width: 360px) {
+  .catalogue-list .admin-table :is(th, td) { padding-inline: 4px; }
+  .catalogue-list .admin-table:has(.catalogue-list-checkbox) thead th:first-child { padding-inline: 0; }
+  .catalogue-list-stock dt { white-space: nowrap; }
 }

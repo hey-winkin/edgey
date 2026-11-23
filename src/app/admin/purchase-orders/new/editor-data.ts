@@ -14,6 +14,8 @@ export const maxNoteLength = 500;
 export const maxOrderNoteLength = 2_000;
 export const purchaseId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type ReceivedPrice = { currency: PurchaseCurrency; unitMinor: number };
+
 export type PurchaseLine = {
   product: PurchaseVariant;
   quantity: string;
@@ -21,6 +23,8 @@ export type PurchaseLine = {
   supplierPart: string;
   note: string;
   received: number;
+  receivedPrice?: ReceivedPrice;
+  prefilledPrice?: boolean;
 };
 
 export type PurchaseHeader = {
@@ -79,6 +83,31 @@ export function newPurchaseLine(product: PurchaseVariant): PurchaseLine {
 
 export function priceInput(value: number | null | undefined) {
   return formatPoundsInput(value);
+}
+
+export function stockPurchasePrefill(products: PurchaseVariant[], prices: ReadonlyMap<string, ReceivedPrice>) {
+  const counts = { GBP: 0, USD: 0, EUR: 0 };
+  for (const product of products) {
+    const price = prices.get(product.id);
+    if (price) counts[price.currency]++;
+  }
+  const currency = currencies.reduce((best, code) => counts[code] > counts[best] ? code : best);
+  const lines = products.map((product): PurchaseLine => {
+    const receivedPrice = prices.get(product.id);
+    const prefilledPrice = receivedPrice?.currency === currency;
+    return {
+      ...newPurchaseLine(product), quantity: "", receivedPrice, prefilledPrice,
+      unitPrice: prefilledPrice ? priceInput(receivedPrice.unitMinor) : "",
+    };
+  });
+  return { currency, lines };
+}
+
+export function readPurchaseLinePrice(line: PurchaseLine, unitPrice: string, currency: string, alreadyCleared = false) {
+  const untouchedPrefill = !alreadyCleared && line.prefilledPrice && line.receivedPrice &&
+    parsePoundsToPence(unitPrice) === line.receivedPrice.unitMinor;
+  const cleared = Boolean(untouchedPrefill && line.receivedPrice?.currency !== currency);
+  return { unitPrice: cleared ? "" : unitPrice, prefilledPrice: Boolean(untouchedPrefill && !cleared), cleared };
 }
 
 function validDate(value: string) {

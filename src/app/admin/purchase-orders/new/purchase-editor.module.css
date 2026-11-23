@@ -83,6 +83,7 @@
 }
 .line { padding: clamp(10px, 2vw, 16px); background: var(--edgey-product-card); }
 .linePrice:has(input:not(:placeholder-shown)) .priceTools { display: none; }
+.receivedAmount { white-space: nowrap; }
 .priceTools button { margin-top: 5px; font-size: .83rem; }
 .lineDetail[open] { margin-top: 8px; border-top: 1px solid var(--line); }
 .lineExtra { padding-bottom: 8px; }

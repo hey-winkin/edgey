@@ -9,7 +9,7 @@ import { submitPurchaseEditor } from "./actions";
 import { captureEarlyPurchaseEditor, restoreEarlyPurchaseFields } from "./early-editor";
 import {
   currencies, maxCodeLength, maxNoteLength, maxOrderNoteLength, maxPartNumberLength, maxPurchaseLines,
-  purchaseCurrency, type PurchaseEditorState, type PurchaseLine,
+  purchaseCurrency, readPurchaseLinePrice, type PurchaseEditorState, type PurchaseLine,
 } from "./editor-data";
 import type { PurchaseBrand, PurchaseSupplierOption } from "./editor-load";
 import styles from "./purchase-editor.module.css";
@@ -74,6 +74,21 @@ function intentButton(intent: string, pending: boolean, children: ReactNode, pro
     className={props?.prominent ? "primary" : `admin-secondary ${styles.secondary}`} disabled={pending || props?.disabled}>{children}</button>;
 }
 
+function clearPrefilledPrices(form: HTMLFormElement, lines: PurchaseLine[], currency: string) {
+  const cleared: string[] = [];
+  for (const line of lines) {
+    if (!line.prefilledPrice) continue;
+    const { id } = line.product;
+    if (form.elements.namedItem(`prefill_cleared:${id}`)) continue;
+    const input = form.elements.namedItem(`price:${id}`);
+    if (input instanceof HTMLInputElement && readPurchaseLinePrice(line, input.value, currency).cleared) {
+      input.value = "";
+      cleared.push(id);
+    }
+  }
+  return cleared;
+}
+
 function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
   state: PurchaseEditorState;
   brands: PurchaseBrand[];
@@ -83,11 +98,17 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
 }) {
   const { header, lines, status, results, query, brand, page, more, notice, suggestions } = state;
   const [scope, setScope] = useState({ currency: header.currency, supplier: header.supplier });
+  const [clearedPrefill, setClearedPrefill] = useState(() => new Set<string>());
   const [currency, supplier] = [scope.currency, scope.supplier];
   const ordered = new Set(lines.map(({ product }) => product.id));
   const lockSupplier = status !== "draft";
   const supplierRecord = suppliers.find((item) => item.id === supplier);
   const samePriceScope = currency === header.currency && supplier === header.supplier;
+
+  const clearPrices = useCallback((form: HTMLFormElement, currency: string) => {
+    const cleared = clearPrefilledPrices(form, lines, currency);
+    if (cleared.length) setClearedPrefill((current) => new Set([...current, ...cleared]));
+  }, [lines]);
 
   const attach = useCallback((root: HTMLDivElement | null) => {
     const form = root?.closest("form");
@@ -97,8 +118,9 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
     const supplier = form.elements.namedItem("supplier_id");
     if (currency instanceof HTMLSelectElement && purchaseCurrency(currency.value) && supplier instanceof HTMLSelectElement) {
       setScope({ currency: currency.value, supplier: supplier.value });
+      clearPrices(form, currency.value);
     }
-  }, []);
+  }, [clearPrices]);
 
   useEffect(() => {
     if (state.focus && (!document.activeElement?.closest("#purchase-editor") || document.activeElement === document.body)) {
@@ -246,8 +268,10 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
             <AdminField label="Order currency">
               <select name="currency" id="currency" defaultValue={header.currency} {...invalidField(state, "currency")}
                 onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  if (purchaseCurrency(value)) setScope((current) => ({ ...current, currency: value }));
+                  const { value, form } = event.currentTarget;
+                  if (!purchaseCurrency(value)) return;
+                  setScope((current) => ({ ...current, currency: value }));
+                  if (form) clearPrices(form, value);
                 }}>
                   {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
               </select>
@@ -268,7 +292,13 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
           </AdminField>
           <p className="admin-muted">Enter the agreed rate; no live conversion. GBP orders always use 1.</p>
         </div>
-        {!lockSupplier && lines.length > 0 && <p className="admin-muted">Changing the order currency does not convert amounts already entered.</p>}
+        {!lockSupplier && lines.length > 0 && <p className="admin-muted">
+          Changing the order currency does not convert amounts already entered.
+          {lines.some((line) => line.prefilledPrice) && " Unchanged prefilled prices are cleared if you choose a different currency."}
+        </p>}
+        {clearedPrefill.size > 0 && <p className="admin-muted" role="status">
+          Prefilled prices in a different currency were cleared. Review the line prices.
+        </p>}
       </div>
     </AdminSection>
 
@@ -276,6 +306,7 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
       <div id="po-lines" role="group" aria-label="Order lines" tabIndex={-1}>
         {lines.length ? <ul className={styles.lines} aria-label="Selected products">
           {lines.map((line) => <Line key={line.product.id} {...{ line, state, pending, currency }}
+            prefillCleared={clearedPrefill.has(line.product.id)}
             suggestion={samePriceScope ? suggestions[line.product.id] : undefined} />)}
         </ul> : <p className="admin-notice">No lines yet. Use the catalogue above to add the first product.</p>}
       </div>
@@ -315,29 +346,40 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
   </div>;
 }
 
-function MoneyField({ label, id, value, state }: { label: string; id: string; value: string; state: PurchaseEditorState }) {
+function MoneyField({ label, id, value, state, hint }: {
+  label: string; id: string; value: string; state: PurchaseEditorState; hint?: string;
+}) {
+  const invalid = invalidField(state, id);
   return <AdminField label={label}><input id={id} name={id} defaultValue={value} inputMode="decimal" placeholder="0.00"
-    autoComplete="off" pattern={POUNDS_INPUT_PATTERN} maxLength={11} {...invalidField(state, id)} /></AdminField>;
+    autoComplete="off" pattern={POUNDS_INPUT_PATTERN} maxLength={11} {...invalid}
+    aria-describedby={[invalid["aria-describedby"], hint].filter(Boolean).join(" ") || undefined} /></AdminField>;
 }
 
-function Line({ line, state, pending, currency, suggestion }: {
-  line: PurchaseLine; state: PurchaseEditorState; pending: boolean; currency: string; suggestion?: number;
+function Line({ line, state, pending, currency, prefillCleared, suggestion }: {
+  line: PurchaseLine; state: PurchaseEditorState; pending: boolean; currency: string; prefillCleared: boolean; suggestion?: number;
 }) {
-  const { product, quantity, unitPrice, supplierPart, note, received } = line;
+  const { product, quantity, unitPrice, supplierPart, note, received, receivedPrice } = line;
+  const quantityField = `quantity:${product.id}`;
+  const priceHint = receivedPrice ? `received-price:${product.id}` : undefined;
   const detail = state.error?.field === `part:${product.id}` || state.error?.field === `note:${product.id}`;
   return <li className={styles.line}>
     <input type="hidden" name="line" value={product.id} />
+    {prefillCleared && <input type="hidden" name={`prefill_cleared:${product.id}`} value="1" />}
     <div className={styles.lineGrid}>
       <div>
         <Product product={product} />
         {received > 0 && <p className="admin-muted">{received.toLocaleString("en-GB")} received</p>}
       </div>
       <AdminField label="Quantity">
-        <input id={`quantity:${product.id}`} name={`quantity:${product.id}`} defaultValue={quantity}
-          inputMode="numeric" maxLength={10} autoComplete="off" {...invalidField(state, `quantity:${product.id}`)} />
+        <input id={quantityField} name={quantityField} defaultValue={quantity}
+          autoFocus={state.response === 0 && state.focus === quantityField}
+          inputMode="numeric" maxLength={10} autoComplete="off" {...invalidField(state, quantityField)} />
       </AdminField>
       <div className={styles.linePrice}>
-        <MoneyField label="Unit price ex VAT (order currency)" id={`price:${product.id}`} value={unitPrice} state={state} />
+        <MoneyField label="Unit price ex VAT (order currency)" id={`price:${product.id}`} value={unitPrice} state={state} hint={priceHint} />
+        {receivedPrice && <p className="admin-muted" id={priceHint}>
+          Last received unit price: <span className={styles.receivedAmount}>{receivedPrice.currency} {formatPoundsInput(receivedPrice.unitMinor)}</span>
+        </p>}
         <div className={styles.priceTools}>
           {suggestion !== undefined
             ? intentButton(`usePrice:${product.id}`, pending, `Use last paid · ${currency} ${formatPoundsInput(suggestion)}`,

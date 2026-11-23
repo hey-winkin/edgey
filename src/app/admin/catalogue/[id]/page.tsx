@@ -87,7 +87,7 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
     if (!variant?.products) notFound();
     return (
       <div className={styles.editor}>
-        <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
+        <AdminLink href="/admin/catalogue">{staffDestinationLabels.stock}</AdminLink>
         <AdminHeading eyebrow={variant.sku} title={variant.products.name} description={variant.option_label ?? undefined} />
         {variant.publication_status !== "archived" && <div className={styles.purchaseAction}>
           <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>
@@ -117,7 +117,7 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
 
   return (
     <div className={styles.editor}>
-      <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
+      <AdminLink href="/admin/catalogue">{staffDestinationLabels.stock}</AdminLink>
       <AdminHeading eyebrow={variant.sku} title={family.name} description={variant.option_label ?? undefined} />
       {editable && <div className={styles.purchaseAction}>
         <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>
