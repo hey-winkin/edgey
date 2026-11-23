@@ -57,12 +57,10 @@ export function parseDeliveryTable(input: string, options: { csvOnly: boolean; c
 
       if (fields.some(Boolean)) {
         const [code = "", quantity = "", unitCost = ""] = fields;
-        const header = first && code.toLowerCase() === "code" && quantity.toLowerCase() === "quantity";
+        const header = first && /^(?:code|sku|blade code)$/i.test(code) && /^(?:quantity|qty)$/i.test(quantity);
         if (header) {
-          if (fields.length === 3 && !/^unit[ _]+cost(?:\s*\(£\))?$/i.test(unitCost)) {
-            return { ok: false, error: options.canManageCosts
-              ? "Name the third column unit cost, or remove it."
-              : "Use the blank template to check your column headings." };
+          if (options.canManageCosts && fields.length === 3 && !/^(?:landed[ _]+)?unit[ _]+cost(?:\s*\(£\))?$/i.test(unitCost)) {
+            return { ok: false, error: "Name the third column unit cost, or remove it." };
           }
           columnCount = fields.length;
         } else {

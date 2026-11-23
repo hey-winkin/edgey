@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { commitDelivery, importDeliveryLines, lookupDeliveryCodes } from "@/app/admin/stock/receive/actions";
 import { GET as deliveryTemplate } from "@/app/admin/stock/receive/template/route";
+import { addDeliveryLineCost } from "@/app/admin/stock/deliveries/[id]/actions";
 
 const { staffSession, rpc, revalidatePath } = vi.hoisted(() => ({
   staffSession: vi.fn(), rpc: vi.fn(), revalidatePath: vi.fn(),
@@ -34,6 +35,21 @@ describe("delivery server boundaries", () => {
     await expect(commitDelivery(payload())).resolves.toMatchObject({ ok: false });
     expect((await deliveryTemplate()).status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses late cost entry from a warehouse-only session", async () => {
+    staffSession.mockResolvedValue({ roles: ["warehouse"], db: { rpc } });
+    const form = new FormData();
+    form.set("unitCost", "4.56");
+    await expect(addDeliveryLineCost(randomUUID(), 1, null, form)).resolves.toMatchObject({ ok: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("accepts imported variant identifiers in PostgreSQL UUID format", async () => {
+    const input = payload();
+    input.lines[0].variantId = "00000000-0000-0000-0000-000000000001";
+    rpc.mockResolvedValue({ data: input.id, error: null });
+    await expect(commitDelivery(input)).resolves.toEqual({ ok: true, id: input.id });
   });
 
   it("does not send unpermitted costs, invalid quantities or duplicate variants to the database", async () => {

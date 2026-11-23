@@ -14,12 +14,12 @@ const referenceSchema = z.string().trim().min(1).max(MAX_DELIVERY_CODE_LENGTH)
   .refine((code) => !hasDeliveryControlCharacters(code));
 const codeSchema = referenceSchema.refine((code) => /[A-Za-z0-9]/.test(code));
 const commitSchema = z.strictObject({
-  id: z.uuid(),
+  id: z.guid(),
   reference: referenceSchema,
   receivedOn: z.string().refine(isDeliveryDate),
   note: z.string().trim().max(500).refine((note) => !note.includes("\0")),
   lines: z.array(z.strictObject({
-    variantId: z.uuid().transform((id) => id.toLowerCase()),
+    variantId: z.guid().transform((id) => id.toLowerCase()),
     quantity: z.number().int().min(1).max(DELIVERY_QUANTITY_MAX),
     unitCostPence: z.number().int().min(0).max(DELIVERY_QUANTITY_MAX).nullable(),
   })).min(1).max(MAX_DELIVERY_ROWS),
@@ -50,6 +50,20 @@ export async function lookupDeliveryCodes(codes: string[]) {
   const parsed = z.array(codeSchema).max(MAX_DELIVERY_ROWS).safeParse(codes);
   if (!parsed.success) return fail("Enter a blade code of up to 120 characters on each line.");
   return matchCodes(staff.db, parsed.data);
+}
+
+export async function findRecentDelivery(reference: string) {
+  const staff = await staffSession();
+  if (!staff?.roles.includes("warehouse")) return fail("Warehouse access is required to receive a delivery.");
+  const parsed = referenceSchema.safeParse(reference);
+  if (!parsed.success) return fail("Enter a delivery reference.");
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await staff.db.from("staff_deliveries").select("id,received_on")
+    .eq("reference", parsed.data).gte("received_at", weekAgo)
+    .order("received_at", { ascending: false }).order("id", { ascending: false })
+    .limit(1).maybeSingle();
+  if (error) return fail("Could not check Delivery history for this reference. Check history before receiving stock.");
+  return { ok: true, record: data && { id: data.id, receivedOn: data.received_on } } as const;
 }
 
 export async function importDeliveryLines(form: FormData) {

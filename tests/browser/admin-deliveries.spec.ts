@@ -84,6 +84,15 @@ test("paste preview flags bad matches and quantities without moving stock until 
   expect((await stock()).data?.map((row) => [row.stock_on_hand, row.publication_status])).toEqual([[11, "draft"], [4, "draft"], [3, "draft"]]);
   await page.getByRole("link", { name: "Delivery history", exact: true }).click();
   await expect(page.getByRole("link", { name: reference })).toBeVisible();
+  const previous = await page.getByRole("link", { name: reference }).getAttribute("href");
+  await page.goto("/admin/stock/receive");
+  await page.getByLabel("Delivery reference").fill(reference);
+  await page.getByLabel("Blade code for line 1", { exact: true }).fill(first.sku);
+  await page.getByLabel("Quantity for line 1", { exact: true }).fill("11");
+  await page.getByRole("button", { name: "Review delivery" }).click();
+  await expect(page.getByText(/this reference was already used/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /open previous delivery/i })).toHaveAttribute("href", previous!);
+  expect((await stock()).data?.map((row) => row.stock_on_hand)).toEqual([11, 4, 3]);
 });
 
 test("warehouse can import CSV and receive without cost; finance can cost the same receipt later", async ({ page, browser, baseURL }) => {
@@ -115,7 +124,7 @@ test("warehouse can import CSV and receive without cost; finance can cost the sa
   });
   await page.getByRole("button", { name: "Add imported lines" }).click();
   await expect(page.getByText(second.name, { exact: false }).first()).toBeVisible();
-  await expect(page.getByLabel("Unit cost for line 1")).toHaveCount(0);
+  await expect(page.getByLabel("Unit cost (£) for line 1")).toHaveCount(0);
   await page.getByRole("button", { name: "Review delivery" }).click();
   await page.getByRole("button", { name: "Receive stock", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: reference })).toBeVisible();

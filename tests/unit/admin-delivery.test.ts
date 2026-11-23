@@ -37,6 +37,14 @@ describe("delivery import", () => {
         { sourceRow: 4, code: "TEST-B", quantity: "-4", unitCost: "" },
       ],
     });
+    for (const [input, sourceRow] of [["SKU,Qty,Hidden values\nTEST-A,4,8.77", 2], ["TEST-A,4,8.77", 1]] as const) {
+      expect(parseDeliveryTable(input, { ...csv, canManageCosts: false })).toEqual({
+        ok: true, rows: [{ sourceRow, code: "TEST-A", quantity: "4", unitCost: "" }],
+      });
+    }
+    expect(parseDeliveryTable("SKU,Qty,Landed unit cost (£)\nTEST-A,4,8.77", csv)).toEqual({
+      ok: true, rows: [{ sourceRow: 2, code: "TEST-A", quantity: "4", unitCost: "8.77" }],
+    });
   });
 
   it.each([

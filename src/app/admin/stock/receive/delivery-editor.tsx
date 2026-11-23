@@ -17,14 +17,18 @@ import {
   type ImportedDeliveryRow,
 } from "@/lib/admin/deliveries";
 import { formatGbp } from "@/lib/commerce/money";
-import { commitDelivery, importDeliveryLines, lookupDeliveryCodes } from "./actions";
+import { commitDelivery, findRecentDelivery, importDeliveryLines, lookupDeliveryCodes } from "./actions";
 import styles from "./delivery-editor.module.css";
 
 type Row = Omit<ImportedDeliveryRow, "sourceRow"> & { id: number; sourceRow?: number; selectedId?: string };
 type CodeCheck = DeliveryMatch[] | { error: string };
 type Checks = Map<string, CodeCheck>;
 type ReviewedLine = DeliveryCommitInput["lines"][number] & Pick<DeliveryMatch, "bladeName" | "sku">;
-type Review = { input: DeliveryCommitInput; lines: ReviewedLine[] };
+type Review = {
+  input: DeliveryCommitInput;
+  lines: ReviewedLine[];
+  previous: Awaited<ReturnType<typeof findRecentDelivery>>;
+};
 type CommitError = { error: string; retryOnly: boolean };
 
 const quantityMax = DELIVERY_QUANTITY_MAX.toLocaleString("en-GB");
@@ -105,6 +109,8 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
   const ready = ledgerRows.filter((line) => line.ready);
   const units = ready.reduce((total, { quantity }) => total + (quantity ?? 0), 0);
   const reviewedUnits = review?.lines.reduce((total, line) => total + line.quantity, 0) ?? 0;
+  const previousDelivery = review?.previous.ok ? review.previous.record : null;
+  const historyError = review && !review.previous.ok ? review.previous.error : null;
   const referenceError = !reference.trim() ? "Enter a delivery reference."
     : reference.trim().length > MAX_DELIVERY_CODE_LENGTH || hasDeliveryControlCharacters(reference.trim())
       ? "Use a single reference of up to 120 characters." : undefined;
@@ -270,8 +276,10 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
         }
         lines.push({ variantId: match.variantId, sku: match.sku, bladeName: match.bladeName, quantity, unitCostPence });
       }
+      const previous = await findRecentDelivery(reference)
+        .catch(() => ({ ok: false as const, error: "Could not check Delivery history for this reference. Check history before receiving stock." }));
       deliveryId.current ??= crypto.randomUUID();
-      setReview({ lines, input: {
+      setReview({ lines, previous, input: {
         id: deliveryId.current,
         reference: reference.trim(),
         receivedOn,
@@ -340,6 +348,17 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
           </ol>
           <div className={styles.sheetFooter}>
             <p><strong>{review.lines.length}</strong> {review.lines.length === 1 ? "line" : "lines"} <span className="admin-muted">/</span> <strong>{number.format(reviewedUnits)}</strong> {reviewedUnits === 1 ? "unit" : "units"} to receive</p>
+            {(previousDelivery || historyError) && (
+              <div className={styles.errorBlock}>
+                <p>{previousDelivery
+                  ? `This reference was already used for a delivery dated ${displayDate.format(new Date(previousDelivery.receivedOn))}. Check that this is a separate delivery before receiving stock.`
+                  : historyError}</p>
+                <a className="textlink" target="_blank" rel="noopener" href={previousDelivery
+                  ? `/admin/stock/deliveries/${previousDelivery.id}` : "/admin/stock/deliveries"}>
+                  {previousDelivery ? "Open previous delivery" : "Check delivery history"} (opens in a new tab)
+                </a>
+              </div>
+            )}
             {commitError && busy !== "commit" && (
               <div className={styles.errorBlock} id="receipt-commit-error" tabIndex={-1} role="alert">
                 <p>{commitError.error}</p>
@@ -403,7 +422,7 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
               <div>
                 <h2 id="receipt-lines-heading">Delivery lines</h2>
                 <p>Enter a SKU or maker code. Press Enter to move to the next field or line.</p>
-                {showCosts && <p>Unit cost is optional. Enter pounds per blade.</p>}
+                {showCosts && <p>Unit cost is optional. Enter landed cost in pounds per blade.</p>}
               </div>
               <dl className={styles.tally}>
                 <div><dt>Lines ready</dt><dd>{ready.length}<span> / {entered}</span></dd></div>
@@ -471,7 +490,7 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                       {matches.length > 1 && (
                         <>
                           <label htmlFor={rowId(row, "match")} className={styles.fieldHint}>Choose the exact SKU</label>
-                          <select id={rowId(row, "match")} aria-label={`Matched blade for line ${label}`} value={match?.variantId ?? ""}
+                          <select id={rowId(row, "match")} aria-label={`Choose the exact SKU for line ${label}`} value={match?.variantId ?? ""}
                             aria-invalid={invalidMatch} aria-describedby={invalidMatch ? rowId(row, "match-error") : undefined}
                             onChange={(event) => editRow(row, "selectedId", event.target.value)}>
                             <option value="">Choose a blade</option>
@@ -481,7 +500,7 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                       )}
                       <div role="status" className={styles.matchStatus}>
                         {match ? <><span>{match.bladeName}</span><span className="admin-mono admin-muted">{match.sku}</span></>
-                          : invalidMatch ? <p className={styles.error} id={rowId(row, "match-error")}>Multiple matches. Choose the SKU on the packet.</p>
+                          : invalidMatch ? <p className={styles.error} id={rowId(row, "match-error")}>Multiple matches. Choose the SKU on the packet or type it in the code field.</p>
                           : <span className="admin-muted">{checks.has(code) || !code ? "—" : "Awaiting match"}</span>}
                       </div>
                     </div>
@@ -498,7 +517,7 @@ export function DeliveryEditor({ showCosts, today }: { showCosts: boolean; today
                     {showCosts && (
                       <div className={styles.cost}>
                         <label htmlFor={rowId(row, "cost")} className={styles.fieldLabel}>Unit cost (£)</label>
-                        <input id={rowId(row, "cost")} aria-label={`Unit cost for line ${label}`} inputMode="decimal" value={row.unitCost} placeholder="Optional"
+                        <input id={rowId(row, "cost")} aria-label={`Unit cost (£) for line ${label}`} inputMode="decimal" value={row.unitCost} placeholder="Optional"
                           aria-invalid={invalidCost} aria-describedby={invalidCost ? rowId(row, "cost-error") : undefined} maxLength={MAX_DELIVERY_CODE_LENGTH}
                           onChange={(event) => editRow(row, "unitCost", event.target.value)} onKeyDown={(event) => advance(event, row, index, "unitCost")} />
                         {invalidCost && <p className={styles.error} id={rowId(row, "cost-error")}>Use a valid £ amount, e.g. 4.50.</p>}
