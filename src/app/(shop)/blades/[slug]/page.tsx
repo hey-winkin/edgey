@@ -3,6 +3,8 @@ import { siteUrl } from "@/lib/catalogue/site-url";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Breadcrumbs, catalogueCrumb } from "@/components/breadcrumbs";
+import { JsonLd } from "@/components/json-ld";
 import { ProductDetail } from "@/components/product-detail";
 import {
   brandHref,
@@ -15,28 +17,36 @@ import {
   type RouteQuery,
   type Variant,
 } from "@/lib/catalogue";
+import { productShareVariant, socialMetadata } from "@/lib/catalogue/social";
+import { productStructuredData } from "@/lib/catalogue/structured-data";
 
 type Props = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<RouteQuery>;
 };
 
-// Titles, descriptions and structured data are built only from what the public
-// role can read: approved records of published variants.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const family = await getFamily((await params).slug);
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const family = await getFamily(slug);
   if (!family) return { title: "Blade not found", robots: { index: false } };
   const brands = familyBrands(family).map((brand) => brand.name);
   const models = modelCodes(family);
   const fits = models.length ? " for " + [brands.join(" and "), models.join(", ")].filter(Boolean).join(" ") : "";
   const title = family.familyCode + " " + family.name + fits;
-  const description = family.description + " See verified fit, availability and UK trade price breaks.";
+  const description = family.description;
   const url = siteUrl(productHref(family.slug));
+  const sku = queryValue(query.variant);
+  const variant = productShareVariant(family, sku);
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, type: "website", url },
+    ...(variant && socialMetadata(
+      variant.sku + " " + family.name,
+      description,
+      siteUrl(productHref(family.slug, sku === variant.sku ? sku : null)),
+      { slug: family.slug, sku: variant.sku },
+    )),
   };
 }
 
@@ -48,13 +58,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
   return (
     <main id="main-content" tabIndex={-1} className="frame product">
-      <nav className="crumbs" aria-label="Breadcrumb">
-        <Link href="/blades">Blade catalogue</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={"/blades?type=" + family.toolType.slug}>{family.toolType.name}</Link>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{family.familyCode}</span>
-      </nav>
+      <Breadcrumbs items={[
+        catalogueCrumb,
+        { href: "/blades?" + new URLSearchParams({ type: family.toolType.slug }), label: family.toolType.name },
+        { href: productHref(family.slug), label: family.familyCode },
+      ]} />
       <ProductDetail key={family.slug + (initialSku ?? "")} family={family} initialSku={initialSku} mode="page" />
 
       <div className="product-more">
@@ -78,7 +86,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
           </p>
         </div>
       </div>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData(family)).replace(/</g, "\\u003c") }} />
+      <JsonLd data={productStructuredData(family, family.variants.find(({ sku }) => sku === initialSku), siteUrl)} />
     </main>
   );
 }
@@ -146,54 +154,4 @@ function modelCodes(family: Family): string[] {
       ),
     ),
   ];
-}
-
-// schema.org Product, or ProductGroup when the family has several variants.
-// Prices are the business price: GBP excluding VAT, flagged as such.
-function structuredData(family: Family) {
-  const url = siteUrl(productHref(family.slug));
-  const product = (variant: Variant) => ({
-    "@type": "Product",
-    name: family.name + (family.variants.length > 1 ? ", " + variantLabel(variant) : ""),
-    sku: variant.sku,
-    description: family.description,
-    category: family.toolType.name + " blade",
-    brand: { "@type": "Brand", name: "Edgey" },
-    image: (variant.media ?? family.media).drawing ? siteUrl("/line-art/" + (variant.media ?? family.media).drawing) : undefined,
-    additionalProperty: variant.compatibility.map((record) => ({
-      "@type": "PropertyValue",
-      name: "OEM reference",
-      value: [record.brand?.name, record.code].filter(Boolean).join(" "),
-    })),
-    offers: {
-      "@type": "Offer",
-      url: siteUrl(productHref(family.slug, family.variants.length > 1 ? variant.sku : null)),
-      priceCurrency: "GBP",
-      price: (variant.prices.oneToFour / 100).toFixed(2),
-      priceSpecification: {
-        "@type": "UnitPriceSpecification",
-        price: (variant.prices.oneToFour / 100).toFixed(2),
-        priceCurrency: "GBP",
-        valueAddedTaxIncluded: false,
-        eligibleQuantity: { "@type": "QuantitativeValue", minValue: 1, unitText: "blade" },
-      },
-      availability: "https://schema.org/" + (variant.availability === "in_stock" ? "InStock" : "OutOfStock"),
-      itemCondition: "https://schema.org/NewCondition",
-      eligibleCustomerType: "https://schema.org/Business",
-      eligibleRegion: "GB",
-    },
-  });
-  const only = family.variants.length === 1 ? family.variants[0] : undefined;
-  if (only) return { "@context": "https://schema.org", ...product(only), url };
-  return {
-    "@context": "https://schema.org",
-    "@type": "ProductGroup",
-    name: family.name,
-    description: family.description,
-    productGroupID: family.familyCode,
-    brand: { "@type": "Brand", name: "Edgey" },
-    url,
-    variesBy: ["Blade configuration"],
-    hasVariant: family.variants.map(product),
-  };
 }

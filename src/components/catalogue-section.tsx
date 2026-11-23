@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { bladeCount, formatNumber, toolHeadsForMachine, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
 import { CatalogueControls, CatalogueFacets } from "./catalogue-controls";
+import { Breadcrumbs, catalogueCrumb } from "./breadcrumbs";
 import styles from "./catalogue-filters.module.css";
 import { ClearFiltersLink } from "./catalogue-links";
 import { FinderAttribution } from "./finder-attribution";
@@ -40,6 +41,7 @@ export function CatalogueSection({
     <section className={"catalogue" + (asPage ? " is-page" : "")} id="catalogue" tabIndex={-1} aria-labelledby="catalogue-title">
       {view.finderEventId && <FinderAttribution eventId={view.finderEventId} />}
       <div className="frame">
+        {asPage && <Breadcrumbs items={[{ href: "/", label: "Home" }, catalogueCrumb]} />}
         <div className={"section-head" + (asPage ? " " + styles.heading : "")}>
           <Heading id="catalogue-title" className={asPage ? "page-title" : undefined}>
             Blade catalogue

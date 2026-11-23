@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { buildReferenceGuide } from "@/lib/catalogue/reference-guide";
 import { listFamilies } from "@/lib/catalogue/server";
 import { siteUrl } from "@/lib/catalogue/site-url";
+import { socialMetadata } from "@/lib/catalogue/social";
 import { ReferenceGuide } from "./reference-guide";
 import styles from "./reference-guide.module.css";
 
@@ -18,7 +19,7 @@ export function generateMetadata(): Metadata {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, type: "website", url },
+    ...socialMetadata(title, description, url),
   };
 }
 

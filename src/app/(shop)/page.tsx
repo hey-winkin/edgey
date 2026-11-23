@@ -5,14 +5,19 @@ import { readFilters, type RouteQuery } from "@/lib/catalogue";
 import { buildCoreStudies } from "@/lib/catalogue/material-hero";
 import { listFamilies, loadCatalogue } from "@/lib/catalogue/server";
 import { siteUrl } from "@/lib/catalogue/site-url";
+import { siteDescription, siteTitle, socialMetadata } from "@/lib/catalogue/social";
 
 type Props = { searchParams: Promise<RouteQuery> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const filters = readFilters(await searchParams);
-  return Object.values(filters).some(Boolean)
-    ? { robots: { index: false, follow: true } }
-    : { alternates: { canonical: siteUrl("/") } };
+  const url = siteUrl("/");
+  return {
+    ...socialMetadata(siteTitle, siteDescription, url),
+    ...(Object.values(filters).some(Boolean)
+      ? { robots: { index: false, follow: true } }
+      : { alternates: { canonical: url } }),
+  };
 }
 
 export default async function HomePage({ searchParams }: Props) {
