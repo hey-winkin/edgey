@@ -42,12 +42,16 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ");
 describe("purchase order PDF", () => {
   it("renders the supplier-facing field list, exact currency amounts and A4 paper", async () => {
     const bytes = await purchaseDocumentPdf(order);
+    const structure = new TextDecoder().decode(bytes);
     const pdf = await getDocumentProxy(new Uint8Array(bytes));
     const page = await pdf.getPage(1);
     expect(page.getViewport({ scale: 1 }).width).toBeCloseTo(595.28);
     expect(page.getViewport({ scale: 1 }).height).toBeCloseTo(841.89);
     const { totalPages, text } = await extractText(pdf, { mergePages: true });
     expect(totalPages).toBe(1);
+    for (const face of ["Inter-Regular", "Inter-Bold", "IBMPlexMono-Regular", "IBMPlexMono-Bold"]) {
+      expect(structure).toMatch(new RegExp(`/BaseFont /[A-Z]{6}\\+${face}(?:\\s|$)`));
+    }
     const contents = oneLine(text);
     for (const field of [
       "Purchase order", "PO-0987", "REVISION 2", "22 Nov 2026", "9 Dec 2026", "EUR",
@@ -143,10 +147,24 @@ describe("purchase order PDF download", () => {
     expect((await request()).status).toBe(404);
   });
 
-  it("offers the Unicode-capable printable copy and CSV instead of altering supplier text", async () => {
+  it("downloads Latin Extended supplier text and uses Inter for glyphs missing from Plex Mono", async () => {
+    vi.mocked(staffSession).mockResolvedValue({ db, roles: ["finance"] } as NonNullable<Awaited<ReturnType<typeof staffSession>>>);
+    const note = "Zażółć gęślą jaźń";
+    vi.mocked(readPurchaseDocument).mockResolvedValue({
+      ...order,
+      supplier: [{ label: "Name", value: "Żuraw Tooling" }, { label: "Address", value: "ul. Przykładowa 26\nŁódź" }],
+      lines: [{ ...line, sku: "Ł-01", partNumber: "Ω-01", note }],
+    });
+    const response = await request();
+    expect(response.status).toBe(200);
+    const { text } = await pdfText(await response.arrayBuffer());
+    for (const field of ["Żuraw Tooling", "ul. Przykładowa 26", "Łódź", "Ł-01", "Ω-01", note]) expect(text[0]).toContain(field);
+  });
+
+  it.each(["示例工具供应商", "仮の住所"])("offers the printable copy and CSV for a missing font script: %s", async (address) => {
     vi.mocked(staffSession).mockResolvedValue({ db, roles: ["finance"] } as NonNullable<Awaited<ReturnType<typeof staffSession>>>);
     vi.mocked(readPurchaseDocument).mockResolvedValue({
-      ...order, supplier: [{ label: "Address", value: "Łódź / 仮の住所" }],
+      ...order, supplier: [{ label: "Address", value: address }],
     });
     const response = await request();
     expect(response.status).toBe(422);
@@ -157,6 +175,6 @@ describe("purchase order PDF download", () => {
     const base = `http://localhost/admin/purchase-orders/${id}`;
     expect([...html.matchAll(/href="([^"]+)"/g)].map(([, href]) => new URL(href!, base + "/export/pdf").href))
       .toEqual([base + "/print", base + "/export"]);
-    expect(html).not.toMatch(/Łódź|仮の住所/);
+    expect(html).not.toContain(address);
   });
 });
