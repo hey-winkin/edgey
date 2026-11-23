@@ -2,11 +2,12 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useTransition } from "react";
-import type { CatalogueFilters } from "@/lib/catalogue";
+import { toolHeadsForMachine, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
+import styles from "./catalogue-filters.module.css";
 
 type Option = { slug: string; name: string };
 
-const filterNames = ["q", "type", "machine", "material"] as const;
+const filterNames = ["q", "type", "machine", "material", "depth", "head"] as const;
 
 function filterQuery(read: (name: keyof CatalogueFilters) => string): string {
   const params = new URLSearchParams();
@@ -22,22 +23,23 @@ function writeFilters(form: HTMLFormElement | null, filters?: CatalogueFilters) 
     const control = form?.elements.namedItem(name);
     if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
       control.value = filters?.[name] ?? "";
+      if (name === "head" && control instanceof HTMLSelectElement && control.selectedIndex === -1) control.value = "";
     }
   }
 }
 
-// Search and filters. State lives in the address (?q=&type=&machine=&material=)
-// so results are server-rendered, shareable and work without JavaScript.
 export function CatalogueControls({
   filters,
   toolTypes = [],
   machines = [],
   searchFirst = false,
+  bladeFacets,
 }: {
   filters: CatalogueFilters;
   toolTypes?: Option[];
   machines?: Option[];
   searchFirst?: boolean;
+  bladeFacets?: Pick<CatalogueView, "toolHeads" | "materials">;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,7 +76,7 @@ export function CatalogueControls({
   return (
     <form
       ref={form}
-      className="controls"
+      className={"controls" + (bladeFacets ? " " + styles.filters : "")}
       id="catalogue-controls"
       role="search"
       data-search-first={searchFirst || undefined}
@@ -93,7 +95,17 @@ export function CatalogueControls({
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         push(event.currentTarget, 0, searchFirst && submitter !== null);
       }}
-      onChange={(event) => push(event.currentTarget, event.target === event.currentTarget.elements.namedItem("q") ? 160 : 0)}
+      onChange={(event) => {
+        const form = event.currentTarget;
+        const target = event.target;
+        if (bladeFacets && target instanceof HTMLSelectElement && target.name === "machine") {
+          const head = form.elements.namedItem("head");
+          if (head instanceof HTMLSelectElement && !toolHeadsForMachine(bladeFacets.toolHeads, target.value).some(({ slug }) => slug === head.value)) {
+            head.value = "";
+          }
+        }
+        push(form, target instanceof HTMLInputElement ? 160 : 0);
+      }}
     >
       {searchFirst && <label htmlFor="finder">Search blades</label>}
       <label className="search-field">
@@ -114,10 +126,31 @@ export function CatalogueControls({
       {searchFirst
         ? <button className="primary" type="submit">Search</button>
         : <CatalogueFacets filters={filters} toolTypes={toolTypes} machines={machines} />}
-      {filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
+      {bladeFacets ? (
+        <>
+          <label className="select-field">
+            <select name="material" aria-label="Material" defaultValue={filters.material}>
+              <option value="">All materials</option>
+              {bladeFacets.materials.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
+            </select>
+          </label>
+          <label className="select-field">
+            <select name="head" aria-label="Tool head" defaultValue={filters.head}>
+              <option value="">All tool heads</option>
+              {toolHeadsForMachine(bladeFacets.toolHeads, filters.machine).map(({ slug, name }) =>
+                <option key={slug} value={slug}>{name}</option>
+              )}
+            </select>
+          </label>
+          <label className={"search-field " + styles.depth}>
+            <span>Minimum depth (mm)</span>
+            <input name="depth" type="number" min="0" step="any" placeholder="Any" defaultValue={filters.depth} />
+          </label>
+        </>
+      ) : filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
       {!searchFirst && (
         <noscript>
-          <button className="secondary" type="submit">Search</button>
+          <button className="secondary" type="submit">{bladeFacets ? "Apply filters" : "Search"}</button>
         </noscript>
       )}
       {searchFirst && <p id="finder-hint">Enter a part number, OEM code, machine or blade name.</p>}

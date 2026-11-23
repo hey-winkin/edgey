@@ -132,7 +132,13 @@ export function formatNumber(value: number): string {
 
 export type RouteQuery = Record<string, string | string[] | undefined>;
 
-export type CatalogueFilters = { q: string; type: string; machine: string; material: string };
+export type CatalogueFilters = { q: string; type: string; machine: string; material: string; depth: string; head: string };
+
+type ToolHead = { slug: string; name: string; machines: string[] };
+
+export function toolHeadsForMachine(heads: ToolHead[], machine: string): ToolHead[] {
+  return machine ? heads.filter((head) => head.machines.includes(machine)) : heads;
+}
 
 export type CatalogueCard = {
   family: Family;
@@ -146,20 +152,36 @@ export type CatalogueView = {
   cards: CatalogueCard[];
   toolTypes: { slug: string; name: string }[];
   machines: { slug: string; name: string }[];
+  toolHeads: ToolHead[];
   materials: (Substrate & { count: number })[];
   activeMaterial: Substrate | null;
+  missingDepthCount: number;
   filtered: boolean;
   finderEventId?: string;
 };
 
 export function buildCatalogueView(families: Family[], hits: SearchHit[] | null, filters: CatalogueFilters): CatalogueView {
-
   const toolTypes = new Map<string, { slug: string; name: string; sortOrder: number }>();
   const machines = new Map<string, { slug: string; name: string }>();
+  const toolHeads = new Map<string, ToolHead>();
+  const headsByReference = new Map<Compatibility, string[]>();
   const materials = new Map<string, Substrate & { count: number }>();
   for (const family of families) {
     toolTypes.set(family.toolType.slug, family.toolType);
     for (const brand of familyBrands(family)) machines.set(brand.slug, brand);
+    for (const { compatibility } of family.variants) {
+      for (const reference of compatibility) {
+        const names = (reference.tool ?? "").split(/[,;]/).map((name) => queryValue(name, 160)).filter(Boolean);
+        const slugs = names.map((name) => {
+          const slug = name.toLowerCase();
+          const head = toolHeads.get(slug) ?? { slug, name, machines: [] };
+          if (reference.brand && !head.machines.includes(reference.brand.slug)) head.machines.push(reference.brand.slug);
+          toolHeads.set(slug, head);
+          return slug;
+        });
+        headsByReference.set(reference, slugs);
+      }
+    }
     for (const substrate of familySubstrates(family)) {
       const entry = materials.get(substrate.slug) ?? { ...substrate, count: 0 };
       entry.count += 1;
@@ -167,10 +189,22 @@ export function buildCatalogueView(families: Family[], hits: SearchHit[] | null,
     }
   }
 
-  const passesFilters = (family: Family, variant: Variant) =>
-    (!filters.type || family.toolType.slug === filters.type) &&
-    (!filters.machine || variant.compatibility.some((record) => record.brand?.slug === filters.machine)) &&
-    (!filters.material || variant.substrates.some((substrate) => substrate.slug === filters.material));
+  const minimumDepth = Number(filters.depth);
+  const missingDepth = new Set<string>();
+  function passesFilters(family: Family, variant: Variant) {
+    if (filters.type && family.toolType.slug !== filters.type) return false;
+    if (filters.material && !variant.substrates.some((substrate) => substrate.slug === filters.material)) return false;
+    if ((filters.machine || filters.head) && !variant.compatibility.some((record) =>
+      (!filters.machine || record.brand?.slug === filters.machine) &&
+      (!filters.head || headsByReference.get(record)?.includes(filters.head))
+    )) return false;
+    if (!minimumDepth) return true;
+    if (variant.cuttingDepthMm === null) {
+      missingDepth.add(variant.id);
+      return false;
+    }
+    return variant.cuttingDepthMm >= minimumDepth;
+  }
 
   const bySlug = new Map(families.map((family) => [family.slug, family]));
   const grouped = new Map<string, CatalogueCard>();
@@ -206,27 +240,38 @@ export function buildCatalogueView(families: Family[], hits: SearchHit[] | null,
     cards,
     toolTypes: [...toolTypes.values()].sort((a, b) => a.sortOrder - b.sortOrder),
     machines: [...machines.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    toolHeads: [...toolHeads.values()].sort((a, b) => a.name.localeCompare(b.name)),
     materials: [...materials.values()].sort((a, b) => a.sortOrder - b.sortOrder),
     activeMaterial: materials.get(filters.material) ?? null,
-    filtered: Boolean(filters.q || filters.type || filters.machine || filters.material),
+    missingDepthCount: missingDepth.size,
+    filtered: Object.values(filters).some(Boolean),
   };
 }
 
-export function readFilters(params: RouteQuery): CatalogueFilters {
+export function readFilters(params: RouteQuery, bladeFacets = false): CatalogueFilters {
   const one = (key: string) => queryValue(params[key]);
-  return { q: one("q"), type: one("type"), machine: one("machine"), material: one("material") };
+  const depth = bladeFacets ? one("depth") : "";
+  const minimum = Number(depth);
+  return {
+    q: one("q"),
+    type: one("type"),
+    machine: one("machine"),
+    material: one("material"),
+    depth: /^(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i.test(depth) && minimum > 0 && Number.isFinite(minimum) ? depth : "",
+    head: bladeFacets ? queryValue(params.head, 160).toLowerCase() : "",
+  };
 }
 
 export function bladeCount(count: number): string {
   return count + (count === 1 ? " blade" : " blades");
 }
 
-export function queryValue(value: string | string[] | undefined): string {
+export function queryValue(value: string | string[] | undefined, maxLength = 80): string {
   return Array.from((Array.isArray(value) ? value[0] : value) ?? "", (character) => {
     if (/\s/.test(character)) return " ";
     const code = character.charCodeAt(0);
     return code < 32 || code === 127 ? "" : character;
-  }).join("").trim().slice(0, 80);
+  }).join("").trim().slice(0, maxLength);
 }
 
 export function productHref(slug: string, sku?: string | null): string {

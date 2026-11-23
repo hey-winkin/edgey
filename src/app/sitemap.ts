@@ -14,6 +14,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     db.from("brands").select("slug").order("slug"),
   ]);
   if (products.error || brands.error) throw new Error("Published sitemap could not be loaded.");
-  return ["/", "/blades", ...products.data.map(({ slug }) => productHref(slug)), ...brands.data.map(({ slug }) => brandHref(slug))]
+  return ["/", "/blades", "/reference-guide", ...products.data.map(({ slug }) => productHref(slug)), ...brands.data.map(({ slug }) => brandHref(slug))]
     .map((path) => ({ url: origin + path }));
 }

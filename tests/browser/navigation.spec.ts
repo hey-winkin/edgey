@@ -72,11 +72,14 @@ test("shop menu exposes published brands and main journeys from a buyer page", a
   expect(publishedBrands).toEqual(["/brands/kongsberg", "/brands/mimaki", "/brands/summa", "/brands/zund"]);
   const buyerRoutes = [
     ["By material", "/blades#materials"], ["All blades", "/blades"], ["Trade accounts", "/trade"],
+    ["Cross-reference guide", "/reference-guide"],
     ["Two-blade trial", "/sample-pack"], ["Match my blade", "/enquiry"], ["Account", "/account"], ["Privacy", "/privacy"],
   ] as const;
   for (const [label, href] of buyerRoutes) {
     await expect(shopNav(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("href", href);
   }
+  const finderGroup = shopNav(page).locator(".fold-group").filter({ has: page.getByRole("heading", { name: "Find a blade", exact: true }) });
+  await expect(finderGroup.getByRole("link", { name: "Cross-reference guide" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Footer" }).getByRole("link")).toHaveText(["Contact", "Privacy", "Back to top"]);
   await shopNav(page).getByRole("link", { name: "Mimaki" }).click();
   await expect(page.getByRole("heading", { name: "Mimaki blade references" })).toBeVisible();
@@ -100,6 +103,10 @@ test("shop menu exposes published brands and main journeys from a buyer page", a
   await menu(page).click();
   await page.goBack();
   await expect(page).toHaveURL(/\/blades#materials$/);
+  await expect(shopNav(page)).toBeHidden();
+  await menu(page).click();
+  await shopNav(page).getByRole("link", { name: "Cross-reference guide" }).click();
+  await expect(page.getByRole("heading", { name: "Blade cross-reference guide", level: 1 })).toBeVisible();
   await expect(shopNav(page)).toBeHidden();
 });
 

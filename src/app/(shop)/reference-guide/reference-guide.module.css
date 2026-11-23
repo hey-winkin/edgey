@@ -1,0 +1,251 @@
+.page {
+  padding-block: clamp(30px, 5vw, 76px);
+}
+
+.page h1 {
+  margin: 16px 0 14px;
+  font-size: var(--edgey-h2-size);
+  line-height: var(--edgey-h2-leading);
+  letter-spacing: var(--edgey-h2-tracking);
+}
+
+.intro,
+.note {
+  max-width: 65ch;
+  color: var(--muted);
+}
+
+.note {
+  margin-top: 8px;
+  font-size: .9em;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-top: 26px;
+}
+
+.controls label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: .9rem;
+}
+
+.controls [role="search"] {
+  width: min(100%, 22rem);
+}
+
+.controls .searchBox {
+  width: 100%;
+}
+
+.searchBox input::placeholder {
+  color: var(--muted);
+}
+
+.count {
+  margin-top: 12px;
+  color: var(--muted);
+  font: .8rem/1.4 var(--mono);
+}
+
+.group,
+.empty {
+  margin-top: 24px;
+}
+
+.group h2 {
+  margin-bottom: 10px;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: var(--edgey-product-card);
+  font-size: .9rem;
+  text-align: left;
+}
+
+.table :is(th, td) {
+  padding: 12px;
+  border-block: 1px solid var(--line);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.table thead,
+.cellLabel {
+  color: var(--muted);
+  font: var(--edgey-overline-weight) .75rem/1.4 var(--mono);
+}
+
+.table thead th:nth-child(1) {
+  width: 20%;
+}
+
+.table thead th:nth-child(2) {
+  width: 22%;
+}
+
+.table thead th:nth-child(3) {
+  width: 20%;
+}
+
+.table thead th:is(:nth-child(4), :nth-child(5)) {
+  width: 10%;
+}
+
+.table th[scope="row"] {
+  font-weight: normal;
+}
+
+.table a {
+  display: inline-grid;
+  align-content: center;
+  min-height: 44px;
+  gap: 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.table code {
+  font-family: var(--mono);
+}
+
+.codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.machines {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.cellLabel,
+.printOnly {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  .table,
+  .table tbody,
+  .table tr,
+  .table th[scope="row"] {
+    display: block;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table tr {
+    padding: 8px 12px 12px;
+    border-block-start: 1px solid var(--line);
+  }
+
+  .table {
+    border-block-end: 1px solid var(--line);
+  }
+
+  .table :is(th, td) {
+    padding: 4px 0;
+    border: 0;
+  }
+
+  .table td {
+    display: grid;
+    grid-template-columns: 6.75rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .cellLabel {
+    display: inline;
+  }
+}
+
+@page edgey-reference-guide {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  :global(html):has(> :global(body) > .page),
+  :global(body):has(> .page) {
+    color-scheme: light;
+    color: #000;
+    background: #fff;
+  }
+
+  :global(body):has(> .page) > :not(.page),
+  .screenOnly {
+    display: none !important;
+  }
+
+  .page {
+    page: edgey-reference-guide;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    font-size: 10pt;
+  }
+
+  .page h1 {
+    margin: 0 0 4pt;
+    font-size: 21pt;
+  }
+
+  .group h2 {
+    break-after: avoid;
+    font-size: 13pt;
+  }
+
+  .printOnly {
+    display: block;
+    margin-top: 8pt;
+    overflow-wrap: anywhere;
+  }
+
+  .table {
+    background: #fff;
+    font-size: 9pt;
+  }
+
+  .table :is(th, td) {
+    padding: 4pt;
+    border-color: #000;
+  }
+
+  .table a {
+    min-height: 0;
+  }
+
+  .table a,
+  .table thead,
+  .machines,
+  .intro,
+  .note {
+    color: #000;
+  }
+
+  .table tr {
+    break-inside: avoid;
+  }
+}
