@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Net30CheckoutResult } from "@/app/api/checkout/net30/route";
 import type { CheckoutSessionResult } from "@/app/api/checkout/session/route";
 import { withCheckoutAttemptLock } from "@/app/(shop)/checkout/attempt-lock";
@@ -16,8 +16,9 @@ import { formatGbp, parseUkPostcode, type LineRequest } from "@/lib/commerce";
 import { activePaymentKey, readActivePayment, sameActivePayment, storeActivePayment, type ActivePayment } from "@/lib/payments/checkout-attempt-client";
 import { CheckoutPaymentMethod, tradeUnavailableMessage, type CheckoutTrade, type TradeUnavailableReason } from "./checkout-payment-method";
 import styles from "./checkout-payment-method.module.css";
+import { DispatchNotice, startQuoteClock, useDispatchNotice, type QuoteClock } from "./dispatch-notice";
 import { useSelection } from "./selection-provider";
-import { DispatchEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
+import { DeliveryEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
 import { useSelectionQuote } from "./use-selection-quote";
 
 const initialFields: CheckoutFields = {
@@ -65,7 +66,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   const [method, setMethod] = useState<"card" | "net30">("card");
   const [poReference, setPoReference] = useState("");
   const [tradeFailure, setTradeFailure] = useState<{ reason: TradeUnavailableReason; revision: number; quoteKey?: string }>();
-  const [result, setResult] = useState<{ lines: LineRequest[]; value: SubmitResult } | null>(null);
+  const [result, setResult] = useState<{ lines: LineRequest[]; value: SubmitResult; clock?: QuoteClock; expired?: boolean } | null>(null);
   const attempt = useRef<{ token: string; revision: number; quoteKey: string } | null>(null);
   const memoryCardAttempt = useRef<ActivePayment | null>(null);
   const submitLock = useRef(false);
@@ -74,16 +75,23 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
   const summaryTitle = useRef<HTMLHeadingElement>(null);
   const parsedPostcode = parseUkPostcode(values.postcode);
   const postcode = parsedPostcode.ok ? parsedPostcode.value.normalised : undefined;
-  const { quote, pending, previousQuote, retry } = useSelectionQuote(lines, hydrated && lines.length > 0, { postcode });
-  const response = result?.lines === lines ? result.value : undefined;
-  const shown = response?.status === "review" ? response.quote : quote ?? (pending ? previousQuote : undefined);
+  const { quote, clock, pending, previousQuote, retry } = useSelectionQuote(lines, hydrated && lines.length > 0, { postcode });
+  const checkoutResult = result?.lines === lines ? result : null;
+  const response = checkoutResult?.value;
+  const review = response?.status === "review" && !checkoutResult?.expired ? response : undefined;
+  const shown = review?.quote ?? quote ?? (pending ? previousQuote : undefined);
+  const refreshDispatch = useCallback(() => {
+    setResult((previous) => previous?.value.status === "review" ? { ...previous, expired: true } : previous);
+    retry();
+  }, [retry]);
+  const dispatch = useDispatchNotice(shown, review ? checkoutResult?.clock : clock, refreshDispatch);
   const priced = shown?.status === "ok" ? shown : null;
   const productNames = priced?.productNames ?? (quote?.status === "ok" ? quote.productNames : undefined);
   const basket = priced?.basket;
   const corrections = priced?.corrections ?? [];
   const paymentQuoteNote = !pending && (corrections.length > 0 || shown?.status === "error");
-  const paymentDates = !corrections.length && basket && priced?.coverage === "covered" &&
-    (priced.dispatchDate || priced.estimatedDeliveryDate) ? priced : null;
+  const dispatchCurrent = !!dispatch && !pending && corrections.length === 0 && priced?.coverage !== "unsupported";
+  const paymentDates = dispatchCurrent && priced?.coverage === "covered" ? priced : null;
   const errors = response?.status === "invalid" ? response.errors : {};
   const unsupported = !pending && priced?.coverage === "unsupported";
   const available = trade && "availableCreditPence" in trade ? trade.availableCreditPence : undefined;
@@ -212,10 +220,12 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
       });
       if (!claimed) return;
       attempt.current = { token, revision, quoteKey };
+      const stopClock = startQuoteClock();
       const value = await paymentRequest({
         attemptToken: token, lines, fields: values, quoteKey,
         supersedesAttemptToken: claimed.previousToken,
       });
+      const clock = stopClock();
       if (value.status === "payment") {
         const recorded = await updateCardAttempt(claimed, { token, sessionId: value.sessionId });
         if (!recorded) return;
@@ -233,7 +243,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
         forgetCheckoutAttempt();
         retry();
       }
-      setResult({ lines, value });
+      setResult({ lines, value, clock });
     } catch {
       setResult({ lines, value: { status: "error", message: "We couldn’t review your checkout. Try again." } });
     } finally {
@@ -255,7 +265,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
     });
   }
 
-  async function finishNet30(value: Net30CheckoutResult, attempt: ActiveNet30, action: "submit" | "resume" | "close") {
+  async function finishNet30(value: Net30CheckoutResult, attempt: ActiveNet30, action: "submit" | "resume" | "close", clock: QuoteClock) {
     if (value.status === "confirming" || value.status === "authorised") {
       const { orderId } = value;
       await rememberNet30Order(attempt.token, orderId);
@@ -278,7 +288,7 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
       }
       setResult({ lines, value: { status: "error", message: tradeUnavailableMessage(value.reason) } });
     } else if ("message" in value) {
-      setResult({ lines, value });
+      setResult({ lines, value, clock });
     }
   }
 
@@ -300,8 +310,9 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
         setActive(readActivePayment() ?? memoryCardAttempt.current);
         return;
       }
+      const stopClock = startQuoteClock();
       const value = await paymentRequest({ attemptToken: next.token, lines, fields: values, quoteKey, poReference: po }, "net30");
-      await finishNet30(value, next, "submit");
+      await finishNet30(value, next, "submit", stopClock());
     } catch {
       const message = next ? "We couldn’t verify your account checkout. Check its status before placing another order."
         : "We couldn’t save your account checkout in this browser. You can still pay by card.";
@@ -323,8 +334,9 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
     setSubmitting(true);
     setResult(null);
     try {
+      const stopClock = startQuoteClock();
       const value = await paymentRequest({ action, attemptToken: current.token }, "net30");
-      await finishNet30(value, current, action);
+      await finishNet30(value, current, action, stopClock());
     } catch {
       setResult({ lines, value: { status: "error", message: "We couldn’t verify your account checkout. Try again." } });
     } finally {
@@ -460,9 +472,10 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
               You’ll enter your card details on Stripe’s payment page.
             </p>
           )}
-          {paymentDates && (
-            <div className="checkout-mobile-promise" aria-hidden={pending || undefined}>
-              <DispatchEstimate quote={paymentDates} onAccount={method === "net30"} datesOnly />
+          {paymentDates && dispatch && (
+            <div className="checkout-mobile-promise">
+              <p className="fine"><time dateTime={dispatch.date} aria-hidden="true">{dispatch.text}</time></p>
+              <DeliveryEstimate quote={paymentDates} current onAccount={method === "net30"} datesOnly />
             </div>
           )}
           <button type="submit" className="primary full" aria-disabled={submitting || undefined}
@@ -512,9 +525,10 @@ export function CheckoutReview({ trade }: { trade: CheckoutTrade | null }) {
             </ul>
             <SelectionTotals quote={priced} />
             {priced.coverage === "unchecked" && <p className="fine">Delivery and the total are estimates until you enter your postcode.</p>}
-            <DispatchEstimate quote={priced} onAccount={method === "net30"} />
           </div>
         )}
+        <DispatchNotice copy={dispatchCurrent ? dispatch : null} />
+        {basket && priced && <DeliveryEstimate quote={priced} current={dispatchCurrent} onAccount={method === "net30"} />}
         {!pending && corrections.length > 0 && priced && (
           <button type="button" className="secondary tray-action" onClick={() => {
             summaryTitle.current?.focus();

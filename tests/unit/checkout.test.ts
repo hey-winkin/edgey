@@ -213,8 +213,24 @@ describe("selection quote", () => {
     });
     expect(resolveDelivery).not.toHaveBeenCalled();
     expect(await quoteSelectionWith([line(1)], "", scoped)).toMatchObject({
-      coverage: "unchecked", dispatchDate: null, estimatedDeliveryDate: null,
+      coverage: "unchecked", dispatchDate: null, dispatchTiming: null, estimatedDeliveryDate: null,
     });
+  });
+
+  it("keeps a quote stable as the countdown ages but changes it when dispatch rolls over", async () => {
+    const deps = dependencies();
+    const read = async (time: string) => ok(await quoteSelectionWith([line(1)], undefined, { ...deps, now: () => new Date(time) }));
+    const before = await read("2026-07-17T14:27:00Z");
+    const later = await read("2026-07-17T14:29:00Z");
+    const after = await read("2026-07-17T14:30:00Z");
+    expect(later.quoteKey).toBe(before.quoteKey);
+    expect(later.dispatchTiming).toEqual({
+      checkedAt: Date.parse("2026-07-17T14:29:00Z"),
+      cutoffAt: Date.parse("2026-07-17T14:30:00Z"),
+      validUntil: Date.parse("2026-07-17T14:30:00Z"),
+    });
+    expect(after.quoteKey).not.toBe(before.quoteKey);
+    expect(after).toMatchObject({ dispatchDate: "2026-07-20", dispatchTiming: { cutoffAt: null } });
   });
 });
 

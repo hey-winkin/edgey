@@ -1,4 +1,5 @@
 import type { BasketTotals, LineRequest } from "@/lib/commerce";
+import type { DispatchTiming } from "@/lib/commerce/dispatch";
 
 export type QuoteResult =
   | { status: "error"; message: string }
@@ -9,6 +10,7 @@ export type QuoteResult =
       basket: BasketTotals | null;
       freeDeliveryMessage: string | null;
       dispatchDate: string | null;
+      dispatchTiming: DispatchTiming | null;
       estimatedDeliveryDate: string | null;
       coverage: "unchecked" | "covered" | "unsupported" | "invalid";
       postcode?: string;

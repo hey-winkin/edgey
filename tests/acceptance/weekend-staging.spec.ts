@@ -406,7 +406,10 @@ test("Delivery promises", async ({ browser, page, request }) => {
       try {
         await chooseBlade(buyer, z10);
         const recipient = await review(buyer);
-        await expect(summary(buyer).locator("dt").filter({ hasText: /^Dispatch$/ }).locator("+ dd")).toHaveText(words);
+        const dispatchNotice = at.includes("T14:29:00Z") && !at.startsWith("2026-08-31")
+          ? /for dispatch today$/
+          : `Dispatches ${words}`;
+        await expect(summary(buyer).locator(`time[datetime="${dispatch}"]`)).toHaveText(dispatchNotice);
         await expect(summary(buyer).locator("dt").filter({ hasText: /^Service$/ }).locator("+ dd")).toHaveText("Next working day");
         const session = await payByCard(buyer);
         await capture(session.id, at);

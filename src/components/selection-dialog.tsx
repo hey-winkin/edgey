@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { BasketLine } from "@/lib/commerce";
 import { useSelection } from "./selection-provider";
-import { DispatchEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
+import { DispatchNotice, useDispatchNotice } from "./dispatch-notice";
+import { DeliveryEstimate, SelectionLineIdentity, SelectionLinePrice, SelectionTotals } from "./selection-summary";
 import { useSelectionQuote } from "./use-selection-quote";
 
 export function SelectionTrigger() {
@@ -95,7 +96,8 @@ export function SelectionDialog() {
   const opener = useRef<HTMLElement | undefined>(undefined);
   const backdropDown = useRef(false);
   const browsing = useRef<HTMLButtonElement>(null);
-  const { previousQuote, quote, pending, retry } = useSelectionQuote(lines, !!opened && lines.length > 0);
+  const { previousQuote, quote, clock, pending, retry } = useSelectionQuote(lines, !!opened && lines.length > 0);
+  const dispatch = useDispatchNotice(quote, clock, retry);
   const displayed = quote ?? (pending ? previousQuote : undefined);
   const priced = displayed?.status === "ok" ? displayed : null;
   const current = quote?.status === "ok" ? quote : null;
@@ -192,9 +194,10 @@ export function SelectionDialog() {
                 })}
               </ul>
               <SelectionTotals quote={priced} />
-              <DispatchEstimate quote={priced} />
             </>
           )}
+          <DispatchNotice copy={corrections.length === 0 ? dispatch : null} />
+          {priced && basket && <DeliveryEstimate quote={priced} current={!!dispatch} />}
         </div>
         <div className="dialog-actions">
           {corrections.length > 0 && current ? (

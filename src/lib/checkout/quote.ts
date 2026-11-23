@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { resolveQuotePhoto } from "@/lib/catalogue/media";
 import {
   calculateBasket,
-  calculateDispatchPromise,
   formatGbp,
   STANDARD_DELIVERY_QUOTE,
   type BasketTotals,
@@ -10,7 +9,8 @@ import {
   type DeliveryQuote,
   type LineRequest,
 } from "@/lib/commerce";
-import { promiseUnderTerms, type DeliveryResolution, type DeliveryTerms, type WarehouseSchedule } from "@/lib/delivery/terms";
+import { calculateDispatchDetails, type DispatchTiming } from "@/lib/commerce/dispatch";
+import type { DeliveryResolution, DeliveryTerms, WarehouseSchedule } from "@/lib/delivery/terms";
 import type { QuoteResult } from "./types";
 import { MAX_ORDER_INTEGER, normaliseLines, readPostcodeInput } from "./validation";
 
@@ -104,6 +104,7 @@ export async function quoteSelectionAndTermsWith(
   let basket: BasketTotals | null = null;
   let freeDeliveryMessage: string | null = null;
   let dispatchDate: string | null = null;
+  let dispatchTiming: DispatchTiming | null = null;
   let estimatedDeliveryDate: string | null = null;
   if (lines.length) {
     const calculated = calculateBasket({ lines, deliveryQuote, variants: [...variants.values()] });
@@ -120,19 +121,16 @@ export async function quoteSelectionAndTermsWith(
         : "Your basket qualifies for free delivery.";
     }
 
+    const schedule = terms ?? await readWarehouseSchedule();
     const instant = now();
-    if (Number.isFinite(instant.getTime())) {
-      const authorisedAt = instant.toISOString();
-      const promise = terms && promiseUnderTerms(authorisedAt, terms);
-      if (promise?.ok) {
-        ({ dispatchDate, estimatedDeliveryDate } = promise.value);
-      } else if (!promise || (promise.error.code === "calendar_out_of_range" && promise.error.calendar === "delivery")) {
-        const schedule = terms ?? await readWarehouseSchedule();
-        if (schedule) {
-          const { warehouseCalendar, cutoffMinutes } = schedule;
-          const dispatchOnly = calculateDispatchPromise({ authorisedAt, warehouseCalendar, cutoffMinutes });
-          if (dispatchOnly.ok) dispatchDate = dispatchOnly.value.dispatchDate;
-        }
+    if (schedule && Number.isFinite(instant.getTime())) {
+      const input = { authorisedAt: instant.toISOString(), warehouseCalendar: schedule.warehouseCalendar, cutoffMinutes: schedule.cutoffMinutes };
+      let promise = calculateDispatchDetails({ ...input, deliveryQuote: terms?.quote, deliveryCalendar: terms?.deliveryCalendar });
+      if (!promise.ok && promise.error.code === "calendar_out_of_range" && promise.error.calendar === "delivery") {
+        promise = calculateDispatchDetails(input);
+      }
+      if (promise.ok) {
+        ({ dispatchDate, estimatedDeliveryDate, dispatchTiming } = promise.value);
       }
     }
   }
@@ -144,7 +142,7 @@ export async function quoteSelectionAndTermsWith(
   })).digest("hex");
 
   return { terms, quote: {
-    status: "ok", lines, corrections, basket, freeDeliveryMessage, dispatchDate, estimatedDeliveryDate, coverage,
+    status: "ok", lines, corrections, basket, freeDeliveryMessage, dispatchDate, dispatchTiming, estimatedDeliveryDate, coverage,
     ...(postcode && { postcode }),
     ...(Object.keys(photos).length > 0 && { photos }),
     quoteKey,
