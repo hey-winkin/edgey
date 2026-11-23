@@ -2147,6 +2147,49 @@ export type Database = {
                     }
                 ];
             };
+            "trial_follow_ups": {
+                Row: {
+                    "followed_on": string;
+                    "id": number;
+                    "next_on": string | null;
+                    "note": string | null;
+                    "outcome": string;
+                    "recorded_by": string;
+                    "trial_request_id": string;
+                };
+                ComputedFields: never;
+                Insert: {
+                    "followed_on": string;
+                    "id"?: never;
+                    "next_on"?: string | null;
+                    "note"?: string | null;
+                    "outcome": string;
+                    "recorded_by": string;
+                    "trial_request_id": string;
+                };
+                Update: {
+                    "followed_on"?: string;
+                    "id"?: never;
+                    "next_on"?: string | null;
+                    "note"?: string | null;
+                    "outcome"?: string;
+                    "recorded_by"?: string;
+                    "trial_request_id"?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "trial_follow_ups_trial_request_id_fkey";
+                        columns: [
+                            "trial_request_id"
+                        ];
+                        isOneToOne: false;
+                        referencedRelation: "trial_fulfilments";
+                        referencedColumns: [
+                            "trial_request_id"
+                        ];
+                    }
+                ];
+            };
             "trial_fulfilments": {
                 Row: {
                     "address_country": string;
@@ -2735,6 +2778,22 @@ export type Database = {
                     "same_postcode": boolean;
                 }[];
             };
+            "admin_trial_follow_up_status": {
+                Args: {
+                    "p_trial_request_id"?: string;
+                };
+                Returns: {
+                    "company": string;
+                    "converted": boolean;
+                    "days_waiting": number;
+                    "dispatched_at": string;
+                    "dispatched_on": string;
+                    "due_on": string;
+                    "email": string;
+                    "latest_id": number;
+                    "trial_request_id": string;
+                }[];
+            };
             "admin_trial_mail_status": {
                 Args: {
                     "p_trial_request_id": string;
@@ -3252,12 +3311,15 @@ export type Database = {
             };
             "checkout_delivery_terms": {
                 Args: {
+                    "p_official_bank_holidays"?: (string)[];
                     "p_postcode": string;
                 };
                 Returns: Json;
             };
             "checkout_warehouse_calendar": {
-                Args: Record<PropertyKey, never>;
+                Args: {
+                    "p_official_bank_holidays"?: (string)[];
+                };
                 Returns: Json;
             };
             "claim_finance_retries": {
@@ -4404,6 +4466,17 @@ export type Database = {
                     isSetofReturn: false;
                 };
             };
+            "record_trial_follow_up": {
+                Args: {
+                    "p_expected_id": number;
+                    "p_followed_on": string;
+                    "p_next_on": string;
+                    "p_note": string;
+                    "p_outcome": string;
+                    "p_trial_request_id": string;
+                };
+                Returns: number;
+            };
             "reinstate_trade_account": {
                 Args: {
                     "p_actor_id": string;
@@ -4598,6 +4671,7 @@ export type Database = {
                     "p_dispatch_date": string;
                     "p_hold_expires_at": string;
                     "p_lines": Json;
+                    "p_official_bank_holidays"?: (string)[];
                     "p_payment_method": Database["public"]['Enums']["order_payment_method"];
                     "p_po_number"?: string;
                     "p_totals": Json;

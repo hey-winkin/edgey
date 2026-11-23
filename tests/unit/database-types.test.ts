@@ -12,5 +12,8 @@ test("application types preserve constraints the Supabase generator cannot infer
   expectTypeOf<Public["Tables"]["staff_variant_suppliers"]["Insert"]>().toBeNever();
   expectTypeOf<Public["Functions"]["save_staff_purchase_order_with_supplier_parts"]["Args"]["p_id"]>().toEqualTypeOf<string | null>();
   expectTypeOf<Public["Functions"]["remember_staff_purchase_supplier_part"]["Args"]["p_expected_association_updated_at"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<Public["Tables"]["trial_follow_ups"]["Insert"]>().toBeNever();
+  expectTypeOf<Public["Functions"]["admin_trial_follow_up_status"]["Returns"][number]["due_on"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<Public["Functions"]["record_trial_follow_up"]["Args"]["p_expected_id"]>().toEqualTypeOf<number | null>();
   expectTypeOf<Public["Views"]["staff_purchase_order_stock"]["Row"]["quantity"]>().toEqualTypeOf<number>();
 });

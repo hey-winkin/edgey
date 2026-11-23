@@ -23,7 +23,8 @@ type StaffReadOnlyTable =
   | "staff_variant_costs"
   | "staff_receipt_costs"
   | "staff_purchase_receipt_cost_breakdowns"
-  | "staff_variant_cost_audit";
+  | "staff_variant_cost_audit"
+  | "trial_follow_ups";
 
 type RequiredViewFields<View extends keyof Views, Fields extends keyof Views[View]["Row"]> =
   Omit<Views[View], "Row"> & {
@@ -50,7 +51,11 @@ type NullableArgs<Fn extends keyof Functions, Fields extends keyof Functions[Fn]
 type StaffAuthenticator = Functions["get_staff_authenticator"];
 type LastStaffPurchasePrice = Functions["last_staff_purchase_price"];
 type SelectionQuote = Functions["lookup_selection_quote"];
+type TrialFollowUpStatus = Functions["admin_trial_follow_up_status"];
 type FunctionRefinements = {
+  admin_trial_follow_up_status: Omit<TrialFollowUpStatus, "Returns"> & {
+    Returns: NullableFields<TrialFollowUpStatus["Returns"][number], "due_on" | "latest_id">[];
+  };
   get_staff_authenticator: Omit<StaffAuthenticator, "Returns"> & {
     Returns: NullableFields<StaffAuthenticator["Returns"][number], "approved_factor_id" | "session_factor_id">[];
   };
@@ -60,6 +65,7 @@ type FunctionRefinements = {
   };
   receive_staff_delivery: NullableArgs<"receive_staff_delivery", "p_note">;
   receive_staff_purchase_order: NullableArgs<"receive_staff_purchase_order", "p_note">;
+  record_trial_follow_up: NullableArgs<"record_trial_follow_up", "p_note" | "p_next_on" | "p_expected_id">;
   remember_staff_purchase_supplier_part: NullableArgs<"remember_staff_purchase_supplier_part", "p_expected_association_updated_at">;
   save_staff_purchase_order: NullableArgs<"save_staff_purchase_order", "p_id">;
   save_staff_purchase_order_with_supplier_parts: NullableArgs<"save_staff_purchase_order_with_supplier_parts", "p_id">;
