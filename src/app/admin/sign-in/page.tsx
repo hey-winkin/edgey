@@ -26,11 +26,12 @@ export default async function StaffSignIn() {
     const factors = data?.totp.filter(({ id }) => !staff.approvedFactor || id === staff.approvedFactor) ?? [];
     return (
       <>
-        <AdminHeading title="Staff sign-in" description="Verify your authenticator before opening the staff desk." />
+        <AdminHeading title="Staff sign-in" description="Use your authenticator app to finish signing in." />
         <div className="admin-panel admin-narrow staff-sign-in-fields">
           {error || (staff.approvedFactor && !factors.length)
-            ? <p role="alert">We couldn’t load your approved authenticator. Contact your Edgey administrator.</p>
+            ? <p role="alert">We couldn’t load your approved authenticator. Reload this page to try again.</p>
             : <StaffAuthenticator factors={factors.map(({ id, friendly_name }) => ({ id, label: friendly_name }))} />}
+          <p className="admin-muted mt-3">Lost access to your authenticator? Ask the shop owner in person to reset it.</p>
           <form action={signOutStaff} className="mt-3"><button className="admin-secondary">Sign out</button></form>
         </div>
       </>
@@ -38,7 +39,7 @@ export default async function StaffSignIn() {
   }
   return (
     <>
-      <AdminHeading title="Staff sign-in" description="Use the account issued to you for Edgey operations." />
+      <AdminHeading title="Staff sign-in" description="Sign in with your Edgey work email and password. Next you’ll use an authenticator app, or set one up if this is your first sign-in." />
       <div className="admin-panel admin-narrow staff-sign-in-fields">
         <AdminForm action={signInStaff} submit="Sign in">
           <AdminField label="Work email"><input type="email" name="email" autoComplete="username" maxLength={254} required /></AdminField>
