@@ -9,6 +9,8 @@ export const annotationTags = {
   range: "F",
   diameter: "G",
   shank: "H",
+  width: "I",
+  bore: "J",
 } as const;
 
 type Annotations = Partial<Record<keyof typeof annotationTags, string>>;

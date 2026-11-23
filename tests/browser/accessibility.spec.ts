@@ -117,6 +117,7 @@ for (const theme of themes) {
         ["/", "Find a blade."],
         ["/?q=3910301", "Find a blade."],
         ["/?material=vinyl", "Find a blade."],
+        ["/?material=reflective-film", "Find a blade."],
         ["/preview/material-hero", "Find a blade by material."],
         ["/preview/material-hero?study=corrugated-board", "Corrugated board."],
         ["/preview/original-hero", "The cutting room."],
@@ -133,6 +134,9 @@ for (const theme of themes) {
         ["/blades/edg-z46", noPage],
         ["/missing-edgey-page", noPage],
       ]);
+      await page.goto("/?material=soft-signage");
+      await page.locator("summary").filter({ hasText: "More studies" }).click();
+      await scanAccessibility(page, theme);
     });
 
     test("request forms, sign-ins and public checkout returns", async ({ page }) => {

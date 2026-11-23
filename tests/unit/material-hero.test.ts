@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Family, Variant } from "@/lib/catalogue";
-import { buildCoreStudies, buildCorrugatedStudy } from "@/lib/catalogue/material-hero";
+import { buildAdditionalStudies, buildCoreStudies, buildCorrugatedStudy } from "@/lib/catalogue/material-hero";
 
 const material = { slug: "corrugated-board", name: "Corrugated board", swatch: "flutes", sortOrder: 10 };
 const reference = {
@@ -129,5 +129,64 @@ describe("homepage cutting studies", () => {
     expect(buildCoreStudies([{ ...plotter, variants: plotter.variants.slice(1) }])).toEqual([]);
     expect(buildCoreStudies([{ ...plotter, variants: [{ ...featured, substrates: [] }] }])).toEqual([]);
     expect(buildCoreStudies([{ ...plotter, variants: [{ ...featured, specs: { "Blade type": "Rotary" } }] }])).toEqual([]);
+  });
+});
+
+describe("additional cutting studies", () => {
+  const foamBoard = { ...material, slug: "foam-board", name: "Foam board" };
+  const flock = { ...material, slug: "flock", name: "Flock" };
+  const dragFamily: Family = {
+    ...family,
+    slug: "edg-sum-drg",
+    toolType: { ...family.toolType, slug: "roll-plotter" },
+    variants: [
+      { ...variant, sku: "EDG-SUM-DRG-36", substrates: [flock], angleDeg: 36 },
+      {
+        ...variant, sku: "EDG-SUM-DRG-60", substrates: [flock], angleDeg: 60,
+        specs: { "Blade type": "Thick/reflective/flock drag blade", Length: "19 mm" },
+        cuttingDepthMm: 0.6, bladeThicknessMm: null, diameterMm: 1.5, compatibility: [],
+      },
+    ],
+  };
+
+  it("requires the exact published SKU and its own substrate mapping, not a sibling's mapping", () => {
+    expect(buildAdditionalStudies([family])).toEqual([]);
+    expect(buildAdditionalStudies([{ ...dragFamily, variants: [dragFamily.variants[0]!] }])).toEqual([]);
+    expect(buildAdditionalStudies([{
+      ...dragFamily,
+      variants: [dragFamily.variants[0]!, { ...dragFamily.variants[1]!, substrates: [] }],
+    }])).toEqual([]);
+    expect(buildAdditionalStudies([dragFamily])[0]).toMatchObject({
+      material: flock, sku: "EDG-SUM-DRG-60", href: "/blades/edg-sum-drg?variant=EDG-SUM-DRG-60",
+      fits: [], model: null,
+      annotations: [
+        { key: "length", value: "19 mm" },
+        { key: "depth", value: "0.6 mm" },
+        { key: "angle", label: "Blade angle", value: "60°" },
+        { key: "motion", value: "Drag" },
+        { key: "diameter", value: "1.5 mm" },
+      ],
+    });
+  });
+
+  it("uses a recorded blade width without changing the existing corrugated study", () => {
+    const updated = {
+      ...family,
+      variants: [{ ...variant, specs: { Width: " 5.6 mm " }, substrates: [material, foamBoard] }],
+    };
+    const extra = buildAdditionalStudies([updated])[0];
+    expect(extra).toMatchObject({ material: foamBoard, sku: "EDG-Z16" });
+    expect(extra?.annotations).toContainEqual({ key: "width", label: "Blade width", value: "5.6 mm" });
+    expect(buildCoreStudies([updated])[0]?.annotations.some(({ key }) => key === "width")).toBe(false);
+  });
+
+  it("omits unrecorded drag motion, but will not render a drag study for an explicitly different blade type", () => {
+    const blade = { ...dragFamily.variants[1]!, specs: {} };
+    const extra = buildAdditionalStudies([{ ...dragFamily, variants: [blade] }])[0];
+    expect(extra?.sku).toBe(blade.sku);
+    expect(extra?.annotations.some(({ key }) => key === "motion")).toBe(false);
+    expect(buildAdditionalStudies([{
+      ...dragFamily, variants: [{ ...blade, specs: { "Blade type": "Rotary" } }],
+    }])).toEqual([]);
   });
 });
