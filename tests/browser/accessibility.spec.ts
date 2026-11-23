@@ -117,7 +117,6 @@ for (const theme of themes) {
         ["/", "Find a blade."],
         ["/?q=3910301", "Find a blade."],
         ["/?material=vinyl", "Find a blade."],
-        ["/?material=reflective-film", "Find a blade."],
         ["/preview/material-hero", "Find a blade by material."],
         ["/preview/material-hero?study=corrugated-board", "Corrugated board."],
         ["/preview/original-hero", "The cutting room."],
@@ -134,8 +133,14 @@ for (const theme of themes) {
         ["/blades/edg-z46", noPage],
         ["/missing-edgey-page", noPage],
       ]);
+    });
+
+    test("additional cutting studies with the chooser closed and open", async ({ page }) => {
+      await scanRoutes(page, theme, [["/?material=reflective-film", "Find a blade."]]);
       await page.goto("/?material=soft-signage");
-      await page.locator("summary").filter({ hasText: "More studies" }).click();
+      const chooser = page.getByRole("navigation", { name: "Browse by material" });
+      await chooser.locator("summary").click();
+      await expect(chooser.getByRole("link", { name: "Soft signage" })).toHaveAttribute("aria-current", "true");
       await scanAccessibility(page, theme);
     });
 
