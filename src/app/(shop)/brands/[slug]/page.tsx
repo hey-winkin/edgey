@@ -2,19 +2,25 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Breadcrumbs, catalogueCrumb } from "@/components/breadcrumbs";
 import { brandHref, formatNumber, productHref, referenceToolFit } from "@/lib/catalogue";
 import { formatPence, incVatLabel, PRICE_BREAKS } from "@/lib/catalogue/display-prices";
 import { getBrandLanding } from "@/lib/catalogue/server";
 import { siteUrl } from "@/lib/catalogue/site-url";
+import { socialMetadata } from "@/lib/catalogue/social";
 import styles from "./brand-page.module.css";
 
 type Props = { params: Promise<{ slug: string }> };
+
+const description = "Check the printed code against these Edgey blade references. Open the blade page to check the machine, tool or holder and any adapter before ordering.";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const landing = await getBrandLanding((await params).slug);
   if (!landing) return { title: "Brand references not found", robots: { index: false } };
   const { brand } = landing;
-  return { title: `${brand.name} blade references`, alternates: { canonical: siteUrl(brandHref(brand.slug)) } };
+  const title = `${brand.name} blade references`;
+  const url = siteUrl(brandHref(brand.slug));
+  return { title, description, alternates: { canonical: url }, ...socialMetadata(title, description, url) };
 }
 
 export default async function BrandPage({ params }: Props) {
@@ -23,12 +29,10 @@ export default async function BrandPage({ params }: Props) {
   const { brand, blades } = landing;
 
   return <main id="main-content" tabIndex={-1} className={"frame " + styles.page}>
-    <nav className="crumbs" aria-label="Breadcrumb">
-      <Link href="/blades">Blade catalogue</Link>
-    </nav>
+    <Breadcrumbs items={[catalogueCrumb, { href: brandHref(brand.slug), label: brand.name }]} />
     <p className="kicker"><span className="register" aria-hidden="true" /> Verified references</p>
     <h1>{brand.name} blade references</h1>
-    <p className={styles.intro}>Check the printed code against these Edgey blade references. Open the blade page to check the machine, tool or holder and any adapter before ordering.</p>
+    <p className={styles.intro}>{description}</p>
     <p className={styles.guide}><Link href="/reference-guide" className="textlink">Browse the printable cross-reference guide</Link></p>
     <table className={styles.references} role="table" aria-labelledby="brand-references-caption">
       <caption id="brand-references-caption" className="sr">Published Edgey blades with verified {brand.name} references</caption>

@@ -32,6 +32,20 @@ approvals, stock and fit are fabricated for development; never use the fixture
 as catalogue evidence or apply it to a live project. `pnpm db:stop` stops
 local Supabase.
 
+### Database types
+
+After adding or applying a migration locally, run `pnpm db:types` and commit
+`src/lib/supabase/database.generated.ts` with the migration. The script uses the
+pinned Supabase CLI and TypeScript formatter against the running local
+database. If your local stack is already running with an older schema, run
+`pnpm db:reset` first to replay the migrations (this discards local data).
+CI regenerates the file after starting Supabase and fails if it differs.
+When other migrations land while yours is open, update from main, replay the
+migrations and regenerate before merging so the generated file includes both.
+Keep application-only type refinements in `src/lib/supabase/database.types.ts`,
+not in the generated file. The generator can't infer some view and function
+nullability or string unions enforced by SQL.
+
 ### Staff desk
 
 Start and seed local Supabase as above, then create one account per staff role:

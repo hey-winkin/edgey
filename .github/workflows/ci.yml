@@ -41,6 +41,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:start
+      - name: Check generated database types
+        run: |
+          pnpm db:types
+          types=src/lib/supabase/database.generated.ts
+          if ! git ls-files --error-unmatch -- "$types" >/dev/null 2>&1 || ! git diff --exit-code -- "$types"; then
+            echo "::error file=$types::Database types are out of date. Start or reset local Supabase, run pnpm db:types, and commit the result."
+            exit 1
+          fi
       - run: pnpm db:env
       - run: pnpm db:fixture
       - run: pnpm test:db

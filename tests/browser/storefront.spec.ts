@@ -180,13 +180,21 @@ test("direct visits render a standalone verified product with per-blade price br
   await expect(page.getByText("In stock", { exact: true })).toBeVisible();
   const breaks = page.getByRole("table", { name: "Price breaks per blade for EDG-Z10" });
   await expect(breaks.getByRole("row", { name: /5–9 blades £19\.95 £23\.94/ })).toBeVisible();
-  const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  expect(JSON.parse(jsonLd ?? "{}")).toMatchObject({
-    "@type": "Product",
+  const structured = await page.locator('script[type="application/ld+json"]').evaluateAll((scripts) =>
+    scripts.map((script) => JSON.parse(script.textContent ?? "")));
+  const products = structured.filter((data) => data["@type"] === "Product");
+  expect(products).toHaveLength(1);
+  expect(products[0]).toMatchObject({
+    name: "Flat-stock drag blade",
     sku: "EDG-Z10",
     url: baseURL + "/blades/edg-z10",
-    image: baseURL + "/line-art/drag-line.svg",
-    offers: { url: baseURL + "/blades/edg-z10", priceCurrency: "GBP" },
+    offers: {
+      availability: "https://schema.org/InStock",
+      priceSpecification: expect.arrayContaining([
+        expect.objectContaining({ priceCurrency: "GBP", price: "19.95", valueAddedTaxIncluded: false }),
+        expect.objectContaining({ priceCurrency: "GBP", price: "23.94", valueAddedTaxIncluded: true }),
+      ]),
+    },
   });
   expect(await page.content()).not.toMatch(/PRIV-Z10-ALIAS|500-9802|FIXTURE-EDG-Z10/);
   const quantity = page.getByRole("spinbutton", { name: "Quantity", exact: true });
