@@ -29,7 +29,7 @@ export default async function StaffSignIn() {
         <AdminHeading title="Staff sign-in" description="Use your authenticator app to finish signing in." />
         <div className="admin-panel admin-narrow staff-sign-in-fields">
           {error || (staff.approvedFactor && !factors.length)
-            ? <p role="alert">We couldn’t load your approved authenticator. Reload this page to try again.</p>
+            ? <p role="alert">We couldn’t load your approved authenticator. Ask the shop owner to check your access.</p>
             : <StaffAuthenticator factors={factors.map(({ id, friendly_name }) => ({ id, label: friendly_name }))} />}
           <p className="admin-muted mt-3">Lost access to your authenticator? Ask the shop owner in person to reset it.</p>
           <form action={signOutStaff} className="mt-3"><button className="admin-secondary">Sign out</button></form>

@@ -322,15 +322,23 @@ test("review retains evidence after refusal and approval refreshes a clean selli
 });
 
 test("finance previews margin for read-only selling prices but warehouse cannot open the cost surface", async ({ page, browser, baseURL, editorFixture }) => {
-  const { path } = editorFixture;
+  const { db, id, path } = editorFixture;
   await setVerifiedStaffSession(page, await createLocalAdminUser("finance"), baseURL);
   await page.goto(path);
   const prices = page.getByRole("region", { name: "Selling prices" });
   await expect(prices.getByText("£23.50 ex VAT")).toBeVisible();
   await expect(prices.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Save selling data" })).toHaveCount(0);
-  await page.getByLabel("Landed unit cost (£)", { exact: true }).fill("20");
+  const cost = page.getByRole("region", { name: "Supplier cost" });
+  await cost.getByLabel("Landed unit cost (£)", { exact: true }).fill("20");
   await expect(prices.getByText(/Margin ex VAT:/)).toHaveCount(3);
+  await db.query("update public.variants set price_1_4_pence = 2500 where id = $1", [id]);
+  await cost.getByLabel("Supplier unit price", { exact: true }).fill("16");
+  await cost.getByLabel("Supplier currency", { exact: true }).selectOption("GBP");
+  await cost.getByRole("button", { name: "Save cost estimate" }).click();
+  await expect(cost.getByText("Cost estimate saved.", { exact: true })).toBeVisible();
+  await expect(prices.getByText("£25.00 ex VAT")).toBeVisible();
+  await expect(prices.getByText("Margin ex VAT: £5.00 (20.0%)")).toBeVisible();
 
   const warehouse = await browser.newPage({ baseURL });
   try {

@@ -23,7 +23,7 @@ export function StaffAuthenticator({ factors }: { factors: { id: string; label?:
           {factors.map(({ id, label }, index) => <option key={id} value={id}>{label || `Authenticator ${index + 1}`}</option>)}
         </select></label>
       ) : <input type="hidden" name="factorId" value={factors[0]?.id ?? setup?.factorId} />}
-      <p id="staff-code-help" className="admin-muted">No email is sent. Open the Edgey entry in your authenticator app, such as Google Authenticator or Microsoft Authenticator.</p>
+      <p id="staff-code-help" className="admin-muted">No email is sent. Open the account you added for Edgey in your authenticator app, such as Google Authenticator or Microsoft Authenticator.</p>
       <label className="admin-field"><span>Enter the 6-digit code from your authenticator app</span>
         <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} aria-describedby="staff-code-help" required />
       </label>
