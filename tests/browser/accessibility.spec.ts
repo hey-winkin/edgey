@@ -71,7 +71,10 @@ async function scanRoutes(
     await test.step(url, async () => {
       await page.goto(url);
       await expect(page.getByRole("heading", { level: 1, name: heading, exact: typeof heading === "string" })).toBeVisible();
-      if (group) await expect(page.locator(".admin-location")).toHaveText(group);
+      if (group) {
+        await expect(page.locator(".admin-location")).toHaveText(group);
+        await expect(page.locator(".admin-heading > [data-area-eyebrow]")).toBeHidden();
+      }
       await scanAccessibility(page, theme);
     });
   }
@@ -231,6 +234,7 @@ for (const theme of themes) {
             [`/admin/warehouse/${order.id}`, "Warehouse order", "Orders"],
             [missing, noPage],
             ["/admin/stock", "Stock"],
+            ["/admin/stock?view=out-of-stock", "Out of stock", "Purchases"],
             ["/admin/stock/receive", "Receive delivery", "Purchases"],
             ["/admin/stock/deliveries", "Delivery history", "Purchases"],
             [`/admin/stock/${variantId}`, sku, "Purchases"],
@@ -284,6 +288,9 @@ for (const theme of themes) {
           await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
           await expect(page.getByRole("banner")).toBeHidden();
           await expect(page.locator(".admin-location")).toBeHidden();
+          const printEyebrow = page.locator(".warehouse-pick-list .eyebrow");
+          await expect(printEyebrow).toHaveText("Warehouse");
+          await expect(printEyebrow).toBeVisible();
           await expect(page.getByRole("heading", { name: "Pick list" })).toBeVisible();
           await page.emulateMedia({ media: "screen" });
           const cancellation = await admin.rpc("cancel_order", {

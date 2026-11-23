@@ -18,12 +18,12 @@ export default async function AdminPage() {
 
   return (
     <>
-      <AdminHeading title="Staff desk" eyebrow="Today’s work" description="See what needs doing, then go straight to it." />
-      {caughtUp && <p className="admin-desk-clear">Nothing is waiting in these queues right now.</p>}
+      <AdminHeading title="Staff desk" eyebrow="Today’s work" description="Start with today’s reminders, or open a work area." />
+      {caughtUp && <p className="admin-desk-clear">There are no daily reminders to show for your role right now.</p>}
       <div className="admin-desk">
         {groups.map(({ title, links }) => {
-          const work = links.flatMap(({ label, href, task }) =>
-            task && counts[task] !== 0 ? [{ label, href, task, count: counts[task] }] : [],
+          const work = links.flatMap(({ label, href, task, taskHref }) =>
+            task && counts[task] !== 0 ? [{ label, href: counts[task] === null ? href : taskHref ?? href, task, count: counts[task] }] : [],
           );
           const shortcuts = links.filter(({ task }) => !task || counts[task] === 0);
           return (

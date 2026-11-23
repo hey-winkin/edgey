@@ -9,6 +9,9 @@
   border-block-end: 1px solid var(--line);
 }
 .admin-location + .admin-heading { margin-block-start: 16px; }
+@media screen {
+  .admin:has(> .admin-location) .admin-heading > [data-area-eyebrow] { display: none; }
+}
 .admin-desk {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

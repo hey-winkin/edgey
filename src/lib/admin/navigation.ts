@@ -3,20 +3,21 @@ import type { Database } from "@/lib/supabase/database.types";
 type StaffRole = Database["public"]["Enums"]["staff_role"];
 
 export type StaffTask = "orders" | "requests" | "outOfStock";
+export const stockOutOfStockHref = "/admin/stock?view=out-of-stock";
 
 const areas: {
   title: string;
-  links: { label: string; href: string; roles?: StaffRole[]; task?: StaffTask }[];
+  links: { label: string; href: string; roles?: StaffRole[]; task?: StaffTask; taskHref?: string }[];
 }[] = [
   { title: "Orders", links: [
     { label: "Pick and dispatch", href: "/admin/warehouse", roles: ["warehouse"], task: "orders" },
     { label: "Customer requests", href: "/admin/requests", task: "requests" },
-    { label: "Order history and returns", href: "/admin/warehouse?view=history", roles: ["warehouse"] },
+    { label: "Order history", href: "/admin/warehouse?view=history", roles: ["warehouse"] },
   ] },
   { title: "Purchases", links: [
     // EDGE-38: insert Purchase orders (with the due task), then Suppliers here.
     { label: "Receive a delivery", href: "/admin/stock/receive", roles: ["warehouse"] },
-    { label: "Stock and adjustments", href: "/admin/stock", roles: ["warehouse"], task: "outOfStock" },
+    { label: "Stock and adjustments", href: "/admin/stock", roles: ["warehouse"], task: "outOfStock", taskHref: stockOutOfStockHref },
     { label: "Delivery history", href: "/admin/stock/deliveries", roles: ["warehouse", "catalogue", "finance"] },
   ] },
   { title: "Admin", links: [
@@ -32,7 +33,7 @@ export function staffAreas(roles: readonly StaffRole[]) {
   return areas.map(({ title, links }) => ({
     title,
     links: links.filter(({ roles: required }) => !required || required.some((role) => roles.includes(role)))
-      .map(({ label, href, task }) => ({ label, href, task })),
+      .map(({ label, href, task, taskHref }) => ({ label, href, task, taskHref })),
   })).filter(({ links }) => links.length > 0);
 }
 

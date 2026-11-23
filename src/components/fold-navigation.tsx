@@ -97,7 +97,8 @@ export function FoldNavigation({
                         <li key={href}>
                           <Link href={href} prefetch={false} aria-current={current} onNavigate={() => {
                             const [destination, fragment] = href.split("#");
-                            if (destination && destination !== pathname) menuDestination.current = destination;
+                            const destinationPath = destination?.split("?")[0];
+                            if (destinationPath && destinationPath !== pathname) menuDestination.current = destinationPath;
                             if (disclosure.current) disclosure.current.open = false;
                             if (destination === pathname && fragment) {
                               const target = document.getElementById(fragment);

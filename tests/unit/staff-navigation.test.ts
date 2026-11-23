@@ -6,7 +6,7 @@ test("staff destinations are ordered by job without exposing their role or task 
     { title: "Orders", links: [
       { label: "Pick and dispatch", href: "/admin/warehouse" },
       { label: "Customer requests", href: "/admin/requests" },
-      { label: "Order history and returns", href: "/admin/warehouse?view=history" },
+      { label: "Order history", href: "/admin/warehouse?view=history" },
     ] },
     { title: "Purchases", links: [
       { label: "Receive a delivery", href: "/admin/stock/receive" },
@@ -27,7 +27,7 @@ test("groups retain the route permissions and suppress an empty group", () => {
   const labels = (roles: Parameters<typeof staffNavigation>[0]) =>
     Object.fromEntries(staffNavigation(roles).map(({ title, links }) => [title, links.map(({ label }) => label)]));
   expect(labels(["warehouse"])).toEqual({
-    Orders: ["Pick and dispatch", "Customer requests", "Order history and returns"],
+    Orders: ["Pick and dispatch", "Customer requests", "Order history"],
     Purchases: ["Receive a delivery", "Stock and adjustments", "Delivery history"],
     Admin: ["Delivery settings", "Sales reports", "Shop performance"],
   });

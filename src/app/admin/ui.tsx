@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 export { AdminForm } from "./form";
 
+const areaEyebrows = new Set(["Edgey operations", "Warehouse", "Warehouse / Stock", "Warehouse / Delivery record", "Requests"]);
+
 export function AdminHeading({ title, eyebrow = "Edgey operations", description }: {
   title: string;
   eyebrow?: string;
@@ -10,7 +12,7 @@ export function AdminHeading({ title, eyebrow = "Edgey operations", description 
 }) {
   return (
     <header className="admin-heading">
-      <p className="eyebrow">{eyebrow}</p>
+      <p className="eyebrow" data-area-eyebrow={areaEyebrows.has(eyebrow) || undefined}>{eyebrow}</p>
       <h1>{title}</h1>
       {description && <p className="admin-muted">{description}</p>}
     </header>

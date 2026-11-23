@@ -16,6 +16,7 @@ const itemColumns = "variant_id,sku,option_label,quantity";
 const stockColumns = "id,sku,option_label,tool,publication_status,stock_on_hand,stock_reserved";
 const pickingStatuses = ["ready_to_pick", "picking"] as const;
 const paymentBlockStatuses = ["refunded", "voided"] as const;
+const outOfStockFilters = { publication_status: "published", availability: "out_of_stock" };
 
 export type WarehouseOrder = Pick<Database["public"]["Tables"]["orders"]["Row"],
   "id" | "order_reference" | "business_name" | "recipient_name" | "address_line1" | "address_line2" |
@@ -87,9 +88,14 @@ export async function getWarehouseReturns(db: StaffDb, orderId: string) {
   return data;
 }
 
-export async function getStockList(page: number) {
+export function countPublishedOutOfStock(db: StaffDb) {
+  return db.from("variants").select("id", { count: "exact", head: true }).match(outOfStockFilters);
+}
+
+export async function getStockList(page: number, outOfStock = false) {
   const first = (page - 1) * warehousePageSize;
-  const { data, error } = await serviceClient().from("variants").select(stockColumns)
+  const query = serviceClient().from("variants").select(stockColumns);
+  const { data, error } = await (outOfStock ? query.match(outOfStockFilters) : query)
     .order("sku").range(first, first + warehousePageSize);
   if (error) throw error;
   return { rows: data.slice(0, warehousePageSize), hasMore: data.length > warehousePageSize };

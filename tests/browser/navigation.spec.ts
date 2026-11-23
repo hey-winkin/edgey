@@ -517,11 +517,18 @@ test.describe("staff shell", () => {
         await setVerifiedStaffSession(page, account, baseURL);
         await page.goto("/admin");
         await expect(page.getByRole("heading", { name: "Staff desk" })).toBeVisible();
-        await expect(page.getByRole("main").getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
+        const main = page.getByRole("main");
+        await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
+        const allowedDeskLinks = await main.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+        expect(allowedDeskLinks).toContain("/admin/requests");
+        if (role !== "warehouse") {
+          expect(allowedDeskLinks).not.toContain("/admin/warehouse");
+          expect(allowedDeskLinks).not.toContain("/admin/stock?view=out-of-stock");
+        }
         await expect(page.getByRole("link", { name: "Staff desk", exact: true })).toHaveAttribute("aria-current", "page");
         await staffMenu(page).click();
         const areas = {
-          Orders: role === "warehouse" ? ["Pick and dispatch", "Customer requests", "Order history and returns"] : ["Customer requests"],
+          Orders: role === "warehouse" ? ["Pick and dispatch", "Customer requests", "Order history"] : ["Customer requests"],
           Purchases: role === "warehouse" ? ["Receive a delivery", "Stock and adjustments", "Delivery history"] : ["Delivery history"],
           Admin: role === "warehouse" ? ["Delivery settings", "Sales reports", "Shop performance"] :
             ["Catalogue", "Sales reports", ...(role === "finance" ? ["Finance and trade accounts"] : [])],
@@ -535,12 +542,27 @@ test.describe("staff shell", () => {
           await staffNav(page).getByRole("link", { name: "Pick and dispatch" }).click();
           await expect(page.getByRole("heading", { name: "Pick and dispatch" })).toBeVisible();
           await expect(staffNav(page)).toBeHidden();
+          await page.goto("/admin");
+          const gate = Promise.withResolvers<void>();
+          let requestedHistory = false;
+          await page.route((url) => url.pathname === "/admin/warehouse" && url.searchParams.get("view") === "history", async (route) => {
+            requestedHistory = true;
+            await gate.promise;
+            await route.continue();
+          });
           await staffMenu(page).click();
-          await staffNav(page).getByRole("link", { name: "Order history and returns" }).click();
+          try {
+            await staffNav(page).getByRole("link", { name: "Order history", exact: true }).click();
+            await expect(staffNav(page)).toBeHidden();
+            await expect.poll(() => requestedHistory).toBe(true);
+            await staffMenu(page).click();
+            await expect(staffNav(page)).toBeVisible();
+          } finally {
+            gate.resolve();
+          }
           await expect(page.getByRole("heading", { name: "Dispatch and cancellation history" })).toBeVisible();
-          await expect(staffNav(page)).toBeHidden();
-          await staffMenu(page).click();
-          await expect(staffNav(page).locator("[aria-current]")).toHaveText(["Order history and returns"]);
+          await expect(staffNav(page)).toBeVisible();
+          await expect(staffNav(page).locator("[aria-current]")).toHaveText(["Order history"]);
           await staffNav(page).getByRole("link", { name: "Shop performance" }).click();
           await expect(page.getByRole("heading", { name: "Commercial measures" })).toBeVisible();
           await expect(staffNav(page)).toBeHidden();
@@ -643,7 +665,8 @@ test.describe("staff shell", () => {
             await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
             await expect(orders.getByRole("link", { name: /^[1-9]\d* orders? to pick or dispatch$/ })).toHaveAttribute("href", "/admin/warehouse");
             await expect(orders.getByRole("link", { name: /^[1-9]\d* customer requests? to answer or review$/ })).toHaveAttribute("href", "/admin/requests");
-            await expect(purchases.getByRole("link", { name: /^[1-9]\d* published blade variants? out of stock$/ })).toHaveAttribute("href", "/admin/stock");
+            const shortages = purchases.getByRole("link", { name: /^[1-9]\d* published blade variants? out of stock$/ });
+            await expect(shortages).toHaveAttribute("href", "/admin/stock?view=out-of-stock");
             await expect(adminGroup.getByRole("link")).toHaveText(roles === "all"
               ? ["Catalogue", "Delivery settings", "Sales reports", "Finance and trade accounts", "Shop performance"]
               : ["Delivery settings", "Sales reports", "Shop performance"]);
@@ -682,6 +705,16 @@ test.describe("staff shell", () => {
               await expect(staffNav(page)).toBeHidden();
               await staffMenu(page).blur();
             }
+            await shortages.click();
+            await expect(page.getByRole("heading", { level: 1, name: "Out of stock" })).toBeVisible();
+            const rows = page.getByRole("table", { name: "Variant balances" }).locator("tbody tr");
+            await expect(rows.first()).toBeVisible();
+            for (const row of await rows.all()) {
+              await expect(row.getByRole("cell").nth(2)).toHaveText("Published");
+              await expect(row.getByRole("cell").last()).toHaveText("0");
+            }
+            await page.getByRole("link", { name: "Show all stock" }).click();
+            await expect(page.getByRole("heading", { level: 1, name: "Stock" })).toBeVisible();
           } finally {
             await db.query("delete from public.enquiries where id = $1", [enquiry]);
           }
