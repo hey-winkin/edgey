@@ -84,9 +84,9 @@ export function SearchHomeHero({ view, filters, coreStudies, moreStudies, qualit
           )}
           {moreStudies.length > 0 && (
             <details className={styles.more}>
-              <summary aria-label={selectedMore ? `${moreLabel} (${moreStudies.length}). Current study: ${selectedMore.material.name}` : undefined}>
+              <summary>
                 <span>{moreLabel} <span className={styles.moreCount}>({moreStudies.length})</span></span>
-                {selectedMore && <span className={styles.moreCurrent}>{selectedMore.material.name}</span>}
+                {selectedMore && <>{" "}<span className={styles.moreCurrent}>{selectedMore.material.name}</span></>}
               </summary>
               <ul role="list">
                 {moreStudies.map(({ material }) => (

@@ -163,7 +163,7 @@ test("the compact disclosure exposes every additional published study without ad
   }
   await page.reload();
   await expect(more).toContainText("Soft signage");
-  await expect(more).toHaveAccessibleName("More studies (9). Current study: Soft signage");
+  await expect(more).toHaveAccessibleName("More studies (9) Soft signage");
   await expect(page.getByRole("region", { name: "Soft signage" })).toContainText("Bore diameter");
 });
 
