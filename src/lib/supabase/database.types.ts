@@ -13,6 +13,7 @@ type StaffReadOnlyTable =
   | "staff_deliveries"
   | "staff_delivery_lines"
   | "staff_suppliers"
+  | "staff_variant_suppliers"
   | "staff_purchase_orders"
   | "staff_purchase_order_costs"
   | "staff_purchase_order_lines"
@@ -59,7 +60,9 @@ type FunctionRefinements = {
   };
   receive_staff_delivery: NullableArgs<"receive_staff_delivery", "p_note">;
   receive_staff_purchase_order: NullableArgs<"receive_staff_purchase_order", "p_note">;
+  remember_staff_purchase_supplier_part: NullableArgs<"remember_staff_purchase_supplier_part", "p_expected_association_updated_at">;
   save_staff_purchase_order: NullableArgs<"save_staff_purchase_order", "p_id">;
+  save_staff_purchase_order_with_supplier_parts: NullableArgs<"save_staff_purchase_order_with_supplier_parts", "p_id">;
   save_staff_supplier: NullableArgs<"save_staff_supplier", "p_id">;
 };
 

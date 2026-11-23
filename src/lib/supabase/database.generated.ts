@@ -272,6 +272,7 @@ export type Database = {
                 Row: {
                     "charge_ex_vat_pence": number | null;
                     "code": string;
+                    "dispatch_carrier": string | null;
                     "kind": string;
                     "scope": string;
                     "service_name": string | null;
@@ -281,6 +282,7 @@ export type Database = {
                 Insert: {
                     "charge_ex_vat_pence"?: number | null;
                     "code": string;
+                    "dispatch_carrier"?: string | null;
                     "kind": string;
                     "scope": string;
                     "service_name"?: string | null;
@@ -289,6 +291,7 @@ export type Database = {
                 Update: {
                     "charge_ex_vat_pence"?: number | null;
                     "code"?: string;
+                    "dispatch_carrier"?: string | null;
                     "kind"?: string;
                     "scope"?: string;
                     "service_name"?: string | null;
@@ -1741,6 +1744,54 @@ export type Database = {
                             "variant_id"
                         ];
                         isOneToOne: true;
+                        referencedRelation: "variants";
+                        referencedColumns: [
+                            "id"
+                        ];
+                    }
+                ];
+            };
+            "staff_variant_suppliers": {
+                Row: {
+                    "is_usual": boolean;
+                    "supplier_id": string;
+                    "supplier_part_number": string | null;
+                    "updated_at": string;
+                    "variant_id": string;
+                };
+                ComputedFields: never;
+                Insert: {
+                    "is_usual"?: boolean;
+                    "supplier_id": string;
+                    "supplier_part_number"?: string | null;
+                    "updated_at"?: string;
+                    "variant_id": string;
+                };
+                Update: {
+                    "is_usual"?: boolean;
+                    "supplier_id"?: string;
+                    "supplier_part_number"?: string | null;
+                    "updated_at"?: string;
+                    "variant_id"?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "staff_variant_suppliers_supplier_id_fkey";
+                        columns: [
+                            "supplier_id"
+                        ];
+                        isOneToOne: false;
+                        referencedRelation: "staff_suppliers";
+                        referencedColumns: [
+                            "id"
+                        ];
+                    },
+                    {
+                        foreignKeyName: "staff_variant_suppliers_variant_id_fkey";
+                        columns: [
+                            "variant_id"
+                        ];
+                        isOneToOne: false;
                         referencedRelation: "variants";
                         referencedColumns: [
                             "id"
@@ -4518,6 +4569,15 @@ export type Database = {
                     isSetofReturn: false;
                 };
             };
+            "remember_staff_purchase_supplier_part": {
+                Args: {
+                    "p_expected_association_updated_at": string;
+                    "p_expected_purchase_revision": number;
+                    "p_purchase_order_id": string;
+                    "p_variant_id": string;
+                };
+                Returns: boolean;
+            };
             "request_finance_retry": {
                 Args: {
                     "p_actor_id": string;
@@ -4745,6 +4805,16 @@ export type Database = {
                     "p_id": string;
                     "p_lines": Json;
                     "p_order": Json;
+                };
+                Returns: string;
+            };
+            "save_staff_purchase_order_with_supplier_parts": {
+                Args: {
+                    "p_expected_revision": number;
+                    "p_id": string;
+                    "p_lines": Json;
+                    "p_order": Json;
+                    "p_remember": Json;
                 };
                 Returns: string;
             };
