@@ -93,6 +93,27 @@ test("depth is inclusive and counts distinct missing-depth options only after ot
   expect(view.missingDepthCount).toBe(1);
 });
 
+test("search counts missing depth only in the match group shown before applying depth", () => {
+  const blade = family.variants[0]!;
+  const suggestedMissing = { ...blade, id: "suggested-missing", sku: "EDG-SUGGESTED-MISSING" };
+  const suggestedFit = { ...blade, id: "suggested-fit", sku: "EDG-SUGGESTED-FIT", cuttingDepthMm: 5 };
+  const families = [{ ...family, variants: [blade, suggestedMissing, suggestedFit] }];
+  const hits = [blade, suggestedMissing, suggestedFit].map(({ sku }, index) => ({
+    productSlug: family.slug, sku, matchType: index ? "suggested" as const : "exact" as const, matchedCode: "DEMO",
+  }));
+  const filters = readFilters({ q: "demo", depth: "5" }, true);
+  const view = buildCatalogueView(families, hits, filters);
+  expect(view.missingDepthCount).toBe(1);
+  expect(view.cards[0]?.match).toBe("suggested");
+  expect(view.cards[0]?.variants).toEqual([suggestedFit]);
+
+  const exactFit = { ...blade, cuttingDepthMm: 5 };
+  families[0]!.variants[0] = exactFit;
+  const exactView = buildCatalogueView(families, hits, filters);
+  expect(exactView.missingDepthCount).toBe(0);
+  expect(exactView.cards[0]?.variants).toEqual([exactFit]);
+});
+
 test("blade facets opt in to positive finite decimal depths and normalized heads", () => {
   for (const depth of ["", "0", "-2", "Infinity", "0x10", "1e999", "4 mm", "NaN"]) {
     expect(readFilters({ depth }, true).depth).toBe("");

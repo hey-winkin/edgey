@@ -107,3 +107,25 @@ test("prints the current guide in black on white with the source and date but wi
   await expect(guide.getByRole("table")).toHaveCount(1);
   await expect(guide.getByText("391-231", { exact: true })).toBeVisible();
 });
+
+test.describe("reference guide without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("keeps the full guide available with browser Find and Print instructions", async ({ page, baseURL }) => {
+    await page.goto(path);
+    const guide = page.getByRole("main");
+    const instructions = guide.getByText("Use your browser’s Find and Print commands to search or print the full guide.");
+    await expect(instructions).toBeVisible();
+    await expect(guide.getByRole("searchbox")).toHaveCount(0);
+    await expect(guide.getByRole("button", { name: "Print guide" })).toHaveCount(0);
+    await expect(guide.getByRole("table", { name: "Zünd", exact: true })).toContainText("3910301");
+    await expect(guide.getByRole("table", { name: "Summa", exact: true })).toContainText("391-231");
+
+    await page.emulateMedia({ media: "print" });
+    await expect(instructions).toBeHidden();
+    await expect(guide.getByRole("link", { name: baseURL + path, exact: true })).toBeVisible();
+    await expect(guide.locator("time")).toBeVisible();
+    await expect(guide.getByRole("table", { name: "Zünd", exact: true })).toBeVisible();
+    await expect(guide.getByRole("table", { name: "Summa", exact: true })).toBeVisible();
+  });
+});

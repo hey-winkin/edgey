@@ -1,4 +1,4 @@
-.heading {
+.heading:global(.section-head) {
   flex-direction: column;
   align-items: stretch;
   gap: 16px;
@@ -6,6 +6,7 @@
 
 .filters {
   display: grid;
+  align-items: start;
   grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)) minmax(14rem, 1.3fr);
 }
 
@@ -18,6 +19,15 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
+  font-size: .88rem;
+}
+
+.depthControl {
+  min-width: 0;
+}
+
+.depthError {
+  margin: 6px 0 0;
   font-size: .88rem;
 }
 
@@ -48,7 +58,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filters :global(.search-field) {
+  .filters :global(.search-field), .depthControl {
     grid-column: 1 / -1;
   }
 }

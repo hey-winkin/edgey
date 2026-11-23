@@ -191,33 +191,41 @@ export function buildCatalogueView(families: Family[], hits: SearchHit[] | null,
 
   const minimumDepth = Number(filters.depth);
   const missingDepth = new Set<string>();
-  function passesFilters(family: Family, variant: Variant) {
+  function passesFacets(family: Family, variant: Variant) {
     if (filters.type && family.toolType.slug !== filters.type) return false;
     if (filters.material && !variant.substrates.some((substrate) => substrate.slug === filters.material)) return false;
     if ((filters.machine || filters.head) && !variant.compatibility.some((record) =>
       (!filters.machine || record.brand?.slug === filters.machine) &&
       (!filters.head || headsByReference.get(record)?.includes(filters.head))
     )) return false;
-    if (!minimumDepth) return true;
-    if (variant.cuttingDepthMm === null) {
-      missingDepth.add(variant.id);
-      return false;
-    }
-    return variant.cuttingDepthMm >= minimumDepth;
+    return true;
   }
+  const passesDepth = (variant: Variant) => !minimumDepth ||
+    (variant.cuttingDepthMm !== null && variant.cuttingDepthMm >= minimumDepth);
 
   const bySlug = new Map(families.map((family) => [family.slug, family]));
   const grouped = new Map<string, CatalogueCard>();
   if (hits === null) {
     for (const family of families) {
-      const variants = family.variants.filter((variant) => passesFilters(family, variant));
+      const variants = family.variants.filter((variant) => {
+        if (!passesFacets(family, variant)) return false;
+        if (minimumDepth && variant.cuttingDepthMm === null) missingDepth.add(variant.id);
+        return passesDepth(variant);
+      });
       if (variants.length) grouped.set(family.slug, { family, variants, match: null, matchedCode: null, href: productHref(family.slug) });
     }
   } else {
+    const matchWithoutDepth = new Map<string, SearchHit["matchType"]>();
     for (const hit of hits) {
       const family = bySlug.get(hit.productSlug);
       const variant = family?.variants.find((candidate) => candidate.sku === hit.sku);
-      if (!family || !variant || !passesFilters(family, variant)) continue;
+      if (!family || !variant || !passesFacets(family, variant)) continue;
+      if (minimumDepth) {
+        const match = matchWithoutDepth.get(family.slug) ?? hit.matchType;
+        matchWithoutDepth.set(family.slug, match);
+        if (match === hit.matchType && variant.cuttingDepthMm === null) missingDepth.add(variant.id);
+      }
+      if (!passesDepth(variant)) continue;
       const card = grouped.get(family.slug) ?? {
         family, variants: [], match: hit.matchType, matchedCode: hit.matchedCode, href: productHref(family.slug),
       };

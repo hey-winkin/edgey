@@ -48,8 +48,61 @@ test("the empty state reports otherwise matching options without a recorded dept
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/blades$/);
 });
 
+test("live depth changes combine with facets and reject invalid values without changing results", async ({ page }) => {
+  await page.goto("/blades?q=3910301&type=drag&machine=zund&material=foamex&head=uct&depth=4.8");
+  const depth = page.getByRole("spinbutton", { name: "Minimum depth (mm)" });
+  const result = page.getByRole("link", { name: /EDG-Z10/ });
+  await expect(result).toBeVisible();
+  await depth.fill("4.81");
+  await expect(page).toHaveURL((url) => url.searchParams.get("depth") === "4.81");
+  await expect(result).toHaveCount(0);
+
+  await depth.evaluate((input: HTMLInputElement) => {
+    input.value = "4.8";
+    input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    input.value = "-1";
+    input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+  const message = "Enter a number of 0 mm or more, or leave it blank.";
+  await expect(depth).toHaveAttribute("aria-invalid", "true");
+  await expect(depth).toHaveAccessibleDescription(message);
+  await expect(page.getByRole("alert").filter({ hasText: message })).toBeVisible();
+  await depth.press("ControlOrMeta+a");
+  await depth.press("Minus");
+  await expect(depth).toHaveAttribute("aria-invalid", "true");
+  await expect(page).toHaveURL((url) => url.searchParams.get("depth") === "4.81");
+  await expect(result).toHaveCount(0);
+
+  await depth.fill("4.8");
+  await expect(depth).not.toHaveAttribute("aria-invalid");
+  await expect(result).toBeVisible();
+  expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
+    q: "3910301", type: "drag", machine: "zund", material: "foamex", head: "uct", depth: "4.8",
+  });
+});
+
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
+
+  test("switching machine explains an incompatible tool head and offers only valid replacements", async ({ page }) => {
+    await page.goto("/blades?machine=zund&head=pot");
+    const apply = page.getByRole("button", { name: "Apply filters" });
+    const head = page.getByRole("combobox", { name: "Tool head", exact: true });
+    await expect(head).toHaveValue("pot");
+    await page.getByRole("combobox", { name: "Machine" }).selectOption("summa");
+    await apply.click();
+    await expect(page).toHaveURL((url) => url.searchParams.get("machine") === "summa" && url.searchParams.get("head") === "pot");
+    await expect(page.getByRole("heading", { name: "No matching blades" })).toBeVisible();
+    const message = "That tool head isn’t listed for the selected machine. Choose a listed tool head or clear the filters.";
+    await expect(page.getByText(message)).toBeVisible();
+    await expect(head).toHaveAccessibleDescription(message);
+    await expect(head).toHaveValue("");
+    await expect(head.getByRole("option", { name: "POT", exact: true })).toHaveCount(0);
+    await head.selectOption("d-series drag");
+    await apply.click();
+    await expect(page.getByText(message)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /EDG-SUM-DRG/ })).toBeVisible();
+  });
 
   test("a GET submission combines search and all facets and keeps them on reload", async ({ page }) => {
     await page.goto("/blades");

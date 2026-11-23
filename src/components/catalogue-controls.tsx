@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { toolHeadsForMachine, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
 import styles from "./catalogue-filters.module.css";
 
@@ -23,7 +23,7 @@ function writeFilters(form: HTMLFormElement | null, filters?: CatalogueFilters) 
     const control = form?.elements.namedItem(name);
     if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
       control.value = filters?.[name] ?? "";
-      if (name === "head" && control instanceof HTMLSelectElement && control.selectedIndex === -1) control.value = "";
+      if (control instanceof HTMLSelectElement && control.selectedIndex === -1) control.value = "";
     }
   }
 }
@@ -46,7 +46,10 @@ export function CatalogueControls({
   const form = useRef<HTMLFormElement>(null);
   const requested = useRef<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [invalidDepth, setInvalidDepth] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heads = bladeFacets ? toolHeadsForMachine(bladeFacets.toolHeads, filters.machine) : [];
+  const unlistedHead = Boolean(filters.head && !heads.some(({ slug }) => slug === filters.head));
 
   const received = filterQuery((name) => filters[name]);
   const rendered = useRef(received);
@@ -55,13 +58,23 @@ export function CatalogueControls({
     rendered.current = received;
     const index = requested.current.indexOf(received);
     requested.current = index === -1 ? [] : requested.current.slice(index + 1);
-    if (index === -1) writeFilters(form.current, filters);
+    if (index === -1) {
+      writeFilters(form.current, filters);
+      setInvalidDepth(false);
+    }
   }, [filters, received]);
 
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [pathname]);
 
   function push(element: HTMLFormElement, delay: number, showResults = false) {
     if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const depth = element.elements.namedItem("depth");
+    if (depth instanceof HTMLInputElement) {
+      const invalid = !depth.validity.valid || (depth.value !== "" && !Number.isFinite(depth.valueAsNumber));
+      setInvalidDepth(invalid);
+      if (invalid) return;
+    }
     const data = new FormData(element);
     const query = filterQuery((name) => String(data.get(name) ?? ""));
     timer.current = setTimeout(() => {
@@ -89,6 +102,7 @@ export function CatalogueControls({
         timer.current = null;
         requested.current = [];
         writeFilters(event.currentTarget, filters);
+        setInvalidDepth(false);
       }}
       onSubmit={(event) => {
         event.preventDefault();
@@ -98,6 +112,7 @@ export function CatalogueControls({
       onChange={(event) => {
         const form = event.currentTarget;
         const target = event.target;
+        if (target instanceof HTMLInputElement && target.name === "depth") return;
         if (bladeFacets && target instanceof HTMLSelectElement && target.name === "machine") {
           const head = form.elements.namedItem("head");
           if (head instanceof HTMLSelectElement && !toolHeadsForMachine(bladeFacets.toolHeads, target.value).some(({ slug }) => slug === head.value)) {
@@ -128,24 +143,38 @@ export function CatalogueControls({
         : <CatalogueFacets filters={filters} toolTypes={toolTypes} machines={machines} />}
       {bladeFacets ? (
         <>
-          <label className="select-field">
+          <div className="select-field">
             <select name="material" aria-label="Material" defaultValue={filters.material}>
               <option value="">All materials</option>
               {bladeFacets.materials.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
             </select>
-          </label>
-          <label className="select-field">
-            <select name="head" aria-label="Tool head" defaultValue={filters.head}>
+          </div>
+          <div className="select-field">
+            <select name="head" aria-label="Tool head" aria-describedby={unlistedHead ? "unlisted-tool-head" : undefined} defaultValue={filters.head}>
               <option value="">All tool heads</option>
-              {toolHeadsForMachine(bladeFacets.toolHeads, filters.machine).map(({ slug, name }) =>
-                <option key={slug} value={slug}>{name}</option>
-              )}
+              {heads.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
             </select>
-          </label>
-          <label className={"search-field " + styles.depth}>
-            <span>Minimum depth (mm)</span>
-            <input name="depth" type="number" min="0" step="any" placeholder="Any" defaultValue={filters.depth} />
-          </label>
+          </div>
+          <div className={styles.depthControl}>
+            <label className={"search-field " + styles.depth}>
+              <span>Minimum depth (mm)</span>
+              <input
+                name="depth"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Any"
+                defaultValue={filters.depth}
+                aria-invalid={invalidDepth || undefined}
+                aria-describedby={invalidDepth ? "catalogue-depth-error" : undefined}
+                onInput={(event) => {
+                  const form = event.currentTarget.form;
+                  if (form) push(form, 160);
+                }}
+              />
+            </label>
+            {invalidDepth && <p className={styles.depthError} id="catalogue-depth-error" role="alert">Enter a number of 0 mm or more, or leave it blank.</p>}
+          </div>
         </>
       ) : filters.material && <input type="hidden" name="material" defaultValue={filters.material} />}
       {!searchFirst && (

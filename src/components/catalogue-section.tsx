@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bladeCount, formatNumber, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
+import { bladeCount, formatNumber, toolHeadsForMachine, type CatalogueFilters, type CatalogueView } from "@/lib/catalogue";
 import { CatalogueControls, CatalogueFacets } from "./catalogue-controls";
 import styles from "./catalogue-filters.module.css";
 import { ClearFiltersLink } from "./catalogue-links";
@@ -22,6 +22,7 @@ export function CatalogueSection({
   const Heading = asPage ? "h1" : "h2";
   const EmptyHeading = asPage ? "h2" : "h3";
   const { type, machine, material, head, depth } = filters;
+  const unlistedHead = asPage && head && !toolHeadsForMachine(view.toolHeads, machine).some(({ slug }) => slug === head);
   const hasFacets = Boolean(type || machine || material || head || depth);
   const active = asPage ? [
     query && `Search: “${query}”`,
@@ -61,6 +62,12 @@ export function CatalogueSection({
             <span>{(asPage ? [count, ...active] : [...active, count]).join(" · ")}</span>
             <ClearFiltersLink>Clear filters</ClearFiltersLink>
           </div>
+        )}
+        {unlistedHead && (
+          <p className={styles.missing} id="unlisted-tool-head">
+            {machine ? "That tool head isn’t listed for the selected machine. " : "That tool head isn’t listed in the catalogue. "}
+            Choose a listed tool head or clear the filters.
+          </p>
         )}
         {excluded && <p className={styles.missing}>{excluded}</p>}
         <div className="cards">

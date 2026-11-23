@@ -60,7 +60,7 @@ describe("blade reference guide", () => {
       }],
       [{
         sku: "EDG-SECOND", name: family.name, href: "/blades/edg-family?variant=EDG-SECOND",
-        codes: [], machines: [], heads: ["Default holder"], angle: null, depth: null, materials: [],
+        codes: [], machines: [], heads: [], angle: null, depth: null, materials: [],
       }],
     ]);
   });
@@ -68,11 +68,14 @@ describe("blade reference guide", () => {
   test("preserves brandless approved references and keeps links clean for single variants", () => {
     const guide = buildReferenceGuide([{
       ...family,
-      variants: [{ ...variant, compatibility: [mapping({ tool: null }), mapping({ brand: null, code: "NO-BRAND" })] }],
+      variants: [{ ...variant, compatibility: [
+        mapping({ tool: null }),
+        mapping({ brand: null, code: "NO-BRAND", tool: null, adapter: "Approved adapter" }),
+      ] }],
     }]);
     expect(guide).toHaveLength(2);
     expect(guide[0]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["Z10"], heads: [] });
-    expect(guide[1]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["NO-BRAND"] });
+    expect(guide[1]?.rows[0]).toMatchObject({ href: "/blades/edg-family", codes: ["NO-BRAND"], heads: ["Adapter: Approved adapter"] });
   });
 
   test("searches only visible fields, normalising printed codes, case and diacritics", () => {
@@ -83,7 +86,7 @@ describe("blade reference guide", () => {
     expect(filterReferenceGuide(guide, "edgsecond")).toEqual([guide[2]]);
     expect(filterReferenceGuide(guide, "f-series 4.8 mm")).toEqual([guide[0]]);
     expect(filterReferenceGuide(guide, "First 3910301")).toEqual([guide[1]]);
-    for (const query of ["Unverified hidden model", "Unused option", "Description not used", "1195"]) {
+    for (const query of ["Unverified hidden model", "Unused option", "Description not used", "Default holder", "1195"]) {
       expect(JSON.stringify(guide)).not.toContain(query);
       expect(filterReferenceGuide(guide, query)).toEqual([]);
     }

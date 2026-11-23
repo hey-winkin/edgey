@@ -39,7 +39,7 @@ export function buildReferenceGuide(families: Family[]): ReferenceGroup[] {
           href: productHref(family.slug, family.variants.length > 1 ? variant.sku : null),
           codes: [...new Set(references.map(({ code }) => code))],
           machines: [...new Set(references.flatMap(({ machine }) => machine ? [machine] : []))],
-          heads: referenceToolFit(slug ? { ...variant, tool: null } : variant, references),
+          heads: referenceToolFit({ ...variant, tool: null }, references),
           angle: variant.angleDeg === null ? null : formatNumber(variant.angleDeg) + "°",
           depth: variant.cuttingDepthMm === null ? null : formatNumber(variant.cuttingDepthMm) + " mm",
           materials: variant.substrates.map(({ name }) => name),

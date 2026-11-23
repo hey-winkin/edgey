@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { filterReferenceGuide, type ReferenceGroup } from "@/lib/catalogue/reference-guide";
 import styles from "./reference-guide.module.css";
 
 const columns = ["Edgey blade", "Maker references", "Tool heads", "Edge angle", "Cutting depth", "Materials"];
+const subscribeToHydration = () => () => {};
+const isHydrated = () => true;
+const isServerHydrated = () => false;
 
 export function ReferenceGuide({ groups, url, date, dateTime }: {
   groups: ReferenceGroup[];
@@ -13,6 +16,7 @@ export function ReferenceGuide({ groups, url, date, dateTime }: {
   dateTime: string;
 }) {
   const [query, setQuery] = useState("");
+  const interactive = useSyncExternalStore(subscribeToHydration, isHydrated, isServerHydrated);
   const printUrl = useRef<HTMLAnchorElement>(null);
   const results = filterReferenceGuide(groups, query);
   const count = results.reduce((sum, group) => sum + group.rows.length, 0);
@@ -31,22 +35,26 @@ export function ReferenceGuide({ groups, url, date, dateTime }: {
         <a ref={printUrl} href={url}>{url}</a>{" · Guide generated "}<time dateTime={dateTime}>{date}</time>
       </p>
       {query.trim() && <p className={styles.printOnly}>Filtered results. Visit the URL above for the full guide.</p>}
-      <div className={`${styles.controls} ${styles.screenOnly}`}>
-        <div role="search" aria-label="Reference guide">
-          <label htmlFor="reference-guide-search">Search the reference guide</label>
-          <div className={`search-field ${styles.searchBox}`}>
-            <span className="search-icon" aria-hidden="true" />
-            <input
-              id="reference-guide-search"
-              type="search"
-              placeholder="e.g. Z10, Summa or vinyl"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+      {interactive ? (
+        <div className={`${styles.controls} ${styles.screenOnly}`}>
+          <div role="search" aria-label="Reference guide">
+            <label htmlFor="reference-guide-search">Search the reference guide</label>
+            <div className={`search-field ${styles.searchBox}`}>
+              <span className="search-icon" aria-hidden="true" />
+              <input
+                id="reference-guide-search"
+                type="search"
+                placeholder="e.g. Z10, Summa or vinyl"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
           </div>
+          <button type="button" className="secondary" onClick={() => window.print()}>Print guide</button>
         </div>
-        <button type="button" className="secondary" onClick={() => window.print()}>Print guide</button>
-      </div>
+      ) : (
+        <p className={`${styles.note} ${styles.screenOnly}`}>Use your browser’s Find and Print commands to search or print the full guide.</p>
+      )}
       <p role="status" className={`${styles.count} ${styles.screenOnly}`}>
         {count} {count === 1 ? "entry" : "entries"}
       </p>
