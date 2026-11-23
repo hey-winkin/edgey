@@ -41,6 +41,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:start
+      - name: Check generated database types
+        run: |
+          pnpm db:types
+          git ls-files --error-unmatch -- src/lib/supabase/database.generated.ts
+          git diff --exit-code -- src/lib/supabase/database.generated.ts
       - run: pnpm db:env
       - run: pnpm db:fixture
       - run: pnpm test:db

@@ -28,23 +28,25 @@ export type TrialMailKey = "confirmation" | "staff_notification" | "trial_approv
 type CommercialDatabase = {
   public: Omit<Public, "Tables" | "Functions"> & {
     Tables: Omit<Public["Tables"], "order_returns"> & { order_returns: Omit<Returns, "Row"> & { Row: ReturnRow } };
-    Functions: Public["Functions"] & {
-      record_exact_finder_search: Rpc<{ p_code: string; p_variant_ids: string[] }, string | null>;
-      link_finder_checkout: Rpc<{ p_event_id: string; p_order_id: string; p_attempt_token: string; p_buyer_id?: string }, boolean>;
-      record_structured_return: Rpc<{
-        p_order_id: string; p_return_id: string; p_variant_id: string; p_quantity: number;
-        p_reason_category: ReturnCategory; p_reason: string; p_reported_lookup_code?: string;
-      }, ReturnRow>;
-      admin_commercial_measures: Rpc<Record<never, never>, CommercialMeasures>;
-      admin_trial_mail_status: Rpc<{ p_trial_request_id: string }, {
-        message_key: TrialMailKey; status: TrialMailState; sent_at: string | null;
-      }[]>;
-      admin_create_draft_variant: Rpc<{
-        p_product_id: string; p_sku: string; p_option_label: string | null;
-        p_price_1_4: number; p_price_5_9: number; p_price_10_plus: number;
-      }, string>;
-    };
+    Functions: Omit<Public["Functions"], keyof CommercialFunctions> & CommercialFunctions;
   };
+};
+
+type CommercialFunctions = {
+  record_exact_finder_search: Rpc<{ p_code: string; p_variant_ids: string[] }, string | null>;
+  link_finder_checkout: Rpc<{ p_event_id: string; p_order_id: string; p_attempt_token: string; p_buyer_id?: string }, boolean>;
+  record_structured_return: Rpc<{
+    p_order_id: string; p_return_id: string; p_variant_id: string; p_quantity: number;
+    p_reason_category: ReturnCategory; p_reason: string; p_reported_lookup_code?: string;
+  }, ReturnRow>;
+  admin_commercial_measures: Rpc<Record<never, never>, CommercialMeasures>;
+  admin_trial_mail_status: Rpc<{ p_trial_request_id: string }, {
+    message_key: TrialMailKey; status: TrialMailState; sent_at: string | null;
+  }[]>;
+  admin_create_draft_variant: Rpc<{
+    p_product_id: string; p_sku: string; p_option_label: string | null;
+    p_price_1_4: number; p_price_5_9: number; p_price_10_plus: number;
+  }, string>;
 };
 
 export function commercialDb(db: SupabaseClient<Database> = serviceClient()) {
