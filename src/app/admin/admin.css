@@ -27,6 +27,8 @@
   font-size: clamp(1.2rem, 1.75vw, 1.5rem);
   letter-spacing: -.025em;
 }
+.admin-desk-action { margin-block-end: 12px; }
+.admin-desk-action p { margin-block: 5px 0; }
 .admin-desk :is(.admin-desk-work, .admin-desk-links) { list-style: none; padding: 0; margin: 0; }
 .admin-desk-work + .admin-desk-links { margin-block-start: 12px; }
 .admin-desk-task {

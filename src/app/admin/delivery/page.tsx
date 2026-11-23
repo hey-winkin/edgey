@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { formatPoundsInput } from "@/lib/admin/pounds";
 import { formatGbp } from "@/lib/commerce";
 import type { Database } from "@/lib/supabase/database.types";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "../ui";
 import { removeDeliveryRule, saveDeliveryCalendar, saveDeliveryRule } from "./actions";
 
-export const metadata: Metadata = { title: "Delivery settings" };
+export const metadata: Metadata = { title: staffDestinationLabels.customerDeliverySettings };
 
 type Calendar = Database["public"]["Tables"]["delivery_calendars"]["Row"];
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -55,7 +56,7 @@ export default async function DeliverySettings({ searchParams }: {
   const rule = rules.data.find(({ scope, code }) => scope === params.scope && code === params.code);
 
   return <>
-    <AdminHeading title="Delivery settings" eyebrow="Warehouse"
+    <AdminHeading title={staffDestinationLabels.customerDeliverySettings} eyebrow="Warehouse"
       description="Enter carrier-approved coverage, service terms and dates. Changes apply to new reservations only." />
     <AdminLink href="/admin">Staff desk</AdminLink>
     {calendars.data.length < 2 && <AdminNotice>Checkout cannot quote delivery until both calendars are configured.</AdminNotice>}

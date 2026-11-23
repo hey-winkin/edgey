@@ -141,7 +141,7 @@ test("live margins, unsaved guard and validation preserve independent selling an
     expect(dialog.message()).toContain("unsaved changes will be lost");
     await dialog.dismiss();
   });
-  await page.getByRole("link", { name: "Back to catalogue" }).click();
+  await page.getByRole("main").getByRole("link", { name: "Products and prices", exact: true }).click();
   await expect(page).toHaveURL(/#specifications$/);
   await expect(firstPrice).toHaveValue("25");
 

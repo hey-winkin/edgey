@@ -1,5 +1,6 @@
 import { requireStaff } from "@/lib/admin/auth";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminPage, adminPageSize, adminRange } from "@/lib/admin/pagination";
 import { enquiryStatus, requestBrand, trialStatus } from "@/lib/admin/requests";
 import { AdminPagination } from "../pagination";
@@ -7,7 +8,7 @@ import { AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "
 
 type Search = Record<string, string | string[] | undefined>;
 
-export const metadata = { title: "Requests" };
+export const metadata = { title: staffDestinationLabels.customerEnquiries };
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const { db, roles } = await requireStaff();
@@ -35,7 +36,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <AdminHeading title="Requests" description={viewFit ? "Review trial requests and respond to enquiries. Access is limited to your assigned roles." : "Review trade applications and record Net 30 decisions."} />
+      <AdminHeading title={staffDestinationLabels.customerEnquiries}
+        description={viewFit ? "Review trial requests and respond to enquiries. Access is limited to your assigned roles." : "Review trade applications and record Net 30 decisions."} />
       {enquiries && <AdminSection title="Enquiries">
         {enquiries.data.length ? (
           <AdminTable label="Enquiries" headers={["Type", "Reply address", "Lookup", "Message", "Status", "Received"]}>

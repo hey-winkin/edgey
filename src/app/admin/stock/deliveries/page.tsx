@@ -1,9 +1,12 @@
 import { AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { dispatchDate, warehousePage, warehousePageSize } from "@/lib/admin/warehouse-format";
 import { WarehousePagination } from "../../warehouse/pagination";
 import styles from "./deliveries.module.css";
+
+export const metadata = { title: staffDestinationLabels.deliveryHistory };
 
 export default async function DeliveryHistory({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { db, roles } = await requireStaff("warehouse", "catalogue", "finance");
@@ -19,11 +22,12 @@ export default async function DeliveryHistory({ searchParams }: { searchParams: 
 
   return (
     <>
-      <AdminHeading title="Delivery history" eyebrow="Warehouse / Stock" description="Open a delivery to see the blades and quantities that were received." />
+      <AdminHeading title={staffDestinationLabels.deliveryHistory} eyebrow="Warehouse / Stock"
+        description="Open a delivery to see the blades and quantities that were received." />
       {warehouse && (
         <nav className={styles.links} aria-label="Stock navigation">
-          <AdminLink href="/admin/stock">Stock balances</AdminLink>
-          <AdminLink href="/admin/stock/receive">Receive a delivery</AdminLink>
+          <AdminLink href="/admin/stock">{staffDestinationLabels.stockLevels}</AdminLink>
+          <AdminLink href="/admin/stock/receive">{staffDestinationLabels.bookInDelivery}</AdminLink>
         </nav>
       )}
       <AdminSection title="Received deliveries">

@@ -37,7 +37,7 @@ test("the owner estimates cost, receives stock at actual cost, then records a si
   await expect(page.getByText("Selling data saved.", { exact: true })).toBeVisible();
   expect((await db.from("variants").select("price_1_4_pence").eq("id", id).single()).data?.price_1_4_pence).toBe(2085);
 
-  await (await openStaffMenu(page)).getByRole("link", { name: "Stock and adjustments", exact: true }).click();
+  await (await openStaffMenu(page)).getByRole("link", { name: "Stock levels", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
   await page.getByLabel("Received quantity").fill("8");
   await page.getByText("Add receipt costs (optional)").click();

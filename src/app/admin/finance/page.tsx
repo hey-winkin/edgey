@@ -2,6 +2,7 @@ import { formatGbp } from "@/lib/commerce";
 import { requireStaff } from "@/lib/admin/auth";
 import { financeOverview } from "@/lib/admin/finance";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminPage, adminPageSize } from "@/lib/admin/pagination";
 import { amountMismatch } from "@/lib/admin/payment-review";
 import { lateCapture } from "@/lib/payments/card-refund";
@@ -11,7 +12,7 @@ import { reconcileFinanceInvoice, refundFinanceCard, resolveFinancePaymentReview
 
 type Search = Record<string, string | string[] | undefined>;
 
-export const metadata = { title: "Finance" };
+export const metadata = { title: staffDestinationLabels.financeAndTradeAccounts };
 
 function CardRefundForm({ id, intentId, verifyOnly = false }: { id: string; intentId: string | null; verifyOnly?: boolean }) {
   return <AdminForm action={refundFinanceCard.bind(null, id, !verifyOnly)}
@@ -51,7 +52,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <AdminHeading title="Finance" description="Manage Net 30 accounts, follow up overdue invoices and review payment exceptions." />
+      <AdminHeading title={staffDestinationLabels.financeAndTradeAccounts}
+        description="Manage Net 30 accounts, follow up overdue invoices and review payment exceptions." />
       <AdminLink href="/admin/requests">Review trade applications</AdminLink>
       <AdminSection title="Trade accounts">
         {overview.accounts.length ? (

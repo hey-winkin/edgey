@@ -35,7 +35,7 @@ test("staging demo orders feed the finance dashboard and cleanup restores stock"
     await dispatchAt(new Date().toISOString());
     const query = new URLSearchParams({ period: "custom", ...range!, grain: "week" });
     await page.goto(`/admin/sales?${query}`);
-    await expect(page.getByRole("heading", { name: "Sales", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sales reports", exact: true })).toBeVisible();
     const currentFigure = (label: RegExp) => page.locator("dt").filter({ hasText: label }).locator("..").locator("dd").first();
     await expect(currentFigure(/^Revenue ex VAT$/)).toHaveText(salesMoney(sales.net));
     await expect(currentFigure(/^Orders$/)).toHaveText(String(sales.count));

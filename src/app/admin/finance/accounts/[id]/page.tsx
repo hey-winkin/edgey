@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/admin/auth";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminPage, adminPageSize } from "@/lib/admin/pagination";
 import { adminTradeAccount } from "@/lib/admin/trade";
 import { isWarehouseId } from "@/lib/admin/warehouse-format";
@@ -33,7 +34,7 @@ export default async function TradeAccountPage({ params, searchParams }: {
     <>
       <AdminHeading title={application?.company ?? account.buyer_name} eyebrow="Trade credit account"
         description="Review credit exposure and invoice history, or change the account’s Net 30 terms." />
-      <AdminLink href="/admin/finance">Back to finance</AdminLink>
+      <AdminLink href="/admin/finance">{staffDestinationLabels.financeAndTradeAccounts}</AdminLink>
       <AdminSection title="Credit position">
         <dl className="admin-spec">
           <div><dt>Net 30 status</dt><dd>{displayState(account.status)}</dd></div>

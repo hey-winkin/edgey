@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
-import { connectAccountDb } from "../helpers/account-fixture";
+import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
 import { scanBothThemes } from "../helpers/accessibility";
 import { switchTheme } from "../helpers/navigation";
 import { setVerifiedStaffSession } from "./admin-fixtures";
@@ -20,6 +20,89 @@ async function capture(page: Page, name: string) {
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name, exact: true });
 
 test.use({ locale: "en-GB", actionTimeout: 10_000 });
+
+test("stock ordering is available to warehouse staff who can manage purchase orders", async ({ page, baseURL }) => {
+  test.setTimeout(60_000);
+  const db = await connectAccountDb();
+  const staff = await createLocalAdminUser("warehouse");
+  let fixture: Awaited<ReturnType<typeof createAccountCatalogue>> | undefined;
+  try {
+    fixture = await createAccountCatalogue(db);
+    const { soldOut: { id, sku, label } } = fixture;
+    const stockPath = "/admin/stock?view=out-of-stock";
+    const newOrderPath = orders + "/new";
+    const bladeOrderPath = `${newOrderPath}?variant=${id}`;
+    const topAction = page.getByRole("link", { name: "Order stock", exact: true });
+    const stockRow = page.getByRole("table", { name: "Variant balances" }).getByRole("row")
+      .filter({ has: page.getByRole("link", { name: sku, exact: true }) });
+    const bladeAction = stockRow.getByRole("link", { name: `Order stock for ${sku}`, exact: true });
+    const selected = page.getByRole("list", { name: "Selected products", exact: true }).getByRole("listitem");
+
+    await setVerifiedStaffSession(page, staff, baseURL);
+    await page.goto(stockPath);
+    await expect(heading(page, "Out of stock")).toBeVisible();
+    await expect(page).toHaveTitle("Out of stock | Edgey");
+    await expect(stockRow).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Order stock(?: for .+)?$/ })).toHaveCount(0);
+    await page.goto(bladeOrderPath);
+    await expect(page).toHaveURL("/admin");
+
+    for (const role of ["catalogue", "finance"] as const) {
+      await test.step(`warehouse with ${role}`, async () => {
+        await db.query("insert into public.staff_members (user_id, role) values ($1, $2)", [staff.id, role]);
+        await page.goto(stockPath);
+        await expect(topAction).toHaveAttribute("href", newOrderPath);
+        await expect(topAction).toHaveClass(/\bprimary\b/);
+        await expect(bladeAction).toHaveText("Order stock");
+        await expect(bladeAction).toHaveAttribute("href", bladeOrderPath);
+        if (role === "catalogue") {
+          const viewport = page.viewportSize()!;
+          await capture(page, "order-stock-levels");
+          await page.setViewportSize({ width: 320, height: 740 });
+          expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+          await bladeAction.scrollIntoViewIfNeeded();
+          await expect(bladeAction).toBeInViewport();
+          const bounds = await bladeAction.boundingBox();
+          expect(bounds?.height).toBeGreaterThanOrEqual(44);
+          await scanBothThemes(page);
+          await capture(page, "order-stock-levels-320");
+          await page.setViewportSize(viewport);
+        }
+
+        await topAction.click();
+        await expect(page).toHaveURL(newOrderPath);
+        await expect(heading(page, "New purchase order")).toBeVisible();
+        await expect(page.getByText("No lines yet. Use the catalogue above to add the first product.")).toBeVisible();
+        await expect(selected).toHaveCount(0);
+
+        await page.goto(stockPath);
+        await bladeAction.click();
+        await expect(page).toHaveURL(bladeOrderPath);
+        await expect(heading(page, "New purchase order")).toBeVisible();
+        await expect(page).toHaveTitle("New purchase order | Edgey");
+        await expect(selected).toHaveCount(1);
+        await expect(selected).toContainText(sku);
+        await expect(selected).toContainText(label);
+
+        await page.goto("/admin/stock");
+        await expect(heading(page, "Stock levels")).toBeVisible();
+        await expect(page.getByRole("link", { name: /^Order stock(?: for .+)?$/ })).toHaveCount(0);
+        await db.query("delete from public.staff_members where user_id = $1 and role = $2", [staff.id, role]);
+      });
+    }
+  } finally {
+    try {
+      if (fixture) {
+        await db.query("delete from public.stock_movements where variant_id in (select id from public.variants where product_id = $1)", [fixture.productId]);
+        await db.query("delete from public.variants where product_id = $1", [fixture.productId]);
+        await db.query("delete from public.products where id = $1", [fixture.productId]);
+      }
+    } finally {
+      await db.end();
+      await localAdminClient().auth.admin.deleteUser(staff.id);
+    }
+  }
+});
 
 test("a draft started before hydration can be saved by native form submission", async ({ page, baseURL }) => {
   const sql = await connectAccountDb();
@@ -96,8 +179,15 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await setVerifiedStaffSession(goods, warehouse, baseURL);
     await page.goto(orders);
     await expect(heading(page, "Purchase orders")).toBeVisible();
+    await expect(page).toHaveTitle("Purchase orders | Edgey");
+    await expect(page.getByRole("link", { name: "Order stock", exact: true })).toHaveAttribute("href", orders + "/new");
+    await capture(page, "order-stock-purchase-list");
+    await goods.goto(orders);
+    await expect(heading(goods, "Purchase orders")).toBeVisible();
+    await expect(goods.getByRole("link", { name: "Order stock", exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: "Suppliers", exact: true }).click();
     await expect(heading(page, "Suppliers")).toBeVisible();
+    await expect(page).toHaveTitle("Suppliers | Edgey");
     await scanBothThemes(page);
     await page.getByRole("link", { name: "Add supplier", exact: true }).click();
     await scanBothThemes(page);
@@ -127,7 +217,10 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await page.goto(`/admin/catalogue/${first.id}`);
     await page.getByRole("link", { name: "Add to purchase order" }).click();
     await expect(heading(page, "Add to purchase order")).toBeVisible();
-    await page.getByRole("link", { name: "Start a draft PO" }).click();
+    await expect(page).toHaveTitle("Add to purchase order | Edgey");
+    const orderStock = page.getByRole("link", { name: "Order stock", exact: true });
+    await expect(orderStock).toHaveAttribute("href", `${orders}/new?variant=${first.id}`);
+    await orderStock.click();
     await expect(heading(page, "New purchase order")).toBeVisible();
     const lines = page.getByRole("list", { name: "Selected products" });
     const line = (sku: string) => lines.getByRole("listitem").filter({ hasText: sku });

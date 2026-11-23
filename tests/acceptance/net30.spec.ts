@@ -134,7 +134,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await expect(method).toHaveAccessibleDescription("Your trade account isn’t approved for Net 30.");
 
         await signInStaff(financePage, finance);
-        await (await openStaffMenu(financePage)).getByRole("link", { name: "Customer requests", exact: true }).click();
+        await (await openStaffMenu(financePage)).getByRole("link", { name: "Customer enquiries", exact: true }).click();
         await financePage.getByRole("table", { name: "Trade applications" }).getByRole("row")
           .filter({ hasText: buyer.email }).getByRole("link", { name: company }).click();
         await expect(financePage).toHaveURL(`/admin/requests/trade/${application}`);
@@ -226,7 +226,7 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
 
       await test.step("Warehouse records real dispatch and tracking while the invoice stays unpaid", async () => {
         await signInStaff(warehousePage, warehouse);
-        await (await openStaffMenu(warehousePage)).getByRole("link", { name: "Pick and dispatch" }).click();
+        await (await openStaffMenu(warehousePage)).getByRole("link", { name: "New sales orders" }).click();
         await warehousePage.getByRole("link", { name: orderReference, exact: true }).click();
         await expect(warehousePage.getByText("Invoiced", { exact: true })).toBeVisible();
         await warehousePage.getByRole("button", { name: "Start picking" }).click();

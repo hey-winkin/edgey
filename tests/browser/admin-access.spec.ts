@@ -170,6 +170,8 @@ test("a stale stock form cannot act after switching to catalogue or finance", as
       await expect(otherPage).toHaveURL(/\/admin$/);
       await otherPage.goto("/admin/stock/receive");
       await expect(otherPage).toHaveURL(/\/admin$/);
+      await otherPage.goto("/admin/stock?view=out-of-stock");
+      await expect(otherPage).toHaveURL(/\/admin$/);
       await page.context().clearCookies();
       await page.context().addCookies(await other.cookies());
       await page.getByRole("button", { name: "Record stock receipt" }).click();

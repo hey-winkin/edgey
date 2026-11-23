@@ -12,7 +12,7 @@ import "./admin.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Staff admin",
+  title: { default: "Staff admin", template: "%s | Edgey" },
   robots: { index: false, follow: false },
 };
 

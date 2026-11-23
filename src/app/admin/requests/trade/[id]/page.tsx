@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/admin/auth";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminTradeApplication } from "@/lib/admin/trade";
 import { isWarehouseId } from "@/lib/admin/warehouse-format";
 import { decideTradeApplication } from "../../../finance/credit-actions";
@@ -23,7 +24,7 @@ export default async function TradeApplicationPage({ params }: { params: Promise
   return (
     <>
       <AdminHeading title={application.company} eyebrow="Trade application" description="Review the named buyer and billing details before offering Net 30." />
-      <AdminLink href="/admin/requests">Back to requests</AdminLink>
+      <AdminLink href="/admin/requests">{staffDestinationLabels.customerEnquiries}</AdminLink>
       <AdminSection title="Application details">
         <dl className="admin-spec">
           <div><dt>Status</dt><dd>{approvalPending ? "Approval in progress" : displayState(application.status)}</dd></div>

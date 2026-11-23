@@ -5,6 +5,7 @@ import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSecti
 import { requireStaff } from "@/lib/admin/auth";
 import { catalogueId, getAdminCataloguePricing, getAdminCatalogueVariant, variantReviewStatus } from "@/lib/admin/catalogue";
 import { displayState, displayTimestamp } from "@/lib/admin/format";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import type { TierPrices } from "@/lib/admin/price-tiers";
 import { getCurrentStaffCost } from "@/lib/admin/stock-cost-data";
 import { editCatalogueVariant } from "./actions";
@@ -86,7 +87,7 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
     if (!variant?.products) notFound();
     return (
       <div className={styles.editor}>
-        <AdminLink href="/admin/catalogue">Back to catalogue</AdminLink>
+        <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
         <AdminHeading eyebrow={variant.sku} title={variant.products.name} description={variant.option_label ?? undefined} />
         {variant.publication_status !== "archived" && <div className={styles.purchaseAction}>
           <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>
@@ -116,7 +117,7 @@ export default async function CatalogueVariantPage({ params }: { params: Promise
 
   return (
     <div className={styles.editor}>
-      <AdminLink href="/admin/catalogue">Back to catalogue</AdminLink>
+      <AdminLink href="/admin/catalogue">{staffDestinationLabels.productsAndPrices}</AdminLink>
       <AdminHeading eyebrow={variant.sku} title={family.name} description={variant.option_label ?? undefined} />
       {editable && <div className={styles.purchaseAction}>
         <AdminLink href={`/admin/purchase-orders?variant=${id}`}>Add to purchase order</AdminLink>

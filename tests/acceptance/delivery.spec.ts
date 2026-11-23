@@ -19,12 +19,12 @@ test("warehouse settings quote an agreed card service and capture uses the reser
     await signInStaff(page, finance);
     await page.goto("/admin/delivery");
     await expect(page).toHaveURL("/admin");
-    await expect(page.getByRole("link", { name: "Delivery settings" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Customer delivery settings" })).toHaveCount(0);
     await signOutFromStaffMenu(page);
     await expect(page).toHaveURL("/admin/sign-in");
     await signInStaff(page, await createLocalAdminUser("warehouse"));
-    await page.getByRole("link", { name: "Delivery settings" }).click();
-    await expect(page.getByRole("heading", { name: "Delivery settings" })).toBeVisible();
+    await page.getByRole("link", { name: "Customer delivery settings" }).click();
+    await expect(page.getByRole("heading", { name: "Customer delivery settings" })).toBeVisible();
     await page.getByLabel("Rule scope").selectOption("district");
     await page.getByLabel("Postcode area or district").fill("sw2");
     await page.getByLabel("Service type").selectOption("agreed");

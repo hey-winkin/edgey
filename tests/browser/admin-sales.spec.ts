@@ -73,7 +73,7 @@ test("warehouse and catalogue can review sales and export products without margi
     try {
       await setVerifiedStaffSession(page, await createLocalAdminUser(role), baseURL);
       await page.goto("/admin/sales?sort=marginPence&dir=asc");
-      await expect(page.getByRole("heading", { name: "Sales", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sales reports", exact: true })).toBeVisible();
       await expect(page.getByText("Gross margin", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("columnheader", { name: /sort by revenue,/i })).toHaveAttribute("aria-sort", "descending");
       const link = await page.getByRole("link", { name: "Download product sales CSV" }).getAttribute("href");

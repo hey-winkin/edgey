@@ -1,17 +1,24 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { WarehousePagination } from "@/app/admin/warehouse/pagination";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels as labels } from "@/lib/admin/navigation";
 import { getAddablePurchaseVariant } from "@/lib/admin/purchase-order-data";
 import { purchaseStatusLabel } from "@/lib/admin/purchase-orders";
 import { canManageCosts, stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { dispatchDate, isWarehouseId, warehousePage, warehousePageSize } from "@/lib/admin/warehouse-format";
+import { OrderStockLink } from "./order-stock-link";
 import styles from "./purchase-orders.module.css";
 
 const pathname = "/admin/purchase-orders";
+const chooseDraftTitle = "Add to purchase order";
+type PurchaseOrdersProps = { searchParams: Promise<{ page?: string; variant?: string }> };
 
-export default async function PurchaseOrders({ searchParams }: { searchParams: Promise<{ page?: string; variant?: string }> }) {
+export async function generateMetadata({ searchParams }: PurchaseOrdersProps) {
+  return { title: (await searchParams).variant ? chooseDraftTitle : labels.purchaseOrders };
+}
+
+export default async function PurchaseOrders({ searchParams }: PurchaseOrdersProps) {
   const { db, roles } = await requireStaff("warehouse", "catalogue", "finance");
   const { page: pageInput, variant: variantId } = await searchParams;
   const showCosts = canManageCosts(roles);
@@ -34,18 +41,18 @@ export default async function PurchaseOrders({ searchParams }: { searchParams: P
 
   return (
     <>
-      <AdminHeading title={blade ? "Add to purchase order" : "Purchase orders"}
-        description={blade ? "Choose a draft purchase order or start a new one for this blade."
+      <AdminHeading title={blade ? chooseDraftTitle : labels.purchaseOrders}
+        description={blade ? "Choose a draft purchase order below, or use Order stock to start a new draft with this blade."
           : "Raise orders against the catalogue and track what’s still due to arrive."} />
       {blade && <p className={styles.selection}><strong>{blade.products?.name}</strong> <span className="admin-mono">{blade.sku}</span>
         {blade.option_label && <span>{blade.option_label}</span>}</p>}
       <nav className={styles.links} aria-label="Purchase order navigation">
-        {showCosts && !orders.error && <Link className="primary" href={`${pathname}/new${variantQuery}`}>Start a draft PO</Link>}
-        {blade ? <AdminLink href="/admin/catalogue">Back to catalogue</AdminLink>
+        {showCosts && !orders.error && <OrderStockLink variant={variantId ? { id: variantId } : undefined} />}
+        {blade ? <AdminLink href="/admin/catalogue">{labels.productsAndPrices}</AdminLink>
           : <>
-              {roles.includes("warehouse") && <AdminLink href="/admin/stock">Stock balances</AdminLink>}
+              {roles.includes("warehouse") && <AdminLink href="/admin/stock">{labels.stockLevels}</AdminLink>}
               {showCosts && !orders.error && <>
-                <AdminLink href={`${pathname}/suppliers`}>Suppliers</AdminLink>
+                <AdminLink href={`${pathname}/suppliers`}>{labels.suppliers}</AdminLink>
                 <AdminLink href={`${pathname}/settings`}>Buyer settings</AdminLink>
               </>}
             </>}

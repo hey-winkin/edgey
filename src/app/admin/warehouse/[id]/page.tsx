@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { getWarehouseOrder, getWarehouseReturns } from "@/lib/admin/warehouse";
 import { runWarehouseAction } from "@/lib/admin/warehouse-actions";
 import { isWarehouseId, movementTime, warehouseLabel } from "@/lib/admin/warehouse-format";
@@ -36,9 +37,9 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
     <>
       <AdminHeading title="Warehouse order" eyebrow="Warehouse" />
       <nav className="flex flex-wrap gap-4" aria-label="Order navigation">
-        <AdminLink href="/admin/warehouse">Picking queue</AdminLink>
+        <AdminLink href="/admin/warehouse">{staffDestinationLabels.newSalesOrders}</AdminLink>
         {undispatched && blocked && <AdminLink href="/admin/warehouse?view=blocked">Payment blocks</AdminLink>}
-        <AdminLink href="/admin/warehouse?view=history">Dispatch and cancellation history</AdminLink>
+        <AdminLink href="/admin/warehouse?view=history">{staffDestinationLabels.pastSalesOrders}</AdminLink>
         {undispatched && !blocked && <AdminLink href={`/admin/warehouse/${order.id}/print`}>Printable pick list</AdminLink>}
       </nav>
       <AdminSection title="Order status">

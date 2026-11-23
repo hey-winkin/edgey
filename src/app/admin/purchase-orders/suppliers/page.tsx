@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { staffDestinationLabels as labels } from "@/lib/admin/navigation";
 import { stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 
-export const metadata: Metadata = { title: "Suppliers" };
+export const metadata: Metadata = { title: labels.suppliers };
 
 export default async function SuppliersPage() {
   const { db } = await requireStaff("catalogue", "finance");
@@ -14,7 +15,7 @@ export default async function SuppliersPage() {
 
   return (
     <>
-      <AdminHeading title="Suppliers" eyebrow="Purchase orders"
+      <AdminHeading title={labels.suppliers} eyebrow={labels.purchaseOrders}
         description="Manage supplier contacts, default currencies and lead times for purchase orders." />
       <nav className="flex flex-wrap items-center gap-4" aria-label="Supplier controls">
         <AdminLink href="/admin/purchase-orders">Back to purchase orders</AdminLink>
