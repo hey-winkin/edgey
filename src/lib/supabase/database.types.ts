@@ -44,6 +44,7 @@ export type Database = {
         Row: {
           charge_ex_vat_pence: number | null;
           code: string;
+          dispatch_carrier: string | null;
           kind: string;
           scope: string;
           service_name: string | null;
@@ -52,6 +53,7 @@ export type Database = {
         Insert: {
           charge_ex_vat_pence?: number | null;
           code: string;
+          dispatch_carrier?: string | null;
           kind: string;
           scope: string;
           service_name?: string | null;
@@ -972,6 +974,28 @@ export type Database = {
         created_at: string;
         updated_at: string;
       }>;
+      staff_variant_suppliers: ReadOnlyTable<{
+        variant_id: string;
+        supplier_id: string;
+        supplier_part_number: string | null;
+        is_usual: boolean;
+        updated_at: string;
+      }, [
+        {
+          foreignKeyName: "staff_variant_suppliers_variant_id_fkey";
+          columns: ["variant_id"];
+          isOneToOne: false;
+          referencedRelation: "variants";
+          referencedColumns: ["id"];
+        },
+        {
+          foreignKeyName: "staff_variant_suppliers_supplier_id_fkey";
+          columns: ["supplier_id"];
+          isOneToOne: false;
+          referencedRelation: "staff_suppliers";
+          referencedColumns: ["id"];
+        },
+      ]>;
       staff_purchase_orders: ReadOnlyTable<{
         id: string;
         number: string;
@@ -1748,6 +1772,10 @@ export type Database = {
         Args: { p_id: string | null; p_expected_revision: number; p_order: Json; p_lines: Json };
         Returns: string;
       };
+      save_staff_purchase_order_with_supplier_parts: {
+        Args: { p_id: string | null; p_expected_revision: number; p_order: Json; p_lines: Json; p_remember: Json };
+        Returns: string;
+      };
       transition_staff_purchase_order: {
         Args: { p_id: string; p_expected_revision: number; p_status: string };
         Returns: string;
@@ -1860,6 +1888,15 @@ export type Database = {
           p_variant_id: string;
         };
         Returns: string;
+      };
+      remember_staff_purchase_supplier_part: {
+        Args: {
+          p_purchase_order_id: string;
+          p_variant_id: string;
+          p_expected_purchase_revision: number;
+          p_expected_association_updated_at: string | null;
+        };
+        Returns: boolean;
       };
       approve_trial_fulfilment: {
         Args: {

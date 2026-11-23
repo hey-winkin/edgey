@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/admin/auth";
+import { resolveStaffDelivery } from "@/lib/admin/carrier-settings";
 import { requestsDb, type EnquiryMutation } from "@/lib/admin/request-schema";
 import { requireRequestsStaff } from "@/lib/admin/requests";
 import { isWarehouseId, warehouseOrderLookup } from "@/lib/admin/warehouse-format";
@@ -106,24 +107,28 @@ export async function handleTrial(action: TrialAction, _previous: AdminResult | 
       const town = field(form, "town");
       const region = field(form, "region");
       const coverage = await deliveryCoverageForPostcode(field(form, "postcode"));
-      const carrier = field(form, "carrier");
-      const service = field(form, "service");
       if (!coverage.ok) return refused(coverage.error.code === "invalid_postcode"
         ? "Enter a full UK delivery postcode." : "Delivery coverage couldn’t be checked. Try again before approving.", "postcode");
       if (coverage.value.kind !== "covered") return refused("The delivery postcode is outside configured coverage. Do not approve until an agreed service is configured for it.", "postcode");
       if (!recipient || recipient.length > 200 || !line1 || line1.length > 200 || line2.length > 200 ||
-        !town || town.length > 100 || region.length > 100 || !carrier || carrier.length > 100 ||
-        !service || service.length > 100 || field(form, "verified") !== "yes") {
+        !town || town.length > 100 || region.length > 100 || field(form, "verified") !== "yes") {
         return refused(messages.verified_delivery_address_and_service_required);
       }
       if (action.variantIds.length !== 2 || !action.variantIds.every(isWarehouseId)) return refused(messages.two_trial_units_required);
+      const delivery = await resolveStaffDelivery(staffDb, form, false);
+      if (!delivery.ok && delivery.reason === "unavailable") {
+        return refused("Couldn’t check configured delivery services. Try again or select Other.");
+      }
+      if (!delivery.ok) return refused(delivery.reason === "stale"
+        ? "That delivery service is no longer configured. Reload for the current choices, or select Other."
+        : messages.verified_delivery_address_and_service_required);
       result = await db.rpc("approve_trial_fulfilment", {
         ...args, p_variant_ids: action.variantIds,
         p_address: {
           recipient_name: recipient, line1, line2: line2 || null, town, region: region || null,
           postcode: coverage.value.postcode.normalised, country: "GB",
         },
-        p_carrier: carrier, p_carrier_service: service, p_address_verified: true,
+        p_carrier: delivery.carrier, p_carrier_service: delivery.service, p_address_verified: true,
       });
       message = "Trial approved. Two units are reserved and the approval notice is queued.";
       break;

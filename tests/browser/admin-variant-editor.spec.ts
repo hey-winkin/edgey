@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test as base, type Locator } from "@playwright/test";
 import { createLocalAdminUser } from "../../scripts/seed-admin";
 import { connectAccountDb } from "../helpers/account-fixture";
@@ -77,7 +79,7 @@ test("native section links and a reachable save separate family from SKU at 320 
     expect(await page.locator("#specifications").evaluate((section) =>
       section.getBoundingClientRect().top >= document.querySelector("#variant-selling-data")!.getBoundingClientRect().bottom,
     )).toBe(true);
-    await page.getByLabel("Supplier part number").fill("EDITOR-A-TEST");
+    await page.getByLabel("Tool or holder").fill("EDITOR-A-TEST");
     await nav.getByRole("link", { name: "Family details" }).click();
     await expect(page).toHaveURL(/#family$/);
     await expect(page.getByText("Changes here apply to every SKU in this family.")).toBeInViewport();
@@ -87,16 +89,75 @@ test("native section links and a reachable save separate family from SKU at 320 
     await save.click();
     await expect(page.getByRole("status").filter({ hasText: "Selling data saved." })).toBeVisible();
     const { rows } = await db.query(`
-      select variants.id, products.name, variants.supplier_part_number
+      select variants.id, products.name, variants.tool
       from public.variants join public.products on products.id = variants.product_id
       where variants.id in ($1, $2)
     `, [id, siblingId]);
     expect(rows).toEqual(expect.arrayContaining([
-      { id, name: "Renamed editor test blades", supplier_part_number: "EDITOR-A-TEST" },
-      { id: siblingId, name: "Renamed editor test blades", supplier_part_number: null },
+      { id, name: "Renamed editor test blades", tool: "EDITOR-A-TEST" },
+      { id: siblingId, name: "Renamed editor test blades", tool: null },
     ]));
   } finally {
     await context.close();
+  }
+});
+
+test("the selling form keeps registered suppliers’ parts separate from each other and from legacy details", async ({ page, baseURL, editorFixture }) => {
+  const { id, path, db } = editorFixture;
+  const first = randomUUID();
+  const second = randomUUID();
+  try {
+    await db.query("insert into public.staff_suppliers (id, name) values ($1, 'Editor First Supplier'), ($2, 'Editor Second Supplier')",
+      [first, second]);
+    await db.query("update public.variants set supplier_name = 'Legacy supplier', supplier_part_number = 'LEGACY-PART' where id = $1", [id]);
+    await setVerifiedStaffSession(page, await createLocalAdminUser("catalogue"), baseURL);
+    await page.goto(path);
+    await page.getByRole("link", { name: "Specifications & materials" }).click();
+    const panel = page.getByRole("region", { name: "Supplier details", exact: true });
+    const selection = panel.getByRole("combobox", { name: "Usual supplier", exact: true });
+    const part = panel.getByRole("textbox", { name: "Part number for usual supplier", exact: true });
+    const save = page.getByRole("button", { name: "Save selling data" });
+    await expect(selection).toHaveValue("");
+    await expect(panel.getByText("LEGACY-PART", { exact: true })).toBeVisible();
+    await expect(panel.locator("input[name=supplier_name], input[name=supplier_part_number]")).toHaveCount(0);
+    await selection.selectOption(first);
+    await expect(part).toHaveValue("");
+    await part.fill("FIRST-PART");
+    await selection.selectOption(second);
+    await expect(part).toHaveValue("");
+    await selection.selectOption(first);
+    await expect(part).toHaveValue("FIRST-PART");
+    await save.click();
+    await expect(page.getByText("Selling data saved.", { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(selection).toHaveValue(first);
+    await expect(part).toHaveValue("FIRST-PART");
+    await selection.selectOption(second);
+    await expect(part).toHaveValue("");
+    await part.fill("SECOND-PART");
+    await save.click();
+    await expect(page.getByText("Selling data saved.", { exact: true })).toBeVisible();
+    expect((await db.query(`
+      select supplier_id, supplier_part_number, is_usual from public.staff_variant_suppliers where variant_id = $1
+        order by is_usual desc
+    `, [id])).rows).toEqual([
+      { supplier_id: second, supplier_part_number: "SECOND-PART", is_usual: true },
+      { supplier_id: first, supplier_part_number: "FIRST-PART", is_usual: false },
+    ]);
+    await expect(panel.getByText("LEGACY-PART", { exact: true })).toBeVisible();
+    expect((await db.query("select supplier_name, supplier_part_number from public.variants where id = $1", [id])).rows)
+      .toEqual([{ supplier_name: "Legacy supplier", supplier_part_number: "LEGACY-PART" }]);
+
+    const renders = process.env.EDGEY_STAFF_JOIN_RENDERS;
+    if (renders) {
+      await mkdir(renders, { recursive: true });
+      await panel.getByText("Other saved supplier details", { exact: true }).click();
+      await panel.screenshot({ path: join(renders, "catalogue-supplier-details.png") });
+    }
+  } finally {
+    await db.query("delete from public.staff_variant_suppliers where supplier_id in ($1, $2)", [first, second]);
+    await db.query("delete from public.staff_suppliers where id in ($1, $2)", [first, second]);
   }
 });
 

@@ -17,6 +17,7 @@ export const staffDestinationLabels = {
   adjustStock: "Adjust stock",
   deliveryHistory: "Delivery history",
   customerDeliverySettings: "Customer delivery settings",
+  businessDetails: "Business details",
   salesReports: "Sales reports",
   financeAndTradeAccounts: "Finance and trade accounts",
   shopPerformance: "Shop performance",
@@ -50,6 +51,7 @@ const areas: {
   ] },
   { title: "Admin", links: [
     { label: labels.customerDeliverySettings, href: "/admin/delivery", roles: ["warehouse"] },
+    { label: labels.businessDetails, href: "/admin/purchase-orders/settings", roles: purchaseRoles },
     { label: labels.salesReports, href: "/admin/sales" },
     { label: labels.financeAndTradeAccounts, href: "/admin/finance", roles: ["finance"] },
     { label: labels.shopPerformance, href: "/admin/commercial", roles: ["warehouse"] },

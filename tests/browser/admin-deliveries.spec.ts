@@ -9,6 +9,9 @@ import { setVerifiedStaffSession } from "./admin-fixtures";
 
 test.use({ locale: "en-GB" });
 
+const receivePath = "/admin/stock/receive";
+const standalonePath = `${receivePath}?view=standalone`;
+
 async function deliveryFixture() {
   const db = localAdminClient();
   const key = randomUUID().slice(0, 6).toUpperCase();
@@ -58,7 +61,7 @@ async function enterBeforeHydration(page: Page, enter: () => Promise<void>) {
     await route.continue();
   });
   try {
-    await page.goto("/admin/stock/receive", { waitUntil: "commit" });
+    await page.goto(standalonePath, { waitUntil: "commit" });
     await expect.poll(() => blocked).toBeGreaterThan(0);
     await enter();
   } finally {
@@ -173,7 +176,7 @@ test("review can submit natively while Next scripts are blocked", async ({ page,
     await page.getByLabel("Quantity for line 1").fill("6");
     await page.getByLabel("Unit cost (£) for line 1").fill("1.20");
     const request = page.waitForRequest((request) => request.isNavigationRequest() && request.method() === "POST"
-      && new URL(request.url()).pathname === "/admin/stock/receive");
+      && new URL(request.url()).pathname + new URL(request.url()).search === standalonePath);
     await page.getByRole("button", { name: "Review delivery" }).click();
     await request;
     const review = page.getByRole("region", { name: "Review delivery" });
@@ -257,10 +260,75 @@ for (const method of ["spreadsheet rows", "CSV upload"] as const) {
 test.describe("receiving without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
+  test("the chooser lists only POs with outstanding units and opens the prefilled editor", async ({ page, baseURL }) => {
+    const { blades: [first, second] } = await deliveryFixture();
+    const suffix = randomUUID().slice(0, 8);
+    const orders = [
+      { id: randomUUID(), number: `TEST-SENT-${suffix}`, status: "sent", received: 0, expected: "2026-11-27" },
+      { id: randomUUID(), number: `TEST-PART-${suffix}`, status: "part_received", received: 4, expected: null },
+      { id: randomUUID(), number: `TEST-DRAFT-${suffix}`, status: "draft", received: 0, expected: null },
+      { id: randomUUID(), number: `TEST-CLOSED-${suffix}`, status: "closed", received: 4, expected: null },
+      { id: randomUUID(), number: `TEST-SATISFIED-${suffix}`, status: "sent", received: 10, expected: null },
+    ];
+    const sql = await connectAccountDb();
+    try {
+      for (const { id, number, status, received, expected } of orders) {
+        await sql.query(`
+          insert into public.staff_purchase_orders (id, number, status, ordered_on, expected_on, revision, document_revision)
+          values ($1, $2, $3, '2026-11-20', $4, 1, 1)
+        `, [id, number, status, expected]);
+        await sql.query(`
+          insert into public.staff_purchase_order_lines (purchase_order_id, variant_id, position, sku, blade_name, quantity, received_quantity)
+          values ($1, $2, 1, $3, $4, 10, $5)
+        `, [id, first.id, first.sku, first.name, received]);
+      }
+      await sql.query(`
+        insert into public.staff_purchase_order_lines (purchase_order_id, variant_id, position, sku, blade_name, quantity, received_quantity)
+        values ($1, $2, 2, $3, $4, 3, 1)
+      `, [orders[1]!.id, second.id, second.sku, second.name]);
+      await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
+      await page.setViewportSize({ width: 320, height: 800 });
+      await page.goto(receivePath);
+      const sent = page.getByRole("link", { name: orders[0]!.number });
+      const part = page.getByRole("link", { name: orders[1]!.number });
+      await expect(sent.locator("..")).toContainText("10 units outstanding");
+      await expect(sent.locator("..").locator("time[datetime='2026-11-27']")).toBeVisible();
+      await expect(part.locator("..")).toContainText("8 units outstanding");
+      for (const { number } of orders.slice(2)) await expect(page.getByRole("link", { name: number })).toHaveCount(0);
+      await expect(page.getByText(first.sku, { exact: true })).toHaveCount(0);
+      await expect(page.getByText(first.name, { exact: true })).toHaveCount(0);
+      await expect(page.getByLabel(/unit cost/i)).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+      const renders = process.env.EDGEY_STAFF_JOIN_RENDERS ?? process.env.EDGEY_DELIVERY_RENDERS;
+      if (renders) {
+        await page.screenshot({ path: join(renders, "chooser-320-dark.png"), fullPage: true });
+        await page.setViewportSize({ width: 1440, height: 960 });
+        await page.screenshot({ path: join(renders, "chooser-1440-dark.png"), fullPage: true });
+      }
+      await part.click();
+      await expect(page).toHaveURL(`${receivePath}?po=${orders[1]!.id}`);
+      await expect(page.getByLabel("Blade code for line 1")).toHaveValue(first.sku);
+      await expect(page.getByLabel("Quantity for line 1")).toHaveValue("6");
+      await expect(page.getByLabel("Quantity for line 2")).toHaveValue("2");
+      await page.getByRole("link", { name: "Back to receiving options" }).click();
+      await expect(page).toHaveURL(receivePath);
+    } finally {
+      try {
+        const ids = orders.map(({ id }) => id);
+        await sql.query("delete from public.staff_purchase_order_lines where purchase_order_id = any($1::uuid[])", [ids]);
+        await sql.query("delete from public.staff_purchase_orders where id = any($1::uuid[])", [ids]);
+      } finally {
+        await sql.end();
+      }
+    }
+  });
+
   test("can add and remove lines, look up and correct codes, edit a review, and receive", async ({ page, baseURL }) => {
     const { blades: [first, second, third], makerRef, reference, db } = await deliveryFixture();
     await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
-    await page.goto("/admin/stock/receive");
+    await page.goto(receivePath);
+    await page.getByRole("link", { name: "Receive without a purchase order", exact: true }).click();
+    await expect(page).toHaveURL(standalonePath);
     const note = "Fictional manual stock receipt without scripts.";
     await page.getByLabel("Delivery reference").fill(reference);
     await page.getByLabel("Date received").fill(testReceivedOn);
@@ -299,6 +367,7 @@ test.describe("receiving without JavaScript", () => {
     const stock = () => db.from("variants").select("stock_on_hand").in("id", [first.id, second.id, third.id]).order("sku");
     expect((await stock()).data?.map(({ stock_on_hand }) => stock_on_hand)).toEqual([0, 0, 0]);
     await page.getByRole("button", { name: "Back to edit", exact: true }).click();
+    await expect(page).toHaveURL(standalonePath);
     await expect(firstCode).toHaveValue(first.sku);
     await expect(firstQty).toHaveValue("3");
     await expect(firstCost).toHaveValue("2.34");
@@ -318,7 +387,7 @@ test.describe("receiving without JavaScript", () => {
   test("can append pasted rows and a CSV to the same delivery, then review and receive", async ({ page, baseURL }) => {
     const { blades: [first, second], makerRef, reference } = await deliveryFixture();
     await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
-    await page.goto("/admin/stock/receive");
+    await page.goto(standalonePath);
     const note = "Fictional pasted and uploaded stock without scripts.";
     await page.getByLabel("Delivery reference").fill(reference);
     await page.getByLabel("Date received").fill(testReceivedOn);
@@ -363,7 +432,7 @@ test("warehouse can fix a failed native pasted import without losing the table",
   const note = "Fictional warehouse-only delivery.";
   try {
     await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
-    await page.goto("/admin/stock/receive");
+    await page.goto(standalonePath);
     await page.getByLabel("Delivery reference").fill(reference);
     await page.getByLabel("Date received").fill(testReceivedOn);
     await page.getByLabel("Delivery note (optional)").fill(note);
@@ -399,6 +468,7 @@ test("paste preview flags bad matches and quantities without moving stock until 
   await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
   await page.goto("/admin/stock");
   await page.getByRole("link", { name: "Book in a delivery", exact: true }).click();
+  await page.getByRole("link", { name: "Receive without a purchase order", exact: true }).click();
   await page.getByLabel("Delivery reference").fill(reference);
   await page.getByLabel("Delivery note (optional)").fill("Fictional delivery for testing");
   await pasteLines(page, `code\tquantity\tunit cost\n${first.sku}\t10\t1.01\n${makerRef}\t4\t\n${ambiguousRef}\t3\t\nTEST-NOT-FOUND\t2\t\n${second.sku}\t0\t`);
@@ -429,7 +499,7 @@ test("paste preview flags bad matches and quantities without moving stock until 
   await page.getByRole("link", { name: "Delivery history", exact: true }).click();
   await expect(page.getByRole("link", { name: reference })).toBeVisible();
   const previous = await page.getByRole("link", { name: reference }).getAttribute("href");
-  await page.goto("/admin/stock/receive");
+  await page.goto(standalonePath);
   await page.getByLabel("Delivery reference").fill(reference);
   await page.getByLabel("Blade code for line 1", { exact: true }).fill(first.sku);
   await page.getByLabel("Quantity for line 1", { exact: true }).fill("11");
@@ -444,6 +514,7 @@ test("warehouse can import CSV and receive without cost; finance can cost the sa
   await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
   await page.goto("/admin");
   await (await openStaffMenu(page)).getByRole("link", { name: "Book in a delivery" }).click();
+  await page.getByRole("link", { name: "Receive without a purchase order", exact: true }).click();
   const template = await page.request.get("/admin/stock/receive/template");
   expect(template.headers()["content-disposition"]).toContain("edgey-delivery-template.csv");
   expect(await template.text()).toBe("code,quantity\r\n");
@@ -500,14 +571,14 @@ test("warehouse can import CSV and receive without cost; finance can cost the sa
 test("a lost response keeps the reviewed delivery locked and retrying does not add stock again", async ({ page, baseURL }) => {
   const { blades: [first], reference, db } = await deliveryFixture();
   await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
-  await page.goto("/admin/stock/receive");
+  await page.goto(standalonePath);
   await page.getByLabel("Delivery reference").fill(reference);
   await page.getByLabel("Blade code for line 1", { exact: true }).fill(first.sku);
   await page.getByLabel("Quantity for line 1", { exact: true }).fill("9");
   await page.getByRole("button", { name: "Review delivery" }).click();
   await expect(page.getByRole("heading", { name: "Review delivery", exact: true })).toBeVisible();
 
-  await page.route("**/admin/stock/receive", async (route) => {
+  await page.route((url) => url.pathname + url.search === standalonePath, async (route) => {
     if (route.request().method() !== "POST") {
       await route.continue();
       return;
@@ -533,7 +604,7 @@ for (const theme of themes) {
     const { blades: [first, second], makerRef, reference } = await deliveryFixture();
     await saveThemeBeforeLoad(page, theme);
     await setVerifiedStaffSession(page, await costedWarehouseUser(), baseURL);
-    await page.goto("/admin/stock/receive");
+    await page.goto(standalonePath);
     await page.getByLabel("Delivery reference").fill(reference);
     await pasteLines(page, `code,quantity,unit cost\n${first.sku},14,1.23\n${makerRef},8`);
     await expect(page.getByText(second.name, { exact: false }).first()).toBeVisible();

@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
+import { StaffDeliveryFields } from "@/app/admin/staff-delivery-fields";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection } from "@/app/admin/ui";
 import { requireStaff } from "@/lib/admin/auth";
+import { readStaffDeliveryChoices } from "@/lib/admin/carrier-settings";
 import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { getWarehouseOrder, getWarehouseReturns } from "@/lib/admin/warehouse";
 import { runWarehouseAction } from "@/lib/admin/warehouse-actions";
@@ -25,6 +27,7 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
   const undispatched = status === "ready_to_pick" || status === "picking";
   const blocked = order.payment_status === "voided" || order.payment_status === "refunded";
   const returns = status === "dispatched" ? await getWarehouseReturns(db, order.id) : [];
+  const deliveryChoices = status === "picking" && !blocked ? await readStaffDeliveryChoices(db) : [];
   const returnedByVariant = new Map<string, number>();
   for (const entry of returns) {
     returnedByVariant.set(entry.variant_id, (returnedByVariant.get(entry.variant_id) ?? 0) + entry.quantity);
@@ -71,9 +74,11 @@ export default async function WarehouseOrderPage({ params }: { params: Promise<{
       )}
       {status === "picking" && !blocked && (
         <AdminSection title="Dispatch">
-          <AdminForm action={runWarehouseAction.bind(null, { kind: "dispatch", orderId: order.id, key: randomUUID() })} submit="Record dispatch">
-            <div className="admin-grid">
-              <AdminField label="Carrier"><input name="carrier" maxLength={100} required /></AdminField>
+          <AdminForm action={runWarehouseAction.bind(null, { kind: "dispatch", orderId: order.id, key: randomUUID() })} submit="Record dispatch" preserveOnError>
+            <p className="break-words">Service on this order: {order.delivery_service}</p>
+            <p>Check the carrier against the parcel label. If it isn’t listed, select Other and enter the carrier.</p>
+            <StaffDeliveryFields choices={deliveryChoices} service={order.delivery_service} dispatch />
+            <div className="admin-narrow">
               <AdminField label="Tracking number"><input name="trackingNumber" maxLength={200} required /></AdminField>
             </div>
           </AdminForm>

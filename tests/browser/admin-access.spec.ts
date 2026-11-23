@@ -8,7 +8,7 @@ const privatePaths = [
   "/admin", "/admin/warehouse", "/admin/warehouse/8028e331-bde6-4d32-97c4-7fcf1bed9190",
   "/admin/warehouse/8028e331-bde6-4d32-97c4-7fcf1bed9190/print", "/admin/stock",
   "/admin/stock/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/catalogue",
-  "/admin/stock/receive", "/admin/stock/deliveries", "/admin/stock/deliveries/8028e331-bde6-4d32-97c4-7fcf1bed9190",
+  "/admin/stock/receive", "/admin/stock/receive?view=standalone", "/admin/stock/deliveries", "/admin/stock/deliveries/8028e331-bde6-4d32-97c4-7fcf1bed9190",
   "/admin/catalogue/8028e331-bde6-4d32-97c4-7fcf1bed9190", "/admin/finance", "/admin/requests", "/admin/sales",
   "/admin/purchase-orders", "/admin/purchase-orders/new", "/admin/purchase-orders/suppliers",
   "/admin/purchase-orders/suppliers/new", "/admin/purchase-orders/settings",
@@ -162,8 +162,12 @@ test("a stale stock form cannot act after switching to catalogue or finance", as
     try {
       await page.context().clearCookies();
       await page.context().addCookies(warehouseCookies);
-      await page.goto(path);
-      await page.getByLabel("Received quantity").fill("1");
+      await page.goto("/admin/stock/receive?view=standalone");
+      await page.getByLabel("Delivery reference").fill(`Blocked receipt ${randomUUID()}`);
+      await page.getByLabel("Blade code for line 1").fill(sku);
+      await page.getByLabel("Quantity for line 1").fill("1");
+      await page.getByRole("button", { name: "Review delivery" }).click();
+      await expect(page.getByRole("heading", { name: "Review delivery", exact: true })).toBeVisible();
       const otherPage = await other.newPage();
       await signInStaff(otherPage, await createLocalAdminUser(role));
       await otherPage.goto(path);
@@ -174,7 +178,7 @@ test("a stale stock form cannot act after switching to catalogue or finance", as
       await expect(otherPage).toHaveURL(/\/admin$/);
       await page.context().clearCookies();
       await page.context().addCookies(await other.cookies());
-      await page.getByRole("button", { name: "Record stock receipt" }).click();
+      await page.getByRole("button", { name: "Receive stock", exact: true }).click();
       await expect(page).toHaveURL(/\/admin$/);
     } finally {
       await other.close();

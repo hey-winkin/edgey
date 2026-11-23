@@ -10,10 +10,11 @@ import { stockSchemaUnavailable } from "@/lib/admin/stock-cost-data";
 import { decodeStockSelection } from "@/lib/admin/stock-selection";
 import {
   blankPurchaseHeader, editablePurchaseStatus, maxPurchaseLines, newPurchaseLine, priceInput,
-  purchaseCurrency, purchaseId, stockPurchasePrefill, type PurchaseCurrency, type PurchaseEditorState, type ReceivedPrice,
+  purchaseCurrency, purchaseId, stockPurchasePrefill, type PurchaseEditorState, type ReceivedPrice,
 } from "./editor-data";
+import { applyPurchaseDefaults, type PurchaseSupplierOption } from "./supplier-defaults";
+import { loadPurchaseAssociations, loadPurchaseRates } from "./supplier-defaults-load";
 
-export type PurchaseSupplierOption = { id: string; name: string; default_currency: PurchaseCurrency | null };
 export type PurchaseBrand = { slug: string; name: string };
 
 type StaffDb = Awaited<ReturnType<typeof requireStaff>>["db"];
@@ -60,13 +61,20 @@ export async function loadPurchaseEditor(id?: string, prefill?: string, stockSel
   const prefillId = !fromStock && prefill && purchaseId.test(prefill) && status === "draft" ? prefill.toLowerCase() : undefined;
   const neededIds = [...new Set([...savedLines.map(({ variant_id }) => variant_id), ...stockIds, ...(prefillId ? [prefillId] : [])])];
   const [suppliers, brands, products, picker] = await Promise.all([
-    db.from("staff_suppliers").select("id, name, default_currency").order("name").order("id"),
+    db.from("staff_suppliers").select("id, name, default_currency, lead_time_days").order("name").order("id"),
     purchaseCatalogueBrands(),
     getPurchaseVariants(neededIds),
     searchPurchaseCatalogue("", "", 1),
   ]);
   if (suppliers.error && stockSchemaUnavailable(suppliers.error)) notFound();
   if (suppliers.error) throw new Error("Could not load the suppliers.");
+  const options = suppliers.data.map((item): PurchaseSupplierOption => ({
+    ...item, default_currency: purchaseCurrency(item.default_currency) ? item.default_currency : null,
+  }));
+  const [associations, rates] = options.length ? await Promise.all([
+    loadPurchaseAssociations(db, neededIds.filter((variant) => products.has(variant) && products.get(variant)?.status !== "archived")),
+    status === "draft" ? loadPurchaseRates(db, id) : {},
+  ]) : [[], {}];
 
   const initial: PurchaseEditorState = {
     id: id ?? randomUUID(), revision: record?.revision ?? 0, status, response: 0,
@@ -90,9 +98,13 @@ export async function loadPurchaseEditor(id?: string, prefill?: string, stockSel
         product, quantity: String(line.quantity), received: line.received_quantity,
         unitPrice: priceInput(lineCosts?.unit_price_minor),
         supplierPart: lineCosts?.supplier_part_number ?? "", note: lineCosts?.note ?? "",
+        partDrafts: { [costs?.supplier_id ?? ""]: lineCosts?.supplier_part_number ?? "" },
       };
     }),
     query: "", brand: "", page: 1, ...picker, exact: "", paste: "", suggestions: {},
+    ...(options.length && { defaults: { suppliers: options, rates, associations, edited: {
+      supplier: Boolean(record), currency: Boolean(record), expected: Boolean(record), exchange: Boolean(record),
+    } } }),
   };
   if (fromStock) {
     const selected = stockIds.flatMap((id) => {
@@ -100,7 +112,13 @@ export async function loadPurchaseEditor(id?: string, prefill?: string, stockSel
       return product && product.status !== "archived" ? [product] : [];
     });
     const prices = await latestReceivedPrices(db, selected);
-    const { currency, lines } = stockPurchasePrefill(selected, prices ?? new Map());
+    if (initial.defaults) {
+      const proposed = applyPurchaseDefaults({ ...initial, lines: selected.map(newPurchaseLine) });
+      initial.defaults.stockCurrency = stockPurchasePrefill(selected, prices ?? new Map()).currency;
+      initial.header.supplier = proposed.header.supplier;
+    }
+    const preferred = options.find(({ id }) => id === initial.header.supplier)?.default_currency;
+    const { currency, lines } = stockPurchasePrefill(selected, prices ?? new Map(), preferred ?? undefined);
     initial.header.currency = currency;
     initial.lines = lines;
     const first = lines[0];
@@ -128,9 +146,7 @@ export async function loadPurchaseEditor(id?: string, prefill?: string, stockSel
   }
 
   return {
-    initial, brands, number: record?.number, canAddDraft: roles.includes("catalogue"),
-    suppliers: suppliers.data.map((item): PurchaseSupplierOption => ({
-      ...item, default_currency: purchaseCurrency(item.default_currency) ? item.default_currency : null,
-    })),
+    initial: applyPurchaseDefaults(initial), brands, number: record?.number, canAddDraft: roles.includes("catalogue"),
+    suppliers: options,
   };
 }

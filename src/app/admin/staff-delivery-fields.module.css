@@ -1,0 +1,4 @@
+.fields:not(:has(option[data-manual-carrier]:checked)) .manualCarrier,
+.fields:not(:has(option[value="other"]:checked)) .manualService {
+  display: none;
+}

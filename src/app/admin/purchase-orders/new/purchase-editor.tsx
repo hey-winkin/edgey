@@ -11,7 +11,11 @@ import {
   currencies, maxCodeLength, maxNoteLength, maxOrderNoteLength, maxPartNumberLength, maxPurchaseLines,
   purchaseCurrency, readPurchaseLinePrice, type PurchaseEditorState, type PurchaseLine,
 } from "./editor-data";
-import type { PurchaseBrand, PurchaseSupplierOption } from "./editor-load";
+import type { PurchaseBrand } from "./editor-load";
+import {
+  applyPurchaseDefaults, defaultFields, purchaseAssociation, purchaseRate, readPurchaseDefaultEdits,
+  readPurchasePartDraft, type PurchaseSupplierOption,
+} from "./supplier-defaults";
 import styles from "./purchase-editor.module.css";
 
 export function PurchaseEditor({ initial, brands, suppliers, canAddDraft, permalink }: {
@@ -89,6 +93,16 @@ function clearPrefilledPrices(form: HTMLFormElement, lines: PurchaseLine[], curr
   return cleared;
 }
 
+function formControl(form: HTMLFormElement, name: string) {
+  const input = form.elements.namedItem(name);
+  return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : undefined;
+}
+
+function setFormValue(form: HTMLFormElement, name: string, value: string) {
+  const input = formControl(form, name);
+  if (input && input.value !== value) input.value = value;
+}
+
 function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
   state: PurchaseEditorState;
   brands: PurchaseBrand[];
@@ -96,31 +110,68 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
   canAddDraft: boolean;
   pending: boolean;
 }) {
-  const { header, lines, status, results, query, brand, page, more, notice, suggestions } = state;
-  const [scope, setScope] = useState({ currency: header.currency, supplier: header.supplier });
+  const { header, lines, status, results, query, brand, page, more, notice, suggestions, defaults } = state;
+  const [scope, setScope] = useState({
+    currency: header.currency, supplier: header.supplier, suggestedRate: status === "draft" && !defaults?.edited.exchange,
+  });
   const [clearedPrefill, setClearedPrefill] = useState(() => new Set<string>());
   const [currency, supplier] = [scope.currency, scope.supplier];
   const ordered = new Set(lines.map(({ product }) => product.id));
   const lockSupplier = status !== "draft";
   const supplierRecord = suppliers.find((item) => item.id === supplier);
   const samePriceScope = currency === header.currency && supplier === header.supplier;
+  const rate = scope.suggestedRate ? purchaseRate(defaults, currency) : undefined;
 
   const clearPrices = useCallback((form: HTMLFormElement, currency: string) => {
     const cleared = clearPrefilledPrices(form, lines, currency);
     if (cleared.length) setClearedPrefill((current) => new Set([...current, ...cleared]));
   }, [lines]);
 
+  const syncDefaults = useCallback((form: HTMLFormElement) => {
+    const { header, status, defaults, lines } = state;
+    const value = (name: string) => formControl(form, name)?.value ?? "";
+    const currency = value("currency");
+    if (!purchaseCurrency(currency) || status !== "draft") return;
+    const supplier = value("supplier_id");
+    if (defaults) {
+      const values = { ...header, currency, supplier, ordered: value("ordered_on"),
+        expected: value("expected_on"), exchange: value("exchange_rate") };
+      const fields = new FormData(form);
+      if (!fields.has("order_id")) return;
+      const edits = readPurchaseDefaultEdits(defaults, header, values, fields);
+      const projected = applyPurchaseDefaults({
+        ...state, header: values, defaults: edits,
+        lines: lines.map((line) => readPurchasePartDraft(line, edits, header.supplier, supplier,
+          value(`part:${line.product.id}`), fields)),
+      });
+      for (const [name, key] of Object.entries(defaultFields)) {
+        setFormValue(form, name, projected.header[key]);
+        setFormValue(form, `default:${name}`, projected.header[key]);
+        setFormValue(form, `edited:${name}`, edits.edited[key] ? "1" : "");
+      }
+      setFormValue(form, "part_supplier", projected.header.supplier);
+      for (const line of projected.lines) {
+        const id = line.product.id;
+        setFormValue(form, `part:${id}`, line.supplierPart);
+        setFormValue(form, `part_drafts:${id}`, line.partDrafts && Object.keys(line.partDrafts).length ? JSON.stringify(line.partDrafts) : "");
+        setFormValue(form, `part_edit:${id}`, "");
+      }
+      setScope({ supplier: projected.header.supplier, currency: projected.header.currency, suggestedRate: !edits.edited.exchange });
+      clearPrices(form, projected.header.currency);
+      return;
+    }
+    setScope({ currency, supplier, suggestedRate: false });
+    clearPrices(form, currency);
+  }, [clearPrices, state]);
+
   const attach = useCallback((root: HTMLDivElement | null) => {
-    const form = root?.closest("form");
+    if (!root) return;
+    const form = root.closest("form");
     if (!form) return;
     restoreEarlyPurchaseFields(form);
-    const currency = form.elements.namedItem("currency");
-    const supplier = form.elements.namedItem("supplier_id");
-    if (currency instanceof HTMLSelectElement && purchaseCurrency(currency.value) && supplier instanceof HTMLSelectElement) {
-      setScope({ currency: currency.value, supplier: supplier.value });
-      clearPrices(form, currency.value);
-    }
-  }, [clearPrices]);
+    syncDefaults(form);
+    root.dataset.supplierDefaultsLive = "true";
+  }, [syncDefaults]);
 
   useEffect(() => {
     if (state.focus && (!document.activeElement?.closest("#purchase-editor") || document.activeElement === document.body)) {
@@ -144,9 +195,26 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
     }
   }
 
-  return <div ref={attach} onKeyDown={advance}>
+  return <div ref={attach} onKeyDown={advance} onChange={({ target }) => {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement) || !target.form) return;
+    const { form, name } = target;
+    if (name.startsWith("part:")) {
+      setFormValue(form, `part_edit:${name.slice(5)}`, formControl(form, "supplier_id")?.value || "none");
+      return;
+    }
+    if (Object.hasOwn(defaultFields, name)) setFormValue(form, `edited:${name}`, "1");
+    if (name === "exchange_rate") setScope((current) => ({ ...current, suggestedRate: false }));
+    else if (name === "supplier_id" || name === "currency" || name === "ordered_on") syncDefaults(form);
+  }}>
     <input type="hidden" name="order_id" value={state.id} />
     <input type="hidden" name="revision" value={state.revision} />
+    {defaults && <>
+      <input hidden readOnly name="part_supplier" defaultValue={header.supplier} />
+      {Object.entries(defaultFields).map(([name, key]) => <span key={name} hidden>
+        <input hidden readOnly name={`default:${name}`} defaultValue={header[key]} />
+        <input hidden readOnly name={`edited:${name}`} defaultValue={defaults.edited[key] ? "1" : ""} />
+      </span>)}
+    </>}
     {notice && <p className={styles.announcement} role="status">{notice}</p>}
 
     <AdminSection title="Pick from the catalogue">
@@ -254,11 +322,7 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
             <p><span className="admin-muted">Currency</span><br /><strong>{header.currency}</strong></p>
           </> : <>
             <AdminField label="Supplier">
-              <select name="supplier_id" id="supplier_id" defaultValue={header.supplier} {...invalidField(state, "supplier_id")}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  setScope((current) => ({ ...current, supplier: value }));
-                }}>
+              <select name="supplier_id" id="supplier_id" defaultValue={header.supplier} {...invalidField(state, "supplier_id")}>
                 <option value="">Choose a supplier</option>
                 {suppliers.map(({ id, name, default_currency }) => <option key={id} value={id}>
                   {name}{default_currency ? ` · default ${default_currency}` : ""}
@@ -266,13 +330,7 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
               </select>
             </AdminField>
             <AdminField label="Order currency">
-              <select name="currency" id="currency" defaultValue={header.currency} {...invalidField(state, "currency")}
-                onChange={(event) => {
-                  const { value, form } = event.currentTarget;
-                  if (!purchaseCurrency(value)) return;
-                  setScope((current) => ({ ...current, currency: value }));
-                  if (form) clearPrices(form, value);
-                }}>
+              <select name="currency" id="currency" defaultValue={header.currency} {...invalidField(state, "currency")}>
                   {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
               </select>
             </AdminField>
@@ -285,11 +343,15 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
         {!suppliers.length && <p className="admin-muted">
           No suppliers yet. You can save an incomplete draft, or <AdminLink href="/admin/purchase-orders/suppliers/new">add a supplier</AdminLink>.
         </p>}
+        {!lockSupplier && defaults && <div className={styles.nativeDefaults}>
+          {intentButton("supplierDefaults", pending, "Apply supplier defaults")}
+        </div>}
         <div className={styles.exchange} data-fixed={lockSupplier && header.currency === "GBP" ? "true" : undefined}>
           <AdminField label="Exchange rate (GBP per 1 unit of order currency)">
             <input id="exchange_rate" name="exchange_rate" inputMode="decimal" maxLength={16}
               defaultValue={header.exchange} {...invalidField(state, "exchange_rate")} />
           </AdminField>
+          {rate && <p className="admin-muted">Last used on {rate.number} · <time dateTime={rate.ordered}>{rate.ordered}</time>. Check the rate before saving.</p>}
           <p className="admin-muted">Enter the agreed rate; no live conversion. GBP orders always use 1.</p>
         </div>
         {!lockSupplier && lines.length > 0 && <p className="admin-muted">
@@ -305,7 +367,7 @@ function EditorFields({ state, brands, suppliers, canAddDraft, pending }: {
     <AdminSection title="Order lines">
       <div id="po-lines" role="group" aria-label="Order lines" tabIndex={-1}>
         {lines.length ? <ul className={styles.lines} aria-label="Selected products">
-          {lines.map((line) => <Line key={line.product.id} {...{ line, state, pending, currency }}
+          {lines.map((line) => <Line key={line.product.id} {...{ line, state, pending, currency, supplier, supplierRecord }}
             prefillCleared={clearedPrefill.has(line.product.id)}
             suggestion={samePriceScope ? suggestions[line.product.id] : undefined} />)}
         </ul> : <p className="admin-notice">No lines yet. Use the catalogue above to add the first product.</p>}
@@ -355,15 +417,22 @@ function MoneyField({ label, id, value, state, hint }: {
     aria-describedby={[invalid["aria-describedby"], hint].filter(Boolean).join(" ") || undefined} /></AdminField>;
 }
 
-function Line({ line, state, pending, currency, prefillCleared, suggestion }: {
-  line: PurchaseLine; state: PurchaseEditorState; pending: boolean; currency: string; prefillCleared: boolean; suggestion?: number;
+function Line({ line, state, pending, currency, supplier, supplierRecord, prefillCleared, suggestion }: {
+  line: PurchaseLine; state: PurchaseEditorState; pending: boolean; currency: string; supplier: string;
+  supplierRecord?: PurchaseSupplierOption; prefillCleared: boolean; suggestion?: number;
 }) {
   const { product, quantity, unitPrice, supplierPart, note, received, receivedPrice } = line;
   const quantityField = `quantity:${product.id}`;
   const priceHint = receivedPrice ? `received-price:${product.id}` : undefined;
   const detail = state.error?.field === `part:${product.id}` || state.error?.field === `note:${product.id}`;
+  const firstSupplier = state.defaults && !state.defaults.associations.some(({ variant_id }) => variant_id === product.id);
+  const association = purchaseAssociation(state.defaults, product.id, supplier);
   return <li className={styles.line}>
     <input type="hidden" name="line" value={product.id} />
+    {state.defaults && <>
+      <input hidden readOnly name={`part_drafts:${product.id}`} defaultValue="" />
+      <input hidden readOnly name={`part_edit:${product.id}`} defaultValue="" />
+    </>}
     {prefillCleared && <input type="hidden" name={`prefill_cleared:${product.id}`} value="1" />}
     <div className={styles.lineGrid}>
       <div>
@@ -401,6 +470,13 @@ function Line({ line, state, pending, currency, prefillCleared, suggestion }: {
             defaultValue={note} {...invalidField(state, `note:${product.id}`)} />
         </AdminField>
         <p className="admin-muted">The supplier copy includes this part number and line note.</p>
+        {state.defaults && supplierRecord && product.status !== "archived" && <label className={styles.rememberPart} key={supplier}>
+          <input type="checkbox" name={`remember:${product.id}`} value={supplier}
+            defaultChecked={state.header.supplier === supplier && line.rememberPart} />
+          <span>{firstSupplier ? `Remember ${supplierRecord.name} as this product’s usual supplier` :
+            `Remember a ${association?.supplier_part_number ? "changed" : "new"} part number for ${supplierRecord.name}`}
+            {firstSupplier && " and keep the part number if entered"}.</span>
+        </label>}
       </div>
     </details>
   </li>;

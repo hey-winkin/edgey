@@ -1,7 +1,10 @@
 import { openStaffMenu, signOutFromStaffMenu, switchTheme } from "../helpers/navigation";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
-import { seedPaidAdminOrder, signInStaff } from "./admin-fixtures";
+import { connectAccountDb } from "../helpers/account-fixture";
+import { seedPaidAdminOrder, setVerifiedStaffSession, signInStaff } from "./admin-fixtures";
 
 test("staff sign in, print the paid order, then submit dispatch twice without moving stock twice", async ({ page }) => {
   const staff = await createLocalAdminUser("warehouse");
@@ -40,7 +43,8 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   await expect(page.locator('time[datetime="2026-11-24"]')).toBeVisible();
   await page.getByRole("link", { name: "Back to order" }).click();
   await page.getByRole("button", { name: "Start picking" }).click();
-  await expect(page.getByLabel("Carrier")).toBeVisible();
+  await expect(page.getByLabel("Carrier choice").locator("option:checked")).toHaveText("Other");
+  await expect(page.getByLabel("Carrier", { exact: true })).toBeVisible();
 
   const dispatchedPath = `/admin/warehouse/${order.id}`;
   let submissions = 0;
@@ -51,7 +55,7 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
     submissions += results.filter((response) => response.ok()).length;
     await route.fulfill({ response: results[0]! });
   });
-  await page.getByLabel("Carrier").fill("Fixture Courier");
+  await page.getByLabel("Carrier", { exact: true }).fill("Fixture Courier");
   await page.getByLabel("Tracking number").fill("SHIP-TEST-001");
   await page.getByRole("button", { name: "Record dispatch" }).click();
   await expect(page.getByText("SHIP-TEST-001", { exact: true })).toBeVisible();
@@ -87,6 +91,82 @@ test("staff sign in, print the paid order, then submit dispatch twice without mo
   await expect(page.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();
 });
 
+test("dispatch matches the saved service, rejects stale choices and works from a native form", async ({ page, browser, baseURL }) => {
+  const db = await connectAccountDb();
+  const service = "Fixture tracked overnight";
+  const native = await browser.newContext({ baseURL, javaScriptEnabled: false, viewport: { width: 390, height: 860 } });
+  try {
+    await db.query(`insert into public.delivery_rules (scope, code, kind, service_name, dispatch_carrier, charge_ex_vat_pence, working_days)
+      values ('district', 'SW98', 'next-working-day', $1, 'Fixture Parcel', 695, 1)`, [service]);
+    const quote = await localAdminClient().rpc("checkout_delivery_terms", { p_postcode: "SW98 1AA" });
+    expect(quote.error).toBeNull();
+    expect(quote.data).toMatchObject({ quote: { serviceName: service } });
+    expect(JSON.stringify(quote.data)).not.toContain("Fixture Parcel");
+
+    const order = await seedPaidAdminOrder({ sku: "EDG-Z50", service });
+    const path = `/admin/warehouse/${order.id}`;
+    await setVerifiedStaffSession(page, await createLocalAdminUser("warehouse"), baseURL);
+    await page.goto(path);
+    await page.getByRole("button", { name: "Start picking" }).click();
+    const selection = page.getByRole("combobox", { name: "Carrier choice" });
+    const manual = page.getByRole("textbox", { name: "Carrier", exact: true });
+    await expect(selection.locator("option:checked")).toHaveText(`Fixture Parcel · ${service}`);
+    await expect(manual).toBeHidden();
+    const renders = process.env.EDGEY_STAFF_CARRIER_RENDERS;
+    if (renders) await mkdir(renders, { recursive: true });
+    const dispatch = page.getByRole("heading", { name: "Dispatch", exact: true }).locator("..");
+    for (const theme of ["dark", "light"] as const) {
+      await switchTheme(page, theme);
+      for (const width of [1280, 390, 320]) {
+        await page.setViewportSize({ width, height: 860 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+        if (renders) await dispatch.screenshot({ path: join(renders, `warehouse-carrier-default-${theme}-${width}.png`) });
+      }
+    }
+
+    await db.query("update public.delivery_rules set dispatch_carrier = 'Fixture Express' where scope = 'district' and code = 'SW98'");
+    await page.getByLabel("Tracking number").fill("TRACK-STALE");
+    await page.getByRole("button", { name: "Record dispatch" }).click();
+    await expect(dispatch.getByRole("alert")).toContainText("carrier service is no longer configured");
+    await expect(page.getByLabel("Tracking number")).toHaveValue("TRACK-STALE");
+    const readShipment = () => localAdminClient().from("orders").select("carrier,delivery_service,tracking_number,fulfilment_status").eq("id", order.id).single();
+    expect((await readShipment()).data).toEqual({
+      carrier: null, delivery_service: service, tracking_number: null, fulfilment_status: "picking",
+    });
+
+    const nativePage = await native.newPage();
+    await setVerifiedStaffSession(nativePage, await createLocalAdminUser("warehouse"), baseURL);
+    await nativePage.goto(path);
+    const nativeChoice = nativePage.getByRole("combobox", { name: "Carrier choice" });
+    const nativeManual = nativePage.getByRole("textbox", { name: "Carrier", exact: true });
+    await expect(nativeChoice.locator("option:checked")).toHaveText(`Fixture Express · ${service}`);
+    await nativeChoice.press("End");
+    await nativeChoice.press("Tab");
+    await expect(nativeManual).toBeFocused();
+    await nativeManual.fill("Fixture Extra");
+    await nativeChoice.selectOption({ label: `Fixture Express · ${service}` });
+    await expect(nativeManual).toBeHidden();
+    await nativeChoice.press("End");
+    await expect(nativeManual).toHaveValue("Fixture Extra");
+    if (renders) await nativePage.getByRole("heading", { name: "Dispatch", exact: true }).locator("..")
+      .screenshot({ path: join(renders, "warehouse-carrier-other-native-390.png") });
+    await nativeChoice.selectOption({ label: `Fixture Express · ${service}` });
+    await nativePage.getByLabel("Tracking number").fill("TRACK-NATIVE");
+    await nativePage.getByRole("button", { name: "Record dispatch" }).click();
+    await expect(nativePage.getByText("TRACK-NATIVE", { exact: true })).toBeVisible();
+    expect((await readShipment()).data).toEqual({
+      carrier: "Fixture Express", delivery_service: service, tracking_number: "TRACK-NATIVE", fulfilment_status: "dispatched",
+    });
+  } finally {
+    await native.close();
+    try {
+      await db.query("delete from public.delivery_rules where scope = 'district' and code = 'SW98' and service_name = $1", [service]);
+    } finally {
+      await db.end();
+    }
+  }
+});
+
 test("a warehouse receipt updates the variant balance and ledger", async ({ page }) => {
   const db = localAdminClient();
   const sku = "EDG-Z16";
@@ -96,9 +176,18 @@ test("a warehouse receipt updates the variant balance and ledger", async ({ page
   await signInStaff(page, staff);
   await (await openStaffMenu(page)).getByRole("link", { name: "Adjust stock", exact: true }).click();
   await page.getByRole("link", { name: sku, exact: true }).click();
-  await page.getByLabel("Received quantity").fill("3");
-  await page.getByRole("button", { name: "Record stock receipt" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Stock receipt recorded." })).toBeVisible();
+  const receive = page.getByRole("link", { name: "Book in a delivery", exact: true });
+  await expect(receive).toHaveAttribute("href", "/admin/stock/receive");
+  await receive.click();
+  await page.getByRole("link", { name: "Receive without a purchase order", exact: true }).click();
+  const reference = `Warehouse stock receipt ${staff.id.slice(0, 8)}`;
+  await page.getByLabel("Delivery reference").fill(reference);
+  await page.getByLabel("Blade code for line 1").fill(sku);
+  await page.getByLabel("Quantity for line 1").fill("3");
+  await page.getByRole("button", { name: "Review delivery" }).click();
+  await page.getByRole("button", { name: "Receive stock", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: reference, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: sku, exact: true }).click();
   await expect(page.getByRole("table", { name: "Movement ledger" }).getByRole("row").filter({ hasText: "Receive" }).filter({ hasText: "+3" }).first()).toBeVisible();
   const after = await db.from("variants").select("stock_on_hand").eq("id", before.data.id).single();
   expect(after.data?.stock_on_hand).toBe(before.data.stock_on_hand + 3);

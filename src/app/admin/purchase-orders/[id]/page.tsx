@@ -21,7 +21,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const { id } = await params;
   if (!isWarehouseId(id)) notFound();
   const showCosts = canManageCosts(roles);
-  const [found, privateHeader, privateLines, events, deliveries] = await Promise.all([
+  const [found, privateHeader, privateLines, events, deliveries, business] = await Promise.all([
     db.from("staff_purchase_orders").select("id,number,status,ordered_on,expected_on,revision,staff_purchase_order_lines(position,variant_id,sku,blade_name,option_label,quantity,received_quantity)")
       .eq("id", id).order("position", { referencedTable: "staff_purchase_order_lines" }).maybeSingle(),
     showCosts ? db.from("staff_purchase_order_costs")
@@ -32,9 +32,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       .eq("purchase_order_id", id) : null,
     db.from("staff_purchase_order_events").select("id,kind,revision,created_at").eq("purchase_order_id", id).order("revision", { ascending: false }).limit(50),
     db.from("staff_deliveries").select("id,reference,received_on,unit_count").eq("purchase_order_id", id).order("received_at", { ascending: false }).limit(50),
+    showCosts ? db.from("staff_purchase_buyer_settings").select("name,address").eq("id", true).maybeSingle() : null,
   ]);
   if (found.error && stockSchemaUnavailable(found.error)) notFound();
-  if (found.error || privateHeader?.error || privateLines?.error || events.error ||
+  if (found.error || privateHeader?.error || privateLines?.error || events.error || business?.error ||
       (deliveries.error && !stockSchemaUnavailable(deliveries.error))) throw new Error("Could not load the purchase order.");
   const order = found.data;
   if (!order || (!showCosts && order.status === "draft")) notFound();
@@ -65,6 +66,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           <a className="textlink" href={`${pathname}/${id}/export/pdf`}>Download PDF</a>
         </>}
       </nav>
+      {business && (!business.data?.name || !business.data.address) && (
+        <AdminNotice><AdminLink href={`${pathname}/settings`}>Add your business details so they print on this order</AdminLink>.</AdminNotice>
+      )}
       <AdminSection title="Order details">
         <dl className={styles.summary}>
           <div><dt>Status</dt><dd>{purchaseStatusLabel[order.status]}</dd></div>

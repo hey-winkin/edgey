@@ -1,13 +1,26 @@
 const attachedEvent = "edgey:purchase-editor-attached";
-const snapshotKey = "__edgeyEarlyPurchaseField";
 
 export const captureEarlyPurchaseEditor = `(() => {
+  const drafts = new Map();
+  const snapshot = (field, value) => {
+    if (!(field instanceof HTMLInputElement)) return;
+    drafts.set(field.name, value);
+    field.value = value;
+  };
   const capture = ({ target: field }) => {
-    if (field.form?.id !== "purchase-editor") return;
+    if (field.form?.id !== "purchase-editor" || !field.name) return;
+    snapshot(field.form.elements.namedItem("edited:" + field.name), "1");
+    if (field.name?.startsWith("part:")) {
+      const part = field.form.elements.namedItem("part_edit:" + field.name.slice(5));
+      const supplier = field.form.elements.namedItem("supplier_id");
+      snapshot(part, supplier?.value || "none");
+    }
     if (field instanceof HTMLTextAreaElement) {
-      field[${JSON.stringify(snapshotKey)}] = [field.value, field.selectionStart, field.selectionEnd, field.selectionDirection];
+      drafts.set(field.name, [field.value, field.selectionStart, field.selectionEnd, field.selectionDirection]);
+    } else if (field instanceof HTMLInputElement) {
+      drafts.set(field.name, field.type === "checkbox" ? field.checked : field.type === "file" ? field.files : field.value);
     } else if (field instanceof HTMLSelectElement) {
-      field[${JSON.stringify(snapshotKey)}] = field.value;
+      drafts.set(field.name, field.value);
     }
   };
   const advance = (event) => {
@@ -30,28 +43,26 @@ export const captureEarlyPurchaseEditor = `(() => {
   document.addEventListener("input", capture, true);
   document.addEventListener("change", capture, true);
   document.addEventListener("keydown", advance, true);
-  document.addEventListener(${JSON.stringify(attachedEvent)}, () => {
+  document.addEventListener(${JSON.stringify(attachedEvent)}, ({ detail: form }) => {
     document.removeEventListener("input", capture, true);
     document.removeEventListener("change", capture, true);
     document.removeEventListener("keydown", advance, true);
+    for (const [name, value] of drafts) {
+      const field = form.elements.namedItem(name);
+      if (!field) continue;
+      if (typeof value === "string") field.value = value;
+      else if (field instanceof HTMLInputElement) {
+        if (typeof value === "boolean") field.checked = value;
+        else if (value instanceof FileList) field.files = value;
+      } else if (field instanceof HTMLTextAreaElement && Array.isArray(value)) {
+        const [text, start, end, direction] = value;
+        field.value = text;
+        field.setSelectionRange(start, end, direction);
+      }
+    }
   }, { once: true });
 })();`;
 
-type Snapshot = string | [string, number, number, "forward" | "backward" | "none"];
-
 export function restoreEarlyPurchaseFields(form: HTMLFormElement) {
-  document.dispatchEvent(new Event(attachedEvent));
-  for (const field of form.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement>("textarea, select")) {
-    const element = field as typeof field & { [snapshotKey]?: Snapshot };
-    const snapshot = element[snapshotKey];
-    if (snapshot === undefined) continue;
-    delete element[snapshotKey];
-    if (typeof snapshot === "string") {
-      element.value = snapshot;
-    } else if (element instanceof HTMLTextAreaElement) {
-      const [value, start, end, direction] = snapshot;
-      element.value = value;
-      element.setSelectionRange(start, end, direction);
-    }
-  }
+  document.dispatchEvent(new CustomEvent(attachedEvent, { detail: form }));
 }

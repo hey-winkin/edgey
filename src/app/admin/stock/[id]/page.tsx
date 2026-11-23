@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { AdminField, AdminForm, AdminHeading, AdminLink, AdminNotice, AdminSection, AdminTable } from "@/app/admin/ui";
-import { CostFields } from "@/app/admin/cost-fields";
 import { requireStaff } from "@/lib/admin/auth";
 import { formatSupplierCost, isStockAdjustmentReason, stockAdjustmentReasons } from "@/lib/admin/stock-cost";
 import { canManageCosts, getStaffReceiptCosts } from "@/lib/admin/stock-cost-data";
@@ -11,6 +10,7 @@ import { runWarehouseAction } from "@/lib/admin/warehouse-actions";
 import { isWarehouseId, movementTime, warehouseLabel, warehousePage } from "@/lib/admin/warehouse-format";
 import { formatGbp } from "@/lib/commerce/money";
 import { WarehousePagination } from "../../warehouse/pagination";
+import { receiveDeliveryHref } from "../receive/routes";
 
 function delta(value: number) {
   return value > 0 ? `+${value}` : value;
@@ -46,16 +46,8 @@ export default async function StockVariantPage({ params, searchParams }: {
         </dl>
       </AdminSection>
       <AdminSection title="Receive stock">
-        <AdminForm action={runWarehouseAction.bind(null, { kind: "receive", variantId: variant.id, key: randomUUID() })} submit="Record stock receipt">
-          <p>Record the physical units received for this variant.</p>
-          <AdminField label="Received quantity">
-            <input name="quantity" type="number" min={1} max={2_147_483_647} step={1} required />
-          </AdminField>
-          {showCosts && <details className="admin-panel">
-            <summary>Add receipt costs (optional)</summary>
-            <CostFields optional />
-          </details>}
-        </AdminForm>
+        <p className="admin-muted mb-2">Book this blade in with the rest of the delivery.</p>
+        <AdminLink href={receiveDeliveryHref}>{staffDestinationLabels.bookInDelivery}</AdminLink>
       </AdminSection>
       <AdminSection title="Adjust stock">
         {adjustmentsAvailable ? (

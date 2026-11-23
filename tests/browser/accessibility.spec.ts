@@ -247,11 +247,14 @@ for (const theme of themes) {
             ["/admin/stock/deliveries", "Delivery history", "Purchasing"],
             ["/admin/catalogue", "Stock", "Purchasing"],
             ["/admin/catalogue?q=EDG-Z10&status=published", "Stock", "Purchasing"],
+            ["/admin/catalogue?view=running-low", "Stock", "Purchasing"],
+            ["/admin/purchase-orders/settings", "Business details", "Admin"],
             ["/admin/finance", "Finance and trade accounts"],
             ["/admin/sales", "Sales reports"],
             ["/admin/requests", "Customer enquiries"],
           ], true);
           await scanRoutes(page, theme, [
+            ["/admin/stock/receive?view=standalone", "Receive without a purchase order", "Purchasing"],
             ["/admin/catalogue/new", "Add draft variant", "Purchasing"],
             [`/admin/warehouse/${order.id}`, "Warehouse order", "Sales orders"],
             [missing, noPage],

@@ -40,6 +40,7 @@ test("staff destinations are ordered by job without exposing their role or task 
     ] },
     { title: "Admin", links: [
       { label: "Customer delivery settings", href: "/admin/delivery" },
+      { label: "Business details", href: "/admin/purchase-orders/settings" },
       { label: "Sales reports", href: "/admin/sales" },
       { label: "Finance and trade accounts", href: "/admin/finance" },
       { label: "Shop performance", href: "/admin/commercial" },
@@ -56,10 +57,10 @@ test("groups retain the route permissions and suppress an empty group", () => {
     Admin: ["Customer delivery settings", "Sales reports", "Shop performance"],
   });
   expect(labels(["catalogue"])).toEqual({
-    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Sales reports"],
+    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Business details", "Sales reports"],
   });
   expect(labels(["finance"])).toEqual({
-    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Sales reports", "Finance and trade accounts"],
+    "Sales orders": ["Customer enquiries"], Purchasing: ["Purchase orders", "Suppliers", "Stock", "Delivery history"], Admin: ["Business details", "Sales reports", "Finance and trade accounts"],
   });
   expect(labels([])).toEqual({ "Sales orders": ["Customer enquiries"], Admin: ["Sales reports"] });
 });
@@ -80,6 +81,8 @@ test("history and record paths select exactly one permitted destination", () => 
     .toEqual({ title: "Purchasing", href: "/admin/stock/deliveries", state: "location" });
   expect(staffLocation(groups, "/admin/purchase-orders/id/print", null))
     .toEqual({ title: "Purchasing", href: "/admin/purchase-orders", state: "location" });
+  expect(staffLocation(groups, "/admin/purchase-orders/settings", null))
+    .toEqual({ title: "Admin", href: "/admin/purchase-orders/settings", state: "page" });
   expect(staffLocation(groups, "/admin/purchase-orders/suppliers/id", null))
     .toEqual({ title: "Purchasing", href: "/admin/purchase-orders/suppliers", state: "location" });
   expect(staffLocation(groups, "/admin/finance/accounts/id", null))

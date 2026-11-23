@@ -13,6 +13,8 @@ import {
   maxPurchaseLines, newPurchaseLine, parsePurchaseImport, previewPurchaseImport, priceInput, purchaseCurrency,
   purchaseId, purchasePayload, readPurchaseLinePrice, type PurchaseEditorState, type PurchaseLine,
 } from "./editor-data";
+import { applyPurchaseDefaults, purchaseRememberRequests, readPurchaseDefaultEdits, readPurchasePartDraft } from "./supplier-defaults";
+import { loadPurchaseAssociations } from "./supplier-defaults-load";
 
 type StaffDb = Awaited<ReturnType<typeof requireStaff>>["db"];
 
@@ -31,6 +33,9 @@ async function getLastPrice(db: StaffDb, state: PurchaseEditorState, variant: st
 }
 
 function saveError(error: { code: string; message: string }, revision: number) {
+  if (error.message === "staff_variant_supplier_conflict") {
+    return "The saved supplier details changed. Uncheck Remember to save only this order, or reopen the editor to review the latest supplier details.";
+  }
   if (error.code === "40001") return revision === 0
     ? "This draft may already be saved. Check the purchase orders list before starting a new one."
     : "This order changed while you were editing it. Open the saved order in another tab to check its current revision.";
@@ -62,6 +67,14 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
   const orderCurrency = purchaseCurrency(currency) ? currency : previous.header.currency;
   const supplier = field(form, "supplier_id", 36);
   const samePriceScope = supplier === previous.header.supplier && currency === previous.header.currency;
+  const header: PurchaseEditorState["header"] = {
+    supplier, ordered: field(form, "ordered_on", 10), expected: field(form, "expected_on", 10),
+    currency: orderCurrency, exchange: field(form, "exchange_rate", 16),
+    shipping: field(form, "shipping_minor", 11), duty: field(form, "duty_minor", 11),
+    other: field(form, "other_minor", 11), vat: field(form, "import_vat_minor", 11),
+    vatPolicy: field(form, "include_import_vat", 7), note: field(form, "order_note", maxOrderNoteLength),
+  };
+  const defaults = previous.defaults && readPurchaseDefaultEdits(previous.defaults, previous.header, header, form);
   const query = field(form, "q", maxCodeLength).trim().slice(0, maxCodeLength);
   const rawBrand = field(form, "brand", maxCodeLength);
   const brand = /^[a-z0-9-]{1,80}$/.test(rawBrand) ? rawBrand : "";
@@ -82,25 +95,20 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       line, field(form, `price:${variant}`, 11), orderCurrency, form.get(`prefill_cleared:${variant}`) === "1",
     );
     clearedPrefill ||= cleared;
-    lines.push({
+    const postedLine = {
       product: line.product, received: line.received,
       ...(line.receivedPrice && { receivedPrice: line.receivedPrice, prefilledPrice }),
       quantity: field(form, `quantity:${variant}`, 10),
       unitPrice,
       supplierPart: field(form, `part:${variant}`, maxPartNumberLength),
       note: field(form, `note:${variant}`, maxNoteLength),
-    });
+    };
+    lines.push(defaults ? readPurchasePartDraft({ ...line, ...postedLine }, defaults, previous.header.supplier,
+      supplier, postedLine.supplierPart, form) : postedLine);
   }
-  const state: PurchaseEditorState = {
+  let state: PurchaseEditorState = {
     id, revision, status: previous.status, response: previous.response + 1,
-    header: {
-      supplier, ordered: field(form, "ordered_on", 10), expected: field(form, "expected_on", 10),
-      currency: orderCurrency,
-      exchange: field(form, "exchange_rate", 16),
-      shipping: field(form, "shipping_minor", 11), duty: field(form, "duty_minor", 11),
-      other: field(form, "other_minor", 11), vat: field(form, "import_vat_minor", 11),
-      vatPolicy: field(form, "include_import_vat", 7), note: field(form, "order_note", maxOrderNoteLength),
-    },
+    header, defaults,
     lines, query, brand, page: previous.page, results: previous.results, more: previous.more,
     exact: field(form, "exact", maxCodeLength), paste,
     preview: paste === previous.paste && currency === previous.header.currency ? previous.preview : undefined,
@@ -108,8 +116,38 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       const price = previous.suggestions[product.id];
       return !unitPrice.trim() && typeof price === "number" && Number.isSafeInteger(price) && price >= 0 ? [[product.id, price]] : [];
     })) : {},
-    notice: clearedPrefill && intent !== "save" ? "Prefilled prices in a different currency were cleared. Review the line prices." : undefined,
   };
+  function refreshDefaults() {
+    const before = state.header;
+    state = applyPurchaseDefaults(state);
+    if (state.header.currency !== before.currency) {
+      state.preview = undefined;
+      state.lines = state.lines.map((line) => {
+        if (!line.prefilledPrice) return line;
+        const { unitPrice, prefilledPrice, cleared } = readPurchaseLinePrice(line, line.unitPrice, state.header.currency);
+        clearedPrefill ||= cleared;
+        return { ...line, unitPrice, prefilledPrice };
+      });
+    }
+    if (state.header.supplier !== before.supplier || state.header.currency !== before.currency) state.suggestions = {};
+    if (clearedPrefill) state.notice = "Prefilled prices in a different currency were cleared. Review the line prices.";
+  }
+  async function addLines(added: PurchaseLine[]) {
+    if (state.defaults) {
+      const ids = added.map(({ product }) => product.id);
+      const addedAssociations = await loadPurchaseAssociations(db, ids);
+      state.defaults.associations = [...state.defaults.associations.filter(({ variant_id }) => !ids.includes(variant_id)), ...addedAssociations];
+      const supplierBefore = state.header.supplier;
+      const proposed = applyPurchaseDefaults({ ...state, lines: [
+        ...state.lines, ...added.map((line) => ({ ...line, partDrafts: undefined })),
+      ] }).header.supplier;
+      for (const line of added) {
+        if (line.supplierPart) line.partDrafts = { [supplierBefore || proposed]: line.supplierPart };
+      }
+    }
+    state.lines = [...state.lines, ...added];
+    refreshDefaults();
+  }
   function refuse(message: string, field?: string, area?: NonNullable<PurchaseEditorState["error"]>["area"]) {
     return { ...state, error: { message, field, area }, focus: area ? `po-${area}-error` : "po-save-error" };
   }
@@ -117,6 +155,7 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
   if (posted.length !== lines.length || posted.length !== known.size) {
     return refuse("The purchase-order lines could not be read. Reopen the purchase order before saving.");
   }
+  refreshDefaults();
   if (intent === "clearImport") return { ...state, paste: "", preview: undefined, focus: "po-import-toggle" };
   if (tooMuchPaste) return refuse("The pasted table exceeded 128 KB and wasn't kept. Paste a smaller table.", "paste", "import");
 
@@ -133,14 +172,32 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       return refuse("Save your spreadsheet as a UTF-8 CSV and try again.", "file", "import");
     }
   }
+  if (intent === "supplierDefaults") return { ...state, focus: "supplier_id", notice: state.notice ?? "Supplier defaults updated." };
   if (intent === "save") {
     if (clearedPrefill) return refuse("Prefilled prices in a different currency were cleared. Review the line prices, then save again.");
     if (state.paste.trim() || file) return refuse("Import the staged table or clear it before saving.", "paste", "import");
+    if (state.header.currency !== currency &&
+        (state.lines.some(({ unitPrice }) => unitPrice.trim()) || [header.shipping, header.duty, header.other, header.vat].some((value) => value.trim()))) {
+      return refuse("The supplier default changed the currency. Review the line prices and charges, then save again.", "currency");
+    }
+    if (state.defaults && state.lines.some(({ product }) => typeof form.get(`remember:${product.id}`) === "string" &&
+        form.get(`remember:${product.id}`) !== state.header.supplier)) {
+      return refuse("The supplier changed. Review the part numbers and choose what to remember before saving.", "supplier_id");
+    }
+    const partScope = form.get("part_supplier") ?? previous.header.supplier;
+    if (state.defaults && partScope && partScope !== state.header.supplier &&
+        state.lines.some((line) => line.supplierPart !== field(form, `part:${line.product.id}`, maxPartNumberLength))) {
+      return refuse("The supplier changed. Review the part numbers for the selected supplier, then save again.", "supplier_id");
+    }
     const payload = purchasePayload(state.header, state.lines, state.status);
     if (!payload.ok) return refuse(payload.message, payload.field);
-    const { data, error } = await db.rpc("save_staff_purchase_order", {
+    const remember = purchaseRememberRequests(state);
+    const args = {
       p_id: id, p_expected_revision: revision, p_order: payload.order, p_lines: payload.lines,
-    });
+    };
+    const { data, error } = remember.length
+      ? await db.rpc("save_staff_purchase_order_with_supplier_parts", { ...args, p_remember: remember })
+      : await db.rpc("save_staff_purchase_order", args);
     if (error) return refuse(saveError(error, revision));
     revalidatePath("/admin/purchase-orders");
     revalidatePath(`/admin/purchase-orders/${data}`);
@@ -173,16 +230,18 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       if (state.preview.some(({ product, error }) => !product || error)) {
         return refuse("Correct the flagged import rows and preview the table again.", "paste", area);
       }
-      if (file || paste !== previous.paste || currency !== previous.header.currency ||
+      if (file || paste !== previous.paste || currency !== previous.header.currency || state.header.currency !== previous.header.currency ||
           state.preview.length !== previous.preview?.length ||
           !state.preview.every((row, index) => row.product?.id === previous.preview?.[index]?.product?.id && !previous.preview?.[index]?.error)) {
         return refuse("The import source, currency or matched products changed. Check the new preview before adding.", "paste", area);
       }
       const added = state.preview.flatMap(({ product, quantity, unitPrice, supplierPart, note }) =>
         product ? [{ ...newPurchaseLine(product), quantity, unitPrice, supplierPart, note }] : []);
+      if (state.defaults && added.some(({ unitPrice }) => unitPrice)) state.defaults.edited.currency = true;
+      await addLines(added);
       return {
-        ...state, lines: [...state.lines, ...added], paste: "", preview: undefined,
-        notice: `Added ${added.length} ${added.length === 1 ? "line" : "lines"} from the table.`,
+        ...state, paste: "", preview: undefined,
+        notice: [`Added ${added.length} ${added.length === 1 ? "line" : "lines"} from the table.`, state.notice].filter(Boolean).join(" "),
         focus: `quantity:${added[0]?.product.id}`,
       };
     }
@@ -203,28 +262,29 @@ export async function submitPurchaseEditor(previous: PurchaseEditorState, form: 
       }
       if (!product || product.status === "archived") return refuse("No selectable product matches. Check the catalogue code or add a draft variant.", undefined, area);
       if (seen.has(product.id)) return refuse(`${product.sku} is already on the order. Change its quantity on the existing line.`, undefined, area);
-      state.lines.push(newPurchaseLine(product));
+      await addLines([newPurchaseLine(product)]);
       const price = await getLastPrice(db, state, product.id).catch(() => null);
       if (price !== null) state.suggestions[product.id] = price;
       if (intent === "exact") state.exact = "";
-      return { ...state, notice: `Added ${product.sku}.`, focus: intent === "exact" ? "exact" : `quantity:${product.id}` };
+      return { ...state, notice: [`Added ${product.sku}.`, state.notice].filter(Boolean).join(" "), focus: intent === "exact" ? "exact" : `quantity:${product.id}` };
     }
 
     const [verb, variant = ""] = intent.split(":");
-    const line = lines.find(({ product }) => product.id === variant);
+    const line = state.lines.find(({ product }) => product.id === variant);
     if (verb === "remove" && line) {
       if (line.received > 0) return refuse("This product already has recorded receipts and cannot be removed.");
-      state.lines = lines.filter(({ product }) => product.id !== variant);
+      state.lines = state.lines.filter(({ product }) => product.id !== variant);
+      refreshDefaults();
       delete state.suggestions[variant];
-      return { ...state, notice: `Removed ${line.product.sku}.`, focus: "po-lines" };
+      return { ...state, notice: [`Removed ${line.product.sku}.`, state.notice].filter(Boolean).join(" "), focus: "po-lines" };
     }
     if ((verb === "lastPrice" || verb === "usePrice") && line) {
       if (line.unitPrice.trim()) return refuse("A price is already entered. Clear it first if you want to use the last paid price.", `price:${variant}`);
-      if (!purchaseId.test(supplier)) return refuse("Choose a supplier to check its previous prices.", "supplier_id");
+      if (!purchaseId.test(state.header.supplier)) return refuse("Choose a supplier to check its previous prices.", "supplier_id");
       const price = await getLastPrice(db, state, variant);
       if (price === null) {
         delete state.suggestions[variant];
-        return { ...state, notice: `No previous received price for ${line.product.sku} in ${currency}.`, focus: `price:${variant}` };
+        return { ...state, notice: `No previous received price for ${line.product.sku} in ${state.header.currency}.`, focus: `price:${variant}` };
       }
       if (verb === "usePrice" && price === state.suggestions[variant]) {
         line.unitPrice = priceInput(price);

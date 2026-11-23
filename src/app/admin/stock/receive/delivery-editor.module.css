@@ -13,6 +13,31 @@
   min-height: 44px;
 }
 
+.purchaseOrders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+
+.purchaseOrders li {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  align-items: center;
+  gap: 4px 18px;
+  padding: 8px clamp(12px, 2vw, 18px);
+  overflow-wrap: anywhere;
+}
+
+.purchaseOrders li + li { border-top: 1px solid var(--line); }
+.purchaseOrders a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  width: fit-content;
+}
+
 .editor {
   --ledger-pad: clamp(13px, 2.4vw, 28px);
   --ledger-error: light-dark(#91292f, #ffafb0);

@@ -230,7 +230,8 @@ test("approves trade terms, dispatches before payment, and shows partial and ful
         await warehousePage.getByRole("link", { name: orderReference, exact: true }).click();
         await expect(warehousePage.getByText("Invoiced", { exact: true })).toBeVisible();
         await warehousePage.getByRole("button", { name: "Start picking" }).click();
-        await warehousePage.getByLabel("Carrier").fill(carrier);
+        await warehousePage.getByLabel("Carrier choice").selectOption({ label: "Other" });
+        await warehousePage.getByLabel("Carrier", { exact: true }).fill(carrier);
         await warehousePage.getByLabel("Tracking number").fill(tracking);
         await warehousePage.getByRole("button", { name: "Record dispatch" }).click();
         await expect(warehousePage.getByText(tracking, { exact: true })).toBeVisible();

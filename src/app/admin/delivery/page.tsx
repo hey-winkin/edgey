@@ -75,11 +75,13 @@ export default async function DeliverySettings({ searchParams }: {
             <option value="agreed">Agreed slower service</option>
           </select></AdminField>
           <AdminField label="Service name"><input name="service" maxLength={100} defaultValue={rule?.service_name ?? undefined} /></AdminField>
+          <AdminField label="Carrier (optional, staff only)"><input name="carrier" maxLength={100} defaultValue={rule?.dispatch_carrier ?? undefined} /></AdminField>
           <AdminField label="Agreed price ex VAT (£)"><input name="chargeGbp" inputMode="decimal"
             defaultValue={rule?.kind === "agreed" ? formatPoundsInput(rule.charge_ex_vat_pence) : undefined} /></AdminField>
           <AdminField label="Agreed transit (working days)"><input name="days" inputMode="numeric" maxLength={3}
             defaultValue={rule?.kind === "agreed" ? rule.working_days ?? undefined : undefined} /></AdminField>
         </div>
+        <p className="admin-muted">The carrier helps staff record dispatch. Customers still see only the service name.</p>
         <p className="admin-muted">Standard next-working-day delivery is £6.95 ex VAT, free from £150 ex VAT. Price and transit fields apply only to an agreed service.</p>
       </AdminForm>
       {rule && <AdminForm action={removeDeliveryRule.bind(null, rule.scope, rule.code)} submit="Remove rule"
@@ -94,10 +96,11 @@ export default async function DeliverySettings({ searchParams }: {
         const matching = rules.data.filter((item) => item.scope === scope);
         return <details key={scope} open={scope === "district" || scope === rule?.scope}>
           <summary>{scope === "district" ? "District overrides" : "Area rules"} ({matching.length})</summary>
-          {matching.length ? <AdminTable label={scope === "district" ? "District overrides" : "Area rules"} headers={["Postcode", "Service", "Charge ex VAT", "Working days"]}>
+          {matching.length ? <AdminTable label={scope === "district" ? "District overrides" : "Area rules"} headers={["Postcode", "Service", "Carrier", "Charge ex VAT", "Working days"]}>
             {matching.map((item) => <tr key={item.code}>
               <td><AdminLink href={`${path}?scope=${scope}&code=${item.code}`}>{item.code}</AdminLink></td>
               <td>{item.service_name ?? "Enquiry only"}</td>
+              <td>{item.dispatch_carrier ?? "—"}</td>
               <td>{item.charge_ex_vat_pence == null ? "—" : formatGbp(item.charge_ex_vat_pence)}</td>
               <td>{item.working_days ?? "—"}</td>
             </tr>)}

@@ -38,7 +38,8 @@ test("records an exact match through card authorisation, dispatch and a structur
     await signInStaff(warehousePage, await createLocalAdminUser("warehouse"));
     await warehousePage.goto(`/admin/warehouse/${orderId}`);
     await warehousePage.getByRole("button", { name: "Start picking" }).click();
-    await warehousePage.getByLabel("Carrier").fill("Fixture carrier");
+    await warehousePage.getByLabel("Carrier choice").selectOption({ label: "Other" });
+    await warehousePage.getByLabel("Carrier", { exact: true }).fill("Fixture carrier");
     await warehousePage.getByLabel("Tracking number").fill("FIXTURE-PACKET-1");
     await warehousePage.getByRole("button", { name: "Record dispatch" }).click();
     await warehousePage.getByLabel("Dispatched line").selectOption(available.id);

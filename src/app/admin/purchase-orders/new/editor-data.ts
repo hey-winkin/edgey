@@ -1,5 +1,6 @@
 import { formatPoundsInput, parsePoundsToPence } from "@/lib/admin/pounds";
 import { DELIVERY_QUANTITY_MAX, deliveryToday, parseDeliveryQuantity } from "@/lib/admin/deliveries";
+import { maxSupplierPartNumberLength as maxPartNumberLength } from "@/lib/admin/variant-suppliers";
 import { normaliseFinderCode } from "@/lib/requests/finder-query";
 import type { ExactPurchaseMatch, PurchaseVariant } from "@/lib/admin/purchase-catalogue";
 
@@ -9,7 +10,7 @@ export type EditablePurchaseStatus = "draft" | "sent" | "part_received";
 export const maxPurchaseLines = 200;
 export const maxImportBytes = 128 * 1024;
 export const maxCodeLength = 80;
-export const maxPartNumberLength = 120;
+export { maxPartNumberLength };
 export const maxNoteLength = 500;
 export const maxOrderNoteLength = 2_000;
 export const purchaseId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,6 +26,8 @@ export type PurchaseLine = {
   received: number;
   receivedPrice?: ReceivedPrice;
   prefilledPrice?: boolean;
+  partDrafts?: Record<string, string>;
+  rememberPart?: boolean;
 };
 
 export type PurchaseHeader = {
@@ -57,6 +60,7 @@ export type PurchaseEditorState = {
   paste: string;
   preview?: ImportPreview[];
   suggestions: Record<string, number>;
+  defaults?: import("./supplier-defaults").PurchaseDefaults;
   error?: { message: string; field?: string; area?: "picker" | "exact" | "import" };
   notice?: string;
   focus?: string;
@@ -85,13 +89,13 @@ export function priceInput(value: number | null | undefined) {
   return formatPoundsInput(value);
 }
 
-export function stockPurchasePrefill(products: PurchaseVariant[], prices: ReadonlyMap<string, ReceivedPrice>) {
+export function stockPurchasePrefill(products: PurchaseVariant[], prices: ReadonlyMap<string, ReceivedPrice>, preferredCurrency?: PurchaseCurrency) {
   const counts = { GBP: 0, USD: 0, EUR: 0 };
   for (const product of products) {
     const price = prices.get(product.id);
     if (price) counts[price.currency]++;
   }
-  const currency = currencies.reduce((best, code) => counts[code] > counts[best] ? code : best);
+  const currency = preferredCurrency ?? currencies.reduce((best, code) => counts[code] > counts[best] ? code : best);
   const lines = products.map((product): PurchaseLine => {
     const receivedPrice = prices.get(product.id);
     const prefilledPrice = receivedPrice?.currency === currency;
@@ -110,7 +114,7 @@ export function readPurchaseLinePrice(line: PurchaseLine, unitPrice: string, cur
   return { unitPrice: cleared ? "" : unitPrice, prefilledPrice: Boolean(untouchedPrefill && !cleared), cleared };
 }
 
-function validDate(value: string) {
+export function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith("0000")) return false;
   const date = new Date(value);
   return Number.isFinite(+date) && date.toISOString().slice(0, 10) === value;
@@ -122,6 +126,10 @@ function optionalMoney(value: string) {
 
 function validPrice(value: string) {
   return !value.trim() || optionalMoney(value) !== null;
+}
+
+export function validPurchaseSupplierPart(value: string) {
+  return value.length <= maxPartNumberLength && !/[\u0000-\u001f\u007f]/u.test(value);
 }
 
 export function purchasePayload(header: PurchaseHeader, lines: PurchaseLine[], status: EditablePurchaseStatus) {
@@ -169,7 +177,7 @@ export function purchasePayload(header: PurchaseHeader, lines: PurchaseLine[], s
     if (!validPrice(line.unitPrice) || (!draft && unit_price_minor === null)) {
       return fail(`Enter a non-negative unit price with up to two decimal places for ${line.product.sku}.`, `price:${variant_id}`);
     }
-    if (line.supplierPart.length > maxPartNumberLength || /[\u0000-\u001f\u007f]/u.test(line.supplierPart)) {
+    if (!validPurchaseSupplierPart(line.supplierPart)) {
       return fail(`Check the supplier part number for ${line.product.sku}.`, `part:${variant_id}`);
     }
     if (line.note.length > maxNoteLength || line.note.includes("\0")) {
@@ -306,7 +314,7 @@ export function previewPurchaseImport(
       error = `Enter a whole quantity from 1 to ${DELIVERY_QUANTITY_MAX.toLocaleString("en-GB")}.`;
     } else if (!validPrice(row.unitPrice)) {
       error = "Enter a non-negative unit price with up to two decimal places, or leave it blank.";
-    } else if (/[\u0000-\u001f\u007f]/u.test(row.supplierPart)) {
+    } else if (!validPurchaseSupplierPart(row.supplierPart)) {
       error = "Use a single-line supplier part number.";
     }
     if (product) used.add(product.id);

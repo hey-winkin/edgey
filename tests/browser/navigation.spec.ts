@@ -556,7 +556,8 @@ test.describe("staff shell", () => {
             ["Delivery history", "/admin/stock/deliveries"],
           ],
           Admin: [
-            ...(role === "warehouse" ? [["Customer delivery settings", "/admin/delivery"]] : []),
+            ...(role === "warehouse" ? [["Customer delivery settings", "/admin/delivery"]]
+              : [["Business details", "/admin/purchase-orders/settings"]]),
             ["Sales reports", "/admin/sales"],
             ...(role === "warehouse" ? [["Shop performance", "/admin/commercial"]]
               : role === "finance" ? [["Finance and trade accounts", "/admin/finance"]] : []),
@@ -705,7 +706,7 @@ test.describe("staff shell", () => {
             await expect(shortages).toHaveAttribute("href", "/admin/stock?view=out-of-stock");
             await expect(purchases.getByRole("link", { name: "Stock", exact: true })).toHaveCount(roles === "all" ? 1 : 0);
             await expect(adminGroup.getByRole("link")).toHaveText(roles === "all"
-              ? ["Customer delivery settings", "Sales reports", "Finance and trade accounts", "Shop performance"]
+              ? ["Customer delivery settings", "Business details", "Sales reports", "Finance and trade accounts", "Shop performance"]
               : ["Customer delivery settings", "Sales reports", "Shop performance"]);
             for (const viewport of staffViewports) {
               await page.setViewportSize(viewport);

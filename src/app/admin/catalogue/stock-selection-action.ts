@@ -6,6 +6,7 @@ import { catalogueCodeMaxLength, catalogueStatuses, getOrderableCatalogueIds } f
 import { orderStockHref } from "@/lib/admin/navigation";
 import { getPurchaseVariants } from "@/lib/admin/purchase-catalogue";
 import { purchaseRoles } from "@/lib/admin/roles";
+import { readRunningLow, runningLowView } from "@/lib/admin/running-low";
 import { encodeStockSelection, stockSelectionLimit } from "@/lib/admin/stock-selection";
 
 type StockListContext = {
@@ -13,6 +14,7 @@ type StockListContext = {
   page: number;
   pageIds: string[];
   offPageIds: string[];
+  runningLow?: boolean;
 };
 
 export async function getActiveStockSelection(ids: string[]) {
@@ -23,8 +25,8 @@ export async function getActiveStockSelection(ids: string[]) {
   });
 }
 
-export async function submitStockSelection({ filters, page, pageIds, offPageIds }: StockListContext, form: FormData) {
-  const { roles } = await requireStaff(...purchaseRoles);
+export async function submitStockSelection({ filters, page, pageIds, offPageIds, runningLow }: StockListContext, form: FormData) {
+  const { db, roles } = await requireStaff(...purchaseRoles);
   const intent = form.get("intent");
   const query = new URLSearchParams();
   if (intent === "filter" || intent === "select-matching") {
@@ -47,16 +49,20 @@ export async function submitStockSelection({ filters, page, pageIds, offPageIds 
     ...pageIds.filter((id) => intent === "select-page" || (intent !== "clear-page" && checked.has(id))),
   ];
   const active = await getActiveStockSelection(ids);
-  const matching = intent === "select-matching"
-    ? [...new Set([...active, ...await getOrderableCatalogueIds(roles, Object.fromEntries(query))])]
-    : active;
+  let matching = active;
+  if (intent === "select-matching") {
+    const scope = runningLow ? await readRunningLow(db) ?? [] : undefined;
+    const matches = await getOrderableCatalogueIds(roles, Object.fromEntries(query), scope);
+    matching = [...new Set([...active, ...matches])];
+  }
   const tooMany = matching.length > stockSelectionLimit;
   const token = encodeStockSelection(tooMany ? active : matching);
   const notice = tooMany ? intent === "select-matching" ? "matching-limit" : "limit" :
     active.length < ids.length ? "removed" : intent === "order" && !active.length ? "empty" : undefined;
   if (intent === "order" && token && !notice) redirect(`${orderStockHref}?variants=${token}`);
 
-  if (token) query.set("selected", token);
+  if (runningLow) query.set("view", runningLowView);
+  if (token || runningLow) query.set("selected", token);
   if (notice) query.set("selectionNotice", notice);
   redirect(`/admin/catalogue${query.size ? `?${query}` : ""}#stock-results`);
 }

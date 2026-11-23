@@ -206,6 +206,8 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await expect(page.getByRole("status")).toHaveText("Supplier saved.");
     await scanBothThemes(page);
     await page.goto(orders + "/settings");
+    await expect(heading(page, "Business details")).toBeVisible();
+    await expect(page).toHaveTitle("Business details | Edgey");
     await expect(page.getByLabel("Business name")).toBeVisible();
     await page.getByLabel("Business name").fill(buyerName);
     await page.getByLabel("Address").fill("");
@@ -292,6 +294,14 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     const orderPath = new URL(page.url()).pathname;
     orderId = orderPath.split("/").at(-1);
     const orderNumber = (await page.getByRole("heading", { level: 1 }).textContent())!;
+    const addDetails = page.getByRole("link", { name: "Add your business details so they print on this order", exact: true });
+    await expect(addDetails).toHaveAttribute("href", orders + "/settings");
+    await addDetails.click();
+    await page.getByLabel("Address").fill("12 Fictional Business Lane");
+    await page.getByRole("button", { name: "Save buyer details" }).click();
+    await expect(page.getByRole("status")).toHaveText("Buyer details saved.");
+    await page.goto(orderPath);
+    await expect(addDetails).toHaveCount(0);
     await scanBothThemes(page);
     await page.getByText("Cancel purchase order", { exact: true }).click();
     await page.getByRole("button", { name: "Confirm cancel purchase order" }).click();
@@ -414,6 +424,12 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await expect(heading(page, reference)).toBeVisible();
     await expect(page.getByText("Original purchase cost breakdown")).toHaveCount(2);
     await expect(page.getByText("Cost to be entered", { exact: true })).toHaveCount(1);
+    await page.goto(`/admin/catalogue/${first.id}`);
+    const costPanel = page.getByRole("region", { name: "Supplier cost", exact: true });
+    await expect(costPanel).toContainText("Received against");
+    await expect(costPanel.getByRole("link", { name: orderNumber, exact: true })).toHaveAttribute("href", orderPath);
+    await costPanel.getByText("Correct latest receipt cost", { exact: true }).click();
+    await expect(costPanel.getByRole("button", { name: "Save receipt cost correction" })).toBeVisible();
     await page.goto(`${orders}/new?variant=${first.id}`);
     await page.getByRole("combobox", { name: "Supplier", exact: true }).selectOption(supplierId!);
     await page.getByRole("combobox", { name: "Order currency", exact: true }).selectOption("USD");

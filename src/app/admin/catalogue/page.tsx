@@ -4,6 +4,7 @@ import { staffDestinationLabels } from "@/lib/admin/navigation";
 import { adminPageSize } from "@/lib/admin/pagination";
 import { getPurchaseStock } from "@/lib/admin/purchase-order-data";
 import { purchaseRoles } from "@/lib/admin/roles";
+import { readRunningLow, runningLowView } from "@/lib/admin/running-low";
 import { decodeStockSelection, stockSelectionLimit } from "@/lib/admin/stock-selection";
 import { displayState } from "@/lib/admin/format";
 import { formatPence } from "@/lib/catalogue/display-prices";
@@ -24,9 +25,12 @@ export default async function CataloguePage({ searchParams }: {
   const canEdit = staff.roles.includes("catalogue");
   const canAdjustStock = staff.roles.includes("warehouse");
   const query = await searchParams;
+  const runningLow = query.view === runningLowView;
+  const lowIds = runningLow ? await readRunningLow(staff.db) : undefined;
   const [{ brands, filters, page, length, rows }, selected] = await Promise.all([
-    listAdminCatalogue(staff, query),
-    getActiveStockSelection(decodeStockSelection(query.selected)),
+    listAdminCatalogue(staff, query, runningLow ? lowIds ?? [] : undefined),
+    query.selected === undefined && lowIds && lowIds.length <= stockSelectionLimit
+      ? lowIds : getActiveStockSelection(decodeStockSelection(query.selected)),
   ]);
   const onOrder = await getPurchaseStock(staff.db, rows.map(({ id }) => id));
   const hasFilters = Boolean(filters.q || filters.status || filters.brand);
@@ -41,18 +45,24 @@ export default async function CataloguePage({ searchParams }: {
   async function updateSelection(form: FormData) {
     "use server";
 
-    await submitStockSelection({ filters, page, pageIds, offPageIds }, form);
+    await submitStockSelection({ filters, page, pageIds, offPageIds, runningLow }, form);
   }
 
   return (
     <div className="catalogue-list">
       <div className="catalogue-list-heading">
-        <AdminHeading title={staffDestinationLabels.stock} description="Check availability and order blades." />
+        <AdminHeading title={staffDestinationLabels.stock} description={runningLow
+          ? "Running low: less than two weeks’ cover at the last 30 days’ sales rate, including units already on order."
+          : "Check availability and order blades."} />
         <div className="catalogue-list-links">
+          {runningLow && <AdminLink href={pathname}>All stock</AdminLink>}
           {canAdjustStock && <AdminLink href="/admin/stock">{staffDestinationLabels.adjustStock}</AdminLink>}
           {canEdit && <AdminLink href={`${pathname}/new`}>Add draft variant</AdminLink>}
         </div>
       </div>
+      {runningLow && lowIds === null && <AdminNotice>Could not calculate stock cover. Try again or return to All stock.</AdminNotice>}
+      {lowIds && lowIds.length > stockSelectionLimit && query.selected === undefined &&
+        <AdminNotice>More than {stockSelectionLimit} blades are running low. Select blades in batches for each order.</AdminNotice>}
       <StockSelectionForm action={updateSelection} key={JSON.stringify([filters, page, selected, pageIds])}
         offPageCount={offPageIds.length} initialVisibleCount={onOrder ? selected.length - offPageIds.length : 0} pageSize={pageIds.length}
         hasFilters={hasFilters} canSelectMatching={Boolean(onOrder && filters.status !== "archived" && (page > 1 || length > adminPageSize))}
@@ -80,7 +90,8 @@ export default async function CataloguePage({ searchParams }: {
       >
         {rows.length === 0 ? <AdminNotice>{page > 1
           ? "No catalogue variants on this page."
-          : hasFilters ? "No catalogue variants match these filters." : "No catalogue variants yet."}</AdminNotice> : (
+          : hasFilters ? "No catalogue variants match these filters."
+            : runningLow ? "No blades in this view." : "No catalogue variants yet."}</AdminNotice> : (
           <AdminTable label="Stock variants" headers={[...(pageIds.length ? ["Select"] : []), "Blade variant", "Status", "Stock", "Price from"]}>
             {rows.map((variant) => (
               <tr key={variant.id}>

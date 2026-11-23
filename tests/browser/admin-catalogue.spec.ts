@@ -1,9 +1,27 @@
 import { openStaffMenu } from "../helpers/navigation";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test as base } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { connectAccountDb } from "../helpers/account-fixture";
 import { signInStaff } from "./admin-fixtures";
+
+const test = base.extend<{ registeredSupplier: string }>({
+  registeredSupplier: async ({}, provide) => {
+    const db = await connectAccountDb();
+    const id = randomUUID();
+    try {
+      await db.query("insert into public.staff_suppliers (id, name) values ($1, 'Fixture Tooling')", [id]);
+      await provide(id);
+    } finally {
+      try {
+        await db.query("delete from public.staff_variant_suppliers where supplier_id = $1", [id]);
+        await db.query("delete from public.staff_suppliers where id = $1", [id]);
+      } finally {
+        await db.end();
+      }
+    }
+  },
+});
 
 test("a catalogue operator can save specifications before setting a draft's prices", async ({ page }) => {
   const db = await connectAccountDb();
@@ -27,13 +45,13 @@ test("a catalogue operator can save specifications before setting a draft's pric
     await page.getByRole("button", { name: "Save selling data" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Enter all three price tiers" })).toBeVisible();
     await firstTier.clear();
-    const part = page.getByLabel("Supplier part number");
-    await part.fill("TEST-UNPRICED-DRAFT");
+    const tool = page.getByLabel("Tool or holder");
+    await tool.fill("TEST-UNPRICED-DRAFT");
     await page.getByRole("button", { name: "Save selling data" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Selling data saved." })).toBeVisible();
     await expect(firstTier).toHaveValue("");
     await page.reload();
-    await expect(part).toHaveValue("TEST-UNPRICED-DRAFT");
+    await expect(tool).toHaveValue("TEST-UNPRICED-DRAFT");
     await expect(firstTier).toHaveValue("");
 
     await firstTier.fill("21.51");
@@ -60,7 +78,7 @@ test("a catalogue operator can save specifications before setting a draft's pric
   }
 });
 
-test("a catalogue operator approves and publishes a draft for public search", async ({ page }) => {
+test("a catalogue operator approves and publishes a draft for public search", async ({ page, registeredSupplier }) => {
   const staff = await createLocalAdminUser("catalogue");
   await signInStaff(page, staff);
   await (await openStaffMenu(page)).getByRole("link", { name: "Stock", exact: true }).click();
@@ -71,8 +89,8 @@ test("a catalogue operator approves and publishes a draft for public search", as
   await expect(page.getByLabel("1–4 blades (£ ex VAT)")).toHaveValue("22.50");
   await expect(page.getByText("£27.00 inc VAT (20%)")).toBeVisible();
 
-  await page.getByLabel("Supplier name").fill("Fixture Tooling");
-  await page.getByLabel("Supplier part number").fill("FIXTURE-Z11");
+  await page.getByRole("combobox", { name: "Usual supplier" }).selectOption(registeredSupplier);
+  await page.getByRole("textbox", { name: "Part number for usual supplier" }).fill("FIXTURE-Z11");
   await page.getByRole("button", { name: "Save selling data" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Selling data saved." })).toBeVisible();
 
@@ -120,11 +138,11 @@ test("a catalogue operator approves and publishes a draft for public search", as
 test("warehouse cannot use a stale catalogue mutation form", async ({ browser, page, baseURL }) => {
   const db = localAdminClient();
   const sku = "EDG-HTR040";
-  const before = await db.from("variants").select("id,supplier_part_number").eq("sku", sku).single();
+  const before = await db.from("variants").select("id,tool").eq("sku", sku).single();
   if (before.error) throw before.error;
   await signInStaff(page, await createLocalAdminUser("catalogue"));
   await page.goto(`/admin/catalogue/${before.data.id}`);
-  await page.getByLabel("Supplier part number").fill("DENIED-STALE-FORM");
+  await page.getByLabel("Tool or holder", { exact: true }).and(page.locator('[form="variant-selling-data"]')).fill("DENIED-STALE-FORM");
 
   const warehouse = await browser.newContext({ baseURL });
   try {
@@ -133,7 +151,7 @@ test("warehouse cannot use a stale catalogue mutation form", async ({ browser, p
     await page.context().addCookies(await warehouse.cookies());
     await page.getByRole("button", { name: "Save selling data" }).click();
     await expect(page).toHaveURL(/\/admin$/);
-    const after = await db.from("variants").select("id,supplier_part_number").eq("sku", sku).single();
+    const after = await db.from("variants").select("id,tool").eq("sku", sku).single();
     expect(after.data).toEqual(before.data);
   } finally {
     await warehouse.close();

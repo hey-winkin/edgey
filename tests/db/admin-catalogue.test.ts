@@ -388,6 +388,46 @@ test("edits family and variant selling data atomically without rewriting identit
   }
 });
 
+test("saves the usual supplier atomically, preserving fit checks and other suppliers’ part numbers", async () => {
+  const service = await connect("service_role");
+  const suppliers = [randomUUID(), randomUUID()];
+  try {
+    await db.query("insert into public.staff_suppliers (id, name) select id, id::text from unnest($1::uuid[]) as id", [suppliers]);
+    const link = { usual_supplier_id: suppliers[0], usual_supplier_part_number: "REGISTERED-PART" };
+    const links = async () => (await db.query(`
+      select supplier_id, supplier_part_number, is_usual from public.staff_variant_suppliers
+      where variant_id = $1 order by is_usual desc
+    `, [variant.id])).rows;
+    await expect(save(service, { ...link, substrates: ["no-such-substrate"] })).rejects.toMatchObject({ code: "23503" });
+    await expect(save(service, { ...link, usual_supplier_part_number: "P".repeat(121) }))
+      .rejects.toMatchObject({ code: "22023", message: "catalogue_invalid_selling_data" });
+    expect(await links()).toEqual([]);
+    const oldVersion = await version("variants", variant.id);
+    await save(service, { ...link, supplier_name: null, supplier_part_number: null, price_1_4_pence: 1250 }, oldVersion);
+    await expect(save(service, { usual_supplier_id: suppliers[1] }, oldVersion)).rejects.toMatchObject({ message: "catalogue_stale" });
+    await review(service);
+    await expect(publish(service)).rejects.toMatchObject({ message: "catalogue_verified_fit_required" });
+    await review(service, { record: mapping });
+    await publish(service);
+    await save(service, { usual_supplier_id: suppliers[1], supplier_name: null, supplier_part_number: null, price_1_4_pence: 1250 });
+
+    expect(await links()).toEqual([
+      { supplier_id: suppliers[1], supplier_part_number: null, is_usual: true },
+      { supplier_id: suppliers[0], supplier_part_number: "REGISTERED-PART", is_usual: false },
+    ]);
+    expect((await db.query("select publication_status, approved_at from public.variants where id = $1", [variant.id])).rows)
+      .toEqual([{ publication_status: "draft", approved_at: null }]);
+    expect((await db.query("select verification_state from public.compatibility where id = $1", [mapping.id])).rows)
+      .toEqual([{ verification_state: "candidate" }]);
+    await review(service);
+    await expect(publish(service)).rejects.toMatchObject({ message: "catalogue_incomplete_selling_data" });
+  } finally {
+    await service.end();
+    await db.query("delete from public.staff_variant_suppliers where supplier_id = any($1::uuid[])", [suppliers]);
+    await db.query("delete from public.staff_suppliers where id = any($1::uuid[])", [suppliers]);
+  }
+});
+
 test("rejects a mapping associated with a different variant and stale mapping reviews", async () => {
   const service = await connect("service_role");
   try {
