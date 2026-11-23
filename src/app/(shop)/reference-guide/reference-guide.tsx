@@ -87,12 +87,23 @@ export function ReferenceGuide({ groups, url, date, dateTime }: {
                       {row.codes.length ? (
                         <ul className={styles.codes}>{row.codes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
                       ) : "None verified"}
-                      {row.machines.length > 0 && <p className={styles.machines}>{row.machines.join("; ")}</p>}
+                      {row.machines.length > 0 && <p className={styles.detail}>{row.machines.join("; ")}</p>}
                     </div>
                   </td>
-                  {[row.heads.join("; "), row.angle, row.depth, row.materials.join(", ")].map((value, index) => (
-                    <td key={columns[index + 2]} role="cell">
-                      <span className={styles.cellLabel} aria-hidden="true">{columns[index + 2]}</span>
+                  <td role="cell">
+                    <span className={styles.cellLabel} aria-hidden="true">{columns[2]}</span>
+                    <div>
+                      {row.heads.length ? (
+                        <ul className={styles.heads} role="list">
+                          {row.heads.map((head) => <li key={head}>{head}</li>)}
+                        </ul>
+                      ) : "Not listed"}
+                      {row.adapters.map((adapter) => <p key={adapter} className={styles.detail}>Adapter: {adapter}</p>)}
+                    </div>
+                  </td>
+                  {[row.angle, row.depth, row.materials.join(", ")].map((value, index) => (
+                    <td key={columns[index + 3]} role="cell">
+                      <span className={styles.cellLabel} aria-hidden="true">{columns[index + 3]}</span>
                       <span>{value || "Not listed"}</span>
                     </td>
                   ))}

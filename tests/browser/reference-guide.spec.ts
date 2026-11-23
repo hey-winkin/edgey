@@ -13,10 +13,17 @@ test("lists published blade specifications and filters in place by verified refe
   const zund = guide.getByRole("table", { name: "Zünd", exact: true });
   await expect(zund.getByRole("columnheader", { name: "Tool heads", exact: true })).toBeVisible();
   const z10 = zund.getByRole("row").filter({ has: page.getByRole("link", { name: "EDG-Z10 Flat-stock drag blade" }) });
-  for (const text of ["Z10", "3910301", "UCT, SCT", "50°", "4.8 mm"]) {
+  for (const text of ["Z10", "3910301", "50°", "4.8 mm"]) {
     await expect(z10.getByText(text, { exact: true })).toBeVisible();
   }
+  await expect(z10.getByRole("listitem").filter({ hasText: /^(UCT|SCT)$/ })).toHaveText(["UCT", "SCT"]);
   await expect(z10).toContainText("Foamex");
+
+  const kongsberg = guide.getByRole("table", { name: "Kongsberg", exact: true }).getByRole("row", { name: /EDG-SR6223/ });
+  await expect(kongsberg.getByRole("listitem").filter({ hasText: /^(HF VibraCut|MP HF|Oscillating)$/ }))
+    .toHaveText(["HF VibraCut", "MP HF", "Oscillating"]);
+  await expect(kongsberg.getByText("Adapter: 6 mm for Oscillating", { exact: true })).toBeVisible();
+  await expect(kongsberg.getByRole("listitem").filter({ hasText: "Adapter:" })).toHaveCount(0);
 
   const search = guide.getByRole("searchbox", { name: "Search the reference guide" });
   await search.focus();
@@ -26,6 +33,9 @@ test("lists published blade specifications and filters in place by verified refe
   await expect(guide.getByRole("table")).toHaveCount(1);
   await expect(search).toBeFocused();
   await expect(page).toHaveURL(/\/reference-guide$/);
+  await search.fill("T-Series Tangential; F-Series Tangential Module");
+  await expect(guide.getByRole("status")).toHaveText("1 entry");
+  await expect(guide.getByRole("link", { name: /EDG-SUM-TAN-36/ })).toBeVisible();
   await search.fill("summa edg-sum-drg-60");
   await expect(zund).toHaveCount(0);
   await expect(guide.getByRole("status")).toHaveText("1 entry");
@@ -106,6 +116,8 @@ test("prints the current guide in black on white with the source and date but wi
   await expect(guide.getByRole("heading", { level: 1 })).toHaveCSS("color", "rgb(0, 0, 0)");
   await expect(guide.getByRole("table")).toHaveCount(1);
   await expect(guide.getByText("391-231", { exact: true })).toBeVisible();
+  await expect(guide.getByRole("listitem").filter({ hasText: /^(D-Series Drag|F-Series Drag Module)$/ }))
+    .toHaveText(["D-Series Drag", "F-Series Drag Module"]);
 });
 
 test.describe("reference guide without JavaScript", () => {

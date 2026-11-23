@@ -48,6 +48,21 @@ test("the empty state reports otherwise matching options without a recorded dept
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/blades$/);
 });
 
+test("offers individual Summa heads and matches either head on the same compatibility record", async ({ page }) => {
+  await page.goto("/blades?machine=summa");
+  const head = page.getByRole("combobox", { name: "Tool head" });
+  const names = ["D-Series Drag", "F-Series Drag Module", "F-Series Tangential Module", "T-Series Tangential"];
+  await expect(head.getByRole("option")).toHaveText(["All tool heads", ...names]);
+
+  for (const name of names) {
+    await head.selectOption({ label: name });
+    await expect(page).toHaveURL((url) => url.searchParams.get("head") === name.toLowerCase());
+    await expect(page.locator(".cards .p-card")).toHaveCount(1);
+    const sku = name.includes("Tangential") ? "EDG-SUM-TAN" : "EDG-SUM-DRG";
+    await expect(page.locator(".cards").getByRole("link", { name: new RegExp(sku) })).toBeVisible();
+  }
+});
+
 test("the full tool head name is readable in the picker and when selected at doubled text", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/blades");
