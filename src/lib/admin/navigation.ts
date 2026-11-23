@@ -11,6 +11,8 @@ const areas: {
     { label: "Requests", href: "/admin/requests" },
     { label: "Pick and dispatch", href: "/admin/warehouse", roles: ["warehouse"] },
     { label: "Stock", href: "/admin/stock", roles: ["warehouse"] },
+    { label: "Receive a delivery", href: "/admin/stock/receive", roles: ["warehouse"] },
+    { label: "Delivery history", href: "/admin/stock/deliveries", roles: ["warehouse", "catalogue", "finance"] },
   ] },
   { title: "Catalogue & delivery", links: [
     { label: "Catalogue", href: "/admin/catalogue", roles: ["catalogue", "finance"] },

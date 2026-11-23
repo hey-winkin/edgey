@@ -19,7 +19,7 @@ type StaffUnitCost = {
   recorded_at: string;
 };
 
-type ReadOnlyTable<Row> = { Row: Row; Insert: never; Update: never; Relationships: [] };
+type ReadOnlyTable<Row, Relationships = []> = { Row: Row; Insert: never; Update: never; Relationships: Relationships };
 
 export type Database = {
   public: {
@@ -909,6 +909,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      staff_deliveries: ReadOnlyTable<{
+        id: string;
+        reference: string;
+        received_on: string;
+        note: string | null;
+        received_at: string;
+        actor_id: string;
+        line_count: number;
+        unit_count: number;
+      }>;
+      staff_delivery_lines: ReadOnlyTable<{
+        delivery_id: string;
+        position: number;
+        variant_id: string;
+        sku: string;
+        blade_name: string;
+        quantity: number;
+        stock_movement_id: number;
+      }, [
+        {
+          foreignKeyName: "staff_delivery_lines_delivery_id_fkey";
+          columns: ["delivery_id"];
+          isOneToOne: false;
+          referencedRelation: "staff_deliveries";
+          referencedColumns: ["id"];
+        },
+        {
+          foreignKeyName: "staff_delivery_lines_stock_movement_id_fkey";
+          columns: ["stock_movement_id"];
+          isOneToOne: true;
+          referencedRelation: "stock_movements";
+          referencedColumns: ["id"];
+        },
+        {
+          foreignKeyName: "staff_delivery_lines_variant_id_fkey";
+          columns: ["variant_id"];
+          isOneToOne: false;
+          referencedRelation: "variants";
+          referencedColumns: ["id"];
+        },
+      ]>;
       staff_variant_costs: ReadOnlyTable<StaffUnitCost>;
       staff_receipt_costs: ReadOnlyTable<StaffUnitCost & { stock_movement_id: number; received_quantity: number }>;
       staff_variant_cost_audit: ReadOnlyTable<{
@@ -1569,6 +1610,10 @@ export type Database = {
       };
     };
     Functions: {
+      add_staff_delivery_line_cost: {
+        Args: { p_delivery_id: string; p_position: number; p_unit_cost_pence: number };
+        Returns: number;
+      };
       adjust_staff_stock: {
         Args: { p_variant_id: string; p_operation_key: string; p_quantity: number; p_reason: string; p_note?: string };
         Returns: number;
@@ -1580,6 +1625,14 @@ export type Database = {
       correct_staff_receipt_cost: {
         Args: { p_variant_id: string; p_stock_movement_id: number; p_expected_recorded_at: string; p_cost: Json };
         Returns: number;
+      };
+      match_staff_delivery_codes: {
+        Args: { p_codes: string[] };
+        Returns: { input_code: string; variant_id: string; sku: string; blade_name: string }[];
+      };
+      receive_staff_delivery: {
+        Args: { p_delivery_id: string; p_reference: string; p_received_on: string; p_note: string | null; p_lines: Json };
+        Returns: string;
       };
       receive_staff_stock_with_cost: {
         Args: { p_variant_id: string; p_operation_key: string; p_quantity: number; p_cost: Json };

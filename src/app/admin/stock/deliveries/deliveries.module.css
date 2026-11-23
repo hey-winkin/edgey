@@ -1,0 +1,61 @@
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+}
+
+.ledger {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+}
+
+.historyRow, .line {
+  display: grid;
+  gap: 8px 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: clamp(13px, 2vw, 20px);
+  overflow-wrap: anywhere;
+}
+
+.historyRow + .historyRow, .line + .line { border-top: 1px solid var(--line); }
+.position { color: var(--muted); font: .78rem var(--mono); margin-inline-end: 10px; }
+.cost { grid-column: 1 / -1; }
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  border: 1px solid var(--line);
+  background: var(--edgey-product-card);
+  margin: 0;
+}
+
+.summary > div { padding: 12px 16px; }
+.summary dt { color: var(--muted); font: .78rem var(--mono); }
+.summary dd { margin: 3px 0 0; }
+
+.costForm {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-block-start: 8px;
+}
+
+.costForm > label { max-inline-size: 8rem; }
+.costForm > p { flex-basis: 100%; }
+:global(.admin) .costForm label input[name="unitCost"],
+.costForm button { border-color: var(--edgey-control-border); }
+.costForm button:disabled { cursor: wait; }
+
+@media (min-width: 720px) {
+  .line { grid-template-columns: minmax(0, 1fr) minmax(6rem, .3fr); }
+  .line:has(.cost) { grid-template-columns: minmax(0, 1fr) minmax(6rem, .3fr) minmax(0, 1fr); }
+  .cost { grid-column: auto; }
+}
+
+@media (max-width: 480px) {
+  .historyRow, .line { grid-template-columns: minmax(0, 1fr); }
+}
