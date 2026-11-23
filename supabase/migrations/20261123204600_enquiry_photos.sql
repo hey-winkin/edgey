@@ -22,11 +22,13 @@ returns boolean
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  insert into private.enquiry_photo_uploads (enquiry_id, token_hash, photo_count)
+  insert into private.enquiry_photo_uploads as upload (enquiry_id, token_hash, photo_count)
   select id, p_token_hash, p_photo_count from public.enquiries
   where id = p_enquiry_id and kind = 'compatibility'
     and created_at > now() - interval '15 minutes'
-  on conflict do nothing;
+  on conflict (enquiry_id) do update
+    set token_hash = excluded.token_hash, photo_count = excluded.photo_count, expires_at = excluded.expires_at
+  where not upload.claimed;
   return found;
 end;
 $$;

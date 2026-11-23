@@ -202,7 +202,6 @@ textarea.control {
   text-underline-offset: .18em;
 }
 
-.photos p:empty,
-.uploadStatus:empty {
+.photos p:empty {
   position: absolute;
 }

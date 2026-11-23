@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   try {
     return Response.json({ deleted: await removeOrphanedEnquiryPhotos() }, { headers: { "Cache-Control": "no-store" } });
   } catch {
+    console.error("Enquiry photo cleanup failed.");
     return Response.json({ error: "Could not remove expired enquiry photos." }, { status: 500 });
   }
 }

@@ -10,7 +10,7 @@ import { saveThemeBeforeLoad, scanAccessibility, themes } from "../helpers/acces
 import { connectAccountDb } from "../helpers/account-fixture";
 import { switchTheme } from "../helpers/navigation";
 import { setVerifiedStaffSession } from "./admin-fixtures";
-import { enquiryPhotoFixture } from "./fixtures/enquiry-photo";
+import { enquiryPhotoFixture, maxSizeEnquiryJpeg } from "./fixtures/enquiry-photo";
 
 test.use({ trace: "off" });
 
@@ -154,6 +154,8 @@ test("saves only retained photos, protects the bucket and lets enquiry staff ope
     const media = await page.request.get(attachment);
     expect(media.headers()["cache-control"]).toBe("private, no-store");
     expect(media.headers()["content-type"]).toBe("image/jpeg");
+    expect((await page.request.get(`/api/enquiry-photos/${id}/4`)).status()).toBe(404);
+    expect((await page.request.get(`/api/enquiry-photos/${randomUUID()}/1`)).status()).toBe(404);
     await popup.close();
   } finally {
     if (key) await storage.remove([`${key}/1.jpg`, `${key}/2.jpg`, `${key}/3.jpg`]);
@@ -163,35 +165,72 @@ test("saves only retained photos, protects the bucket and lets enquiry staff ope
   }
 });
 
-test("announces upload progress and still confirms the enquiry if the upload connection drops", async ({ page }) => {
+test("uploads three photos at the total payload limit through the real server action", async ({ page }) => {
   const admin = localAdminClient();
   const db = await connectAccountDb();
-  const email = `photo-failure-${randomUUID()}@example.test`;
+  const email = `max-photos-${randomUUID()}@example.test`;
+  const photo = await enquiryPhotoFixture();
   try {
-    const { promise, resolve } = Promise.withResolvers<void>();
-    await page.route("**/enquiry", async (route) => {
-      if (!route.request().postDataBuffer()?.includes(Buffer.from('filename="photo.jpg"'))) return route.continue();
-      await promise;
-      await route.abort("connectionreset");
-    });
+    await page.addInitScript((jpeg) => {
+      const bytes = Uint8Array.from(atob(jpeg), (character) => character.charCodeAt(0));
+      HTMLCanvasElement.prototype.toBlob = (callback) => callback(new Blob([bytes], { type: "image/jpeg" }));
+    }, await maxSizeEnquiryJpeg());
     await page.goto("/enquiry");
     await page.getByLabel("Reply email").fill(email);
-    await page.getByLabel("Message").fill("Please help match this fictional blade.");
-    await page.getByLabel("Add photos", { exact: true }).setInputFiles(await enquiryPhotoFixture());
-    await expect(page.getByRole("group", { name: "Photos (optional)" }).getByRole("status")).toHaveText("1 of 3 photos ready");
-    await page.getByRole("button", { name: "Send enquiry" }).click();
-    try {
-      await expect(page.getByText("Enquiry sent. Uploading photos…")).toBeVisible();
-      expect((await admin.from("enquiries").select("id").eq("email", email).single()).error).toBeNull();
-    } finally {
-      resolve();
-    }
-    await expect(page.getByRole("heading", { name: "Enquiry received" })).toBeFocused();
-    await expect(page.getByRole("status")).toContainText("We couldn’t attach your photos. Your enquiry was sent.");
-    await page.goto("/enquiry?kind=delivery");
-    await expect(page.getByRole("group", { name: "Photos (optional)" })).toHaveCount(0);
+    await page.getByLabel("Message").fill("Fictional enquiry with three photos.");
+    await page.getByLabel("Add photos", { exact: true }).setInputFiles([photo, photo, photo]);
+    await expect(page.getByRole("group", { name: "Photos (optional)" }).getByRole("status")).toHaveText("3 of 3 photos ready");
+    const [upload] = await Promise.all([
+      page.waitForRequest((request) => Boolean(request.postDataBuffer()?.includes(Buffer.from('filename="photo.jpg"')))),
+      page.getByRole("button", { name: "Send enquiry" }).click(),
+    ]);
+    expect(upload.postDataBuffer()?.length).toBeGreaterThanOrEqual(3 * photoByteLimit);
+    await expect(page.getByRole("status")).toContainText("3 photos attached.");
   } finally {
+    const key = (await db.query<{ key: string }>("select public.enquiry_photo_storage_key(id) as key from public.enquiries where email = $1", [email])).rows[0]?.key;
+    if (key) await admin.storage.from("enquiry-photos").remove([`${key}/1.jpg`, `${key}/2.jpg`, `${key}/3.jpg`]);
     await db.query("delete from public.enquiries where email = $1", [email]);
     await db.end();
   }
 });
+
+for (const outcome of ["connection drops", "connection stalls"]) {
+  test(`confirms the enquiry while uploading and explains a failure when the ${outcome}`, async ({ page }) => {
+    const admin = localAdminClient();
+    const db = await connectAccountDb();
+    const email = `photo-failure-${randomUUID()}@example.test`;
+    try {
+      if (outcome === "connection stalls") await page.clock.install();
+      const { promise, resolve } = Promise.withResolvers<void>();
+      await page.route("**/enquiry", async (route) => {
+        if (!route.request().postDataBuffer()?.includes(Buffer.from('filename="photo.jpg"'))) return route.continue();
+        await promise;
+        await route.abort("connectionreset");
+      });
+      await page.goto("/enquiry");
+      await page.getByLabel("Reply email").fill(email);
+      await page.getByLabel("Message").fill("Please help match this fictional blade.");
+      await page.getByLabel("Add photos", { exact: true }).setInputFiles(await enquiryPhotoFixture());
+      await expect(page.getByRole("group", { name: "Photos (optional)" }).getByRole("status")).toHaveText("1 of 3 photos ready");
+      await page.getByRole("button", { name: "Send enquiry" }).click();
+      try {
+        await expect(page.getByRole("heading", { name: "Enquiry received" })).toBeFocused();
+        await expect(page.getByText("Uploading photos. Keep this page open.")).toBeVisible();
+        expect((await admin.from("enquiries").select("id").eq("email", email).single()).error).toBeNull();
+        if (outcome === "connection stalls") {
+          await page.clock.fastForward(76_000);
+          await expect(page.getByRole("status")).toContainText("We couldn’t confirm your photo upload.");
+        }
+      } finally {
+        resolve();
+      }
+      await expect(page.getByRole("heading", { name: "Enquiry received" })).toBeFocused();
+      await expect(page.getByRole("status")).toContainText("We couldn’t confirm your photo upload.");
+      await page.goto("/enquiry?kind=delivery");
+      await expect(page.getByRole("group", { name: "Photos (optional)" })).toHaveCount(0);
+    } finally {
+      await db.query("delete from public.enquiries where email = $1", [email]);
+      await db.end();
+    }
+  });
+}

@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 const privateHeaders = {
   "Cache-Control": "private, no-store",
   "Cross-Origin-Resource-Policy": "same-origin",
+  "Referrer-Policy": "no-referrer",
 };
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string; slot: string }> }) {

@@ -60,13 +60,14 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
       <AdminSection title="Buyer photos">
         {photos === null ? <p>Couldn’t load the photos. Reload the enquiry to try again.</p> : photos.length ? (
           <ul className="flex list-none flex-wrap gap-4 p-0">
-            {photos.map((slot) => {
+            {photos.map((slot, index) => {
               const url = `/api/enquiry-photos/${enquiry.id}/${slot}`;
+              const label = `Open photo ${index + 1} full size`;
               return (
                 <li key={slot}>
-                  <a className="textlink inline-grid gap-1" href={url} target="_blank" rel="noopener noreferrer">
+                  <a className="textlink inline-grid gap-1" href={url} target="_blank" rel="noopener noreferrer" aria-label={label + " (opens in a new tab)"}>
                     <Image unoptimized src={url + "?size=thumb"} width={160} height={120} className="h-[120px] w-[160px] object-contain" alt="" />
-                    Open photo {slot} full size
+                    {label}
                   </a>
                 </li>
               );

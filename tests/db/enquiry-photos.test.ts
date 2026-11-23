@@ -47,12 +47,15 @@ test("only the server can claim one photo upload per recent match enquiry", asyn
     const expired = (await issuePhotoUploadToken(expiredId, "1"))!;
     await db.query("update private.enquiry_photo_uploads set expires_at = now() where enquiry_id = $1", [expiredId]);
     expect(await saveEnquiryPhotos(expired, [file])).toBe(0);
+    const lostToken = (await issuePhotoUploadToken(id, "2"))!;
     const token = (await issuePhotoUploadToken(id, "2"))!;
-    expect(await issuePhotoUploadToken(id, "2")).toBeUndefined();
+    expect(token).not.toBe(lostToken);
+    expect(await saveEnquiryPhotos(lostToken, [file, file])).toBe(0);
     expect(await saveEnquiryPhotos(token, [file])).toBe(0);
     expect(await saveEnquiryPhotos(token.slice(0, -1) + (token.endsWith("0") ? "1" : "0"), [file, file])).toBe(0);
     const files = [file, new File(["not an image"], "bad.jpg", { type: "image/jpeg" })];
     expect((await Promise.all([saveEnquiryPhotos(token, files), saveEnquiryPhotos(token, files)])).sort()).toEqual([0, 1]);
+    expect(await issuePhotoUploadToken(id, "2")).toBeUndefined();
     const key = await photoKey(id);
     paths.push(`${key}/1.jpg`);
     expect((await storage.list(key)).data?.map(({ name }) => name)).toEqual(["1.jpg"]);

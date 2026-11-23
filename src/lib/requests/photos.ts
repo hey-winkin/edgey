@@ -31,7 +31,7 @@ export async function issuePhotoUploadToken(id: string, count: FormDataEntryValu
     const token = randomBytes(32).toString("base64url");
     const { data, error } = await photoDb().rpc("issue_enquiry_photo_upload", {
       p_enquiry_id: id, p_token_hash: hashToken(token), p_photo_count: Number(count),
-    });
+    }).abortSignal(AbortSignal.timeout(6_000));
     if (!error && data) return token;
   } catch {
   }
@@ -84,10 +84,17 @@ export async function openEnquiryPhoto(id: string, slot: string) {
 
 export async function removeOrphanedEnquiryPhotos() {
   const db = photoDb();
-  const { data: names, error } = await db.rpc("orphaned_enquiry_photos");
-  if (error) throw error;
-  if (!names.length) return 0;
-  const { data, error: deletionError } = await db.storage.from(photoBucket).remove(names);
-  if (deletionError) throw deletionError;
-  return data.length;
+  const bucket = db.storage.from(photoBucket);
+  const deadline = Date.now() + 40_000;
+  let deleted = 0;
+  for (let batch = 0; batch < 5 && Date.now() < deadline; batch++) {
+    const { data: names, error } = await db.rpc("orphaned_enquiry_photos");
+    if (error) throw error;
+    if (!names.length) break;
+    const { data, error: deletionError } = await bucket.remove(names);
+    if (deletionError) throw deletionError;
+    deleted += data.length;
+    if (names.length < 200 || !data.length) break;
+  }
+  return deleted;
 }
