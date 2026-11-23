@@ -53,7 +53,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <AdminHeading title={order.number} eyebrow="Warehouse / Purchase order"
+      <AdminHeading title={order.number}
         description={order.status === "draft" ? "Review the draft before sending it to the supplier." : purchaseStatusLabel[order.status]} />
       <nav className={styles.links} aria-label="Purchase order navigation">
         {canReceive && roles.includes("warehouse") && <Link className="primary" href={`/admin/stock/receive?po=${id}`}>Receive against this PO</Link>}

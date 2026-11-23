@@ -713,11 +713,14 @@ test.describe("staff shell", () => {
             }
             await shortages.click();
             await expect(page.getByRole("heading", { level: 1, name: "Out of stock" })).toBeVisible();
-            const rows = page.getByRole("table", { name: "Variant balances" }).locator("tbody tr");
+            const table = page.getByRole("table", { name: "Variant balances" });
+            const availableColumn = await table.getByRole("columnheader", { name: "Available", exact: true })
+              .evaluate((cell) => (cell as HTMLTableCellElement).cellIndex);
+            const rows = table.locator("tbody tr");
             await expect(rows.first()).toBeVisible();
             for (const row of await rows.all()) {
               await expect(row.getByRole("cell").nth(2)).toHaveText("Published");
-              await expect(row.getByRole("cell").last()).toHaveText("0");
+              await expect(row.getByRole("cell").nth(availableColumn)).toHaveText("0");
             }
             await page.getByRole("link", { name: "Show all stock" }).click();
             await expect(page.getByRole("heading", { level: 1, name: "Stock" })).toBeVisible();

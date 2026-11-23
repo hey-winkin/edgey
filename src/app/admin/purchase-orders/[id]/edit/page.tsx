@@ -11,7 +11,7 @@ export default async function EditPurchaseOrderPage({ params, searchParams }: Pa
   const draft = editor.initial.status === "draft";
 
   return <>
-    <AdminHeading title={`${draft ? "Edit" : "Amend"} ${editor.number}`} eyebrow="Stock / Purchase orders"
+    <AdminHeading title={`${draft ? "Edit" : "Amend"} ${editor.number}`}
       description={draft ? "Update the order before you mark it sent." : "Changes are recorded. The supplier and currency stay fixed after sending."} />
     <AdminLink href={record}>Back to {editor.number}</AdminLink>
     <PurchaseEditor {...editor} permalink={`${record}/edit`} />

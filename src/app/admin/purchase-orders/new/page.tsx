@@ -9,7 +9,7 @@ export default async function NewPurchaseOrderPage({ searchParams }: PageProps<"
   const editor = await loadPurchaseEditor(undefined, typeof variant === "string" ? variant : undefined);
 
   return <>
-    <AdminHeading title="New purchase order" eyebrow="Stock / Purchase orders"
+    <AdminHeading title="New purchase order"
       description="Choose blades from the catalogue, enter the quantities and supplier prices, then save a draft." />
     <AdminLink href="/admin/purchase-orders">Purchase orders</AdminLink>
     <PurchaseEditor {...editor} permalink="/admin/purchase-orders/new" />

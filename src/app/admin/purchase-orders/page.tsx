@@ -34,7 +34,7 @@ export default async function PurchaseOrders({ searchParams }: { searchParams: P
 
   return (
     <>
-      <AdminHeading eyebrow="Warehouse / Stock" title={blade ? "Add to purchase order" : "Purchase orders"}
+      <AdminHeading title={blade ? "Add to purchase order" : "Purchase orders"}
         description={blade ? "Choose a draft purchase order or start a new one for this blade."
           : "Raise orders against the catalogue and track what’s still due to arrive."} />
       {blade && <p className={styles.selection}><strong>{blade.products?.name}</strong> <span className="admin-mono">{blade.sku}</span>
