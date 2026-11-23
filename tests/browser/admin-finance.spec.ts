@@ -19,7 +19,7 @@ test("finance sees cancellation without a refund and the separate flagged paymen
   if (result.error) throw result.error;
   try {
     await signInStaff(page, finance);
-    await (await openStaffMenu(page)).getByRole("link", { name: "Finance" }).click();
+    await (await openStaffMenu(page)).getByRole("link", { name: "Finance and trade accounts", exact: true }).click();
     const captures = page.getByRole("table", { name: "Outstanding captures" });
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })).toContainText(formatGbp(cancelled.gross));
     await expect(captures.getByRole("row").filter({ hasText: cancelled.reference })

@@ -14,6 +14,8 @@ const queueColumns = "id,order_reference,business_name,recipient_name,delivery_s
 const orderColumns = "id,order_reference,business_name,recipient_name,address_line1,address_line2,address_town,address_region,address_postcode,address_country,delivery_service,promised_dispatch_date,estimated_delivery_date,fulfilment_status,payment_status,dispatched_at,carrier,tracking_number";
 const itemColumns = "variant_id,sku,option_label,quantity";
 const stockColumns = "id,sku,option_label,tool,publication_status,stock_on_hand,stock_reserved";
+const pickingStatuses = ["ready_to_pick", "picking"] as const;
+const paymentBlockStatuses = ["refunded", "voided"] as const;
 
 export type WarehouseOrder = Pick<Database["public"]["Tables"]["orders"]["Row"],
   "id" | "order_reference" | "business_name" | "recipient_name" | "address_line1" | "address_line2" |
@@ -39,10 +41,10 @@ export async function getWarehouseQueue(
     query = query.in("fulfilment_status", ["dispatched", "cancelled"])
       .order("updated_at", { ascending: false });
   } else {
-    query = query.in("fulfilment_status", ["ready_to_pick", "picking"]);
+    query = query.in("fulfilment_status", pickingStatuses);
     query = view === "blocked"
-      ? query.in("payment_status", ["refunded", "voided"])
-      : query.not("payment_status", "in", "(refunded,voided)");
+      ? query.in("payment_status", paymentBlockStatuses)
+      : query.not("payment_status", "in", `(${paymentBlockStatuses.join(",")})`);
     query = query.order("promised_dispatch_date").order("authorised_at");
   }
 
@@ -51,10 +53,16 @@ export async function getWarehouseQueue(
   return { rows: data.slice(0, warehousePageSize), hasMore: data.length > warehousePageSize };
 }
 
+export function countWarehousePicking(db: StaffDb) {
+  return db.from("orders").select("id", { count: "exact", head: true })
+    .not("authorised_at", "is", null).in("fulfilment_status", pickingStatuses)
+    .not("payment_status", "in", `(${paymentBlockStatuses.join(",")})`);
+}
+
 export async function countWarehousePaymentBlocks(db: StaffDb) {
   const { count, error } = await db.from("orders").select("id", { count: "exact", head: true })
-    .not("authorised_at", "is", null).in("fulfilment_status", ["ready_to_pick", "picking"])
-    .in("payment_status", ["refunded", "voided"]);
+    .not("authorised_at", "is", null).in("fulfilment_status", pickingStatuses)
+    .in("payment_status", paymentBlockStatuses);
   if (error) throw error;
   return count ?? 0;
 }

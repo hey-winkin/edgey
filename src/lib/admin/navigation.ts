@@ -2,33 +2,54 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type StaffRole = Database["public"]["Enums"]["staff_role"];
 
+export type StaffTask = "orders" | "requests" | "outOfStock";
+
 const areas: {
   title: string;
-  links: { label: string; href: string; roles?: StaffRole[] }[];
+  links: { label: string; href: string; roles?: StaffRole[]; task?: StaffTask }[];
 }[] = [
-  { title: "Work queues", links: [
-    { label: "Staff desk", href: "/admin" },
-    { label: "Requests", href: "/admin/requests" },
-    { label: "Pick and dispatch", href: "/admin/warehouse", roles: ["warehouse"] },
-    { label: "Stock", href: "/admin/stock", roles: ["warehouse"] },
+  { title: "Orders", links: [
+    { label: "Pick and dispatch", href: "/admin/warehouse", roles: ["warehouse"], task: "orders" },
+    { label: "Customer requests", href: "/admin/requests", task: "requests" },
+    { label: "Order history and returns", href: "/admin/warehouse?view=history", roles: ["warehouse"] },
+  ] },
+  { title: "Purchases", links: [
+    // EDGE-38: insert Purchase orders (with the due task), then Suppliers here.
     { label: "Receive a delivery", href: "/admin/stock/receive", roles: ["warehouse"] },
+    { label: "Stock and adjustments", href: "/admin/stock", roles: ["warehouse"], task: "outOfStock" },
     { label: "Delivery history", href: "/admin/stock/deliveries", roles: ["warehouse", "catalogue", "finance"] },
   ] },
-  { title: "Catalogue & delivery", links: [
+  { title: "Admin", links: [
     { label: "Catalogue", href: "/admin/catalogue", roles: ["catalogue", "finance"] },
     { label: "Delivery settings", href: "/admin/delivery", roles: ["warehouse"] },
-  ] },
-  { title: "Reporting & finance", links: [
-    { label: "Sales", href: "/admin/sales" },
-    { label: "Commercial measures", href: "/admin/commercial", roles: ["warehouse"] },
-    { label: "Finance", href: "/admin/finance", roles: ["finance"] },
+    { label: "Sales reports", href: "/admin/sales" },
+    { label: "Finance and trade accounts", href: "/admin/finance", roles: ["finance"] },
+    { label: "Shop performance", href: "/admin/commercial", roles: ["warehouse"] },
   ] },
 ];
 
-export function staffNavigation(roles: readonly StaffRole[]) {
+export function staffAreas(roles: readonly StaffRole[]) {
   return areas.map(({ title, links }) => ({
     title,
     links: links.filter(({ roles: required }) => !required || required.some((role) => roles.includes(role)))
-      .map(({ label, href }) => ({ label, href })),
+      .map(({ label, href, task }) => ({ label, href, task })),
+  })).filter(({ links }) => links.length > 0);
+}
+
+export function staffNavigation(roles: readonly StaffRole[]) {
+  return staffAreas(roles).map(({ title, links }) => ({
+    title, links: links.map(({ label, href }) => ({ label, href })),
   }));
+}
+
+export function staffLocation(groups: ReturnType<typeof staffNavigation>, pathname: string, view: string | null) {
+  const locations = groups.flatMap(({ title, links }) => links.map(({ href }) => ({ title, href })));
+  const exact = locations.find(({ href }) => href === `${pathname}?view=${view}`) ??
+    locations.find(({ href }) => href === pathname);
+  if (exact) return { ...exact, state: "page" as const };
+
+  const parent = locations.reduce<typeof locations[number] | undefined>((closest, entry) =>
+    pathname.startsWith(entry.href + "/") && entry.href.length > (closest?.href.length ?? 0) ? entry : closest,
+  undefined);
+  return parent ? { ...parent, state: "location" as const } : null;
 }

@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { saveThemeBeforeLoad, scanAccessibility, themes } from "../helpers/accessibility";
-import { setVerifiedStaffSession } from "./admin-fixtures";
+import { seedPaidAdminOrder, setVerifiedStaffSession } from "./admin-fixtures";
+import { withNet30Data } from "./fixtures/net30-data";
 
 test.use({ trace: "off" });
 
@@ -27,11 +29,11 @@ async function releaseWithoutClick(page: Page, control: Locator) {
   await page.mouse.move(0, 200);
 }
 
-async function capture(page: Page, filename: string) {
+async function capture(page: Page, filename: string, fullPage = false) {
   const directory = process.env.EDGEY_NAV_RENDERS;
   if (directory) {
     await mkdir(directory, { recursive: true });
-    await page.screenshot({ path: join(directory, filename + ".png"), animations: "disabled" });
+    await page.screenshot({ path: join(directory, filename + ".png"), animations: "disabled", fullPage });
   }
 }
 
@@ -356,7 +358,9 @@ test.describe("without JavaScript", () => {
       await page.goto("/admin");
       await expect(staffMenu(page)).toHaveAccessibleName("Edgey staff menu");
       await staffMenu(page).press("Enter");
+      await expect(staffNav(page).getByRole("heading")).toHaveText(["Orders", "Purchases", "Admin"]);
       await staffNav(page).getByRole("link", { name: "Delivery settings" }).click();
+      await expect(page.locator(".admin-location")).toHaveText("Admin");
       await expect(page.getByRole("heading", { name: "Delivery settings" })).toBeVisible();
       await expect(staffNav(page)).toBeHidden();
     } finally {
@@ -513,24 +517,35 @@ test.describe("staff shell", () => {
         await setVerifiedStaffSession(page, account, baseURL);
         await page.goto("/admin");
         await expect(page.getByRole("heading", { name: "Staff desk" })).toBeVisible();
+        await expect(page.getByRole("main").getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
+        await expect(page.getByRole("link", { name: "Staff desk", exact: true })).toHaveAttribute("aria-current", "page");
         await staffMenu(page).click();
-        const areas = ["Staff desk", "Requests", ...(
-          role === "warehouse" ? ["Pick and dispatch", "Stock", "Receive a delivery", "Delivery history", "Delivery settings", "Sales", "Commercial measures"] :
-            role === "finance" ? ["Delivery history", "Catalogue", "Sales", "Finance"] : ["Delivery history", "Catalogue", "Sales"]
-        )];
-        await expect(staffNav(page).getByRole("link")).toHaveText(areas);
-        await expect(staffNav(page).getByRole("link", { name: "Staff desk" })).toHaveAttribute("aria-current", "page");
+        const areas = {
+          Orders: role === "warehouse" ? ["Pick and dispatch", "Customer requests", "Order history and returns"] : ["Customer requests"],
+          Purchases: role === "warehouse" ? ["Receive a delivery", "Stock and adjustments", "Delivery history"] : ["Delivery history"],
+          Admin: role === "warehouse" ? ["Delivery settings", "Sales reports", "Shop performance"] :
+            ["Catalogue", "Sales reports", ...(role === "finance" ? ["Finance and trade accounts"] : [])],
+        };
+        await expect(staffNav(page).getByRole("heading")).toHaveText(Object.keys(areas));
+        for (const [group, labels] of Object.entries(areas)) {
+          await expect(staffNav(page).getByRole("heading", { name: group }).locator("..").getByRole("link")).toHaveText(labels);
+        }
+        await expect(staffNav(page).locator("[aria-current]")).toHaveCount(0);
         if (role === "warehouse") {
-          await staffNav(page).getByRole("link", { name: "Delivery settings" }).click();
-          await expect(page.getByRole("heading", { name: "Delivery settings" })).toBeVisible();
+          await staffNav(page).getByRole("link", { name: "Pick and dispatch" }).click();
+          await expect(page.getByRole("heading", { name: "Pick and dispatch" })).toBeVisible();
           await expect(staffNav(page)).toBeHidden();
           await staffMenu(page).click();
-          await expect(staffNav(page)).toBeVisible();
-          await staffNav(page).getByRole("link", { name: "Commercial measures" }).click();
+          await staffNav(page).getByRole("link", { name: "Order history and returns" }).click();
+          await expect(page.getByRole("heading", { name: "Dispatch and cancellation history" })).toBeVisible();
+          await expect(staffNav(page)).toBeHidden();
+          await staffMenu(page).click();
+          await expect(staffNav(page).locator("[aria-current]")).toHaveText(["Order history and returns"]);
+          await staffNav(page).getByRole("link", { name: "Shop performance" }).click();
           await expect(page.getByRole("heading", { name: "Commercial measures" })).toBeVisible();
           await expect(staffNav(page)).toBeHidden();
           await staffMenu(page).click();
-          await expect(staffNav(page).getByRole("link", { name: "Commercial measures" })).toHaveAttribute("aria-current", "page");
+          await expect(staffNav(page).getByRole("link", { name: "Shop performance" })).toHaveAttribute("aria-current", "page");
           const missing = await page.goto("/admin/not-a-staff-page");
           expect(missing?.status()).toBe(404);
           await expect(page.getByRole("banner", { name: "Edgey staff" })).toBeVisible();
@@ -548,8 +563,9 @@ test.describe("staff shell", () => {
     });
   }
 
+  const staffViewports = [viewports[0]!, { width: 1280, height: 800 }, ...viewports.slice(1)];
   for (const theme of themes) {
-    test(`staff shell and open sheet fit the three widths in ${theme}`, async ({ page, baseURL }) => {
+    test(`staff shell retains its controls and keyboard access in ${theme}`, async ({ page, baseURL }) => {
       const account = await createLocalAdminUser("warehouse");
       try {
         await setVerifiedStaffSession(page, account, baseURL);
@@ -559,7 +575,7 @@ test.describe("staff shell", () => {
         await expect(page.locator(".shop-mast, .site-footer, #selection-trigger")).toHaveCount(0);
         await expect(page.getByRole("link", { name: "Search blades", exact: true })).toHaveCount(0);
         await expect(staffMenu(page)).toHaveAttribute("aria-label", "Edgey staff menu");
-        for (const viewport of viewports) {
+        for (const viewport of staffViewports) {
           await page.setViewportSize(viewport);
           await page.mouse.move(0, 200);
           await expectUsableMasthead(page, viewport.width);
@@ -596,5 +612,81 @@ test.describe("staff shell", () => {
         await localAdminClient().auth.admin.deleteUser(account.id);
       }
     });
+
+    for (const roles of ["all", "warehouse"] as const) {
+      test(`the ${roles} desk and open sheet fit four widths in ${theme}`, async ({ page, baseURL }) => {
+        test.setTimeout(60_000);
+        await withNet30Data(async ({ db, buyer, warehouse: staff, sku }) => {
+          const enquiry = randomUUID();
+          const admin = localAdminClient();
+          try {
+            if (roles === "all") {
+              const { error } = await admin.from("staff_members").insert([
+                { user_id: staff.id, role: "catalogue" }, { user_id: staff.id, role: "finance" },
+              ]);
+              if (error) throw error;
+            }
+            const { error } = await admin.rpc("submit_enquiry", {
+              p_id: enquiry, p_kind: "compatibility", p_email: buyer.email,
+              p_query: "Test blade", p_message: "Can you confirm the fit?",
+            });
+            if (error) throw error;
+            await seedPaidAdminOrder({ sku, buyerId: buyer.id, email: buyer.email });
+            await setVerifiedStaffSession(page, staff, baseURL);
+            await saveThemeBeforeLoad(page, theme);
+            await page.emulateMedia({ reducedMotion: "reduce" });
+            await page.goto("/admin");
+            const main = page.getByRole("main");
+            const orders = main.getByRole("region", { name: "Orders" });
+            const purchases = main.getByRole("region", { name: "Purchases" });
+            const adminGroup = main.getByRole("region", { name: "Admin" });
+            await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Orders", "Purchases", "Admin"]);
+            await expect(orders.getByRole("link", { name: /^[1-9]\d* orders? to pick or dispatch$/ })).toHaveAttribute("href", "/admin/warehouse");
+            await expect(orders.getByRole("link", { name: /^[1-9]\d* customer requests? to answer or review$/ })).toHaveAttribute("href", "/admin/requests");
+            await expect(purchases.getByRole("link", { name: /^[1-9]\d* published blade variants? out of stock$/ })).toHaveAttribute("href", "/admin/stock");
+            await expect(adminGroup.getByRole("link")).toHaveText(roles === "all"
+              ? ["Catalogue", "Delivery settings", "Sales reports", "Finance and trade accounts", "Shop performance"]
+              : ["Delivery settings", "Sales reports", "Shop performance"]);
+            for (const viewport of staffViewports) {
+              await page.setViewportSize(viewport);
+              await page.mouse.move(0, 200);
+              expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+              await capture(page, `desk-${roles}-${theme}-${viewport.width}`, true);
+              await scanAccessibility(page, theme);
+              await staffMenu(page).click();
+              await page.mouse.move(0, 200);
+              const nav = staffNav(page);
+              await expect(nav.getByRole("heading")).toHaveText(["Orders", "Purchases", "Admin"]);
+              const geometry = await nav.locator(".fold-group").evaluateAll((groups) => groups.map((group) => ({
+                top: group.getBoundingClientRect().top, bottom: group.getBoundingClientRect().bottom,
+                links: Array.from(group.querySelectorAll("a"), (link) => link.getBoundingClientRect().toJSON()),
+              })));
+              for (const [index, group] of geometry.entries()) {
+                if (viewport.width <= 390 && index > 0) expect(group.top).toBeGreaterThanOrEqual(geometry[index - 1]!.bottom);
+                for (const { width, height, left, right } of group.links) {
+                  expect(width).toBeGreaterThanOrEqual(44);
+                  expect(height).toBeGreaterThanOrEqual(44);
+                  expect(left).toBeGreaterThanOrEqual(0);
+                  expect(right).toBeLessThanOrEqual(viewport.width);
+                }
+              }
+              await capture(page, `menu-${roles}-${theme}-${viewport.width}`);
+              await scanAccessibility(page, theme);
+              if (viewport.width <= 390) {
+                const signOut = page.getByRole("button", { name: "Sign out" });
+                await signOut.scrollIntoViewIfNeeded();
+                await expect(signOut).toBeInViewport();
+                await capture(page, `menu-${roles}-${theme}-${viewport.width}-end`);
+              }
+              await page.keyboard.press("Escape");
+              await expect(staffNav(page)).toBeHidden();
+              await staffMenu(page).blur();
+            }
+          } finally {
+            await db.query("delete from public.enquiries where id = $1", [enquiry]);
+          }
+        });
+      });
+    }
   }
 });

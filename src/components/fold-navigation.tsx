@@ -11,13 +11,14 @@ export type NavigationGroup = {
 };
 
 export function FoldNavigation({
-  label, mark, title, landmark, groups, children,
+  label, mark, title, landmark, groups, currentLink, children,
 }: {
   label: string;
   mark: ReactNode;
   title: string;
   landmark: string;
   groups: NavigationGroup[];
+  currentLink?: { href: string; state: "page" | "location" } | null;
   children?: ReactNode;
 }) {
   const pathname = usePathname();
@@ -88,8 +89,10 @@ export function FoldNavigation({
                 {links.length ? (
                   <ul>
                     {links.map(({ label, href }) => {
-                      const current = pathname === href ? "page" :
-                        href !== "/admin" && pathname?.startsWith(href + "/") ? "location" : undefined;
+                      const current = currentLink !== undefined
+                        ? currentLink?.href === href ? currentLink.state : undefined
+                        : pathname === href ? "page" :
+                          href !== "/admin" && pathname?.startsWith(href + "/") ? "location" : undefined;
                       return (
                         <li key={href}>
                           <Link href={href} prefetch={false} aria-current={current} onNavigate={() => {
