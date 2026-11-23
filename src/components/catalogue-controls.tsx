@@ -149,7 +149,7 @@ export function CatalogueControls({
               {bladeFacets.materials.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
             </select>
           </div>
-          <div className="select-field">
+          <div className={"select-field " + styles.head}>
             <select name="head" aria-label="Tool head" aria-describedby={unlistedHead ? "unlisted-tool-head" : undefined} defaultValue={filters.head}>
               <option value="">All tool heads</option>
               {heads.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}

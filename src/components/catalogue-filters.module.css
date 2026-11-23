@@ -4,26 +4,69 @@
   gap: 16px;
 }
 
-.filters {
-  display: grid;
+.filters:global(.controls) {
   align-items: start;
-  grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)) minmax(14rem, 1.3fr);
+  justify-content: start;
 }
 
-.filters :global(.search-field) {
-  width: auto;
+.filters > :global(.search-field) {
+  flex: 2 1 12rem;
   min-width: 0;
+}
+
+.filters > :global(.select-field) {
+  flex: 1 1 max-content;
+  max-width: 100%;
+}
+
+.filters :global(.select-field) select {
+  flex: auto;
+  min-width: 0;
+  width: auto;
+  padding-inline: 10px 27px;
+}
+
+@supports (appearance: base-select) {
+  .filters .head {
+    flex-basis: 12rem;
+  }
+
+  .head select,
+  .head select::picker(select) {
+    appearance: base-select;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .head select::picker-icon {
+    display: none;
+  }
+
+  .head select::picker(select) {
+    max-inline-size: calc(100vw - 28px);
+    border: 1px solid var(--edgey-control-border);
+    color: var(--ink);
+    background: var(--edgey-field);
+  }
+
+  .head option {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .filters .depth {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, auto) minmax(2.5rem, 1fr);
   gap: 8px;
   font-size: .88rem;
+  width: 100%;
 }
 
 .depthControl {
+  flex: 1 1 14rem;
   min-width: 0;
+  max-width: 100%;
 }
 
 .depthError {
@@ -47,18 +90,8 @@
   font-size: .88rem;
 }
 
-@media (max-width: 1100px) {
-  .filters {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 660px) {
-  .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .filters :global(.search-field), .depthControl {
-    grid-column: 1 / -1;
+  .filters > :global(.search-field), .depthControl {
+    flex-basis: 100%;
   }
 }

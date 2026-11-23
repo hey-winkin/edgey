@@ -48,6 +48,24 @@ test("the empty state reports otherwise matching options without a recorded dept
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/blades$/);
 });
 
+test("the full tool head name is readable in the picker and when selected at doubled text", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/blades");
+  await page.locator("html").evaluate((html) => { html.style.fontSize = "200%"; });
+  const head = page.getByRole("combobox", { name: "Tool head" });
+  const closed = (await head.boundingBox())!.height;
+  await head.click();
+  const option = head.getByRole("option", { name: "F-Series Tangential Module", exact: true });
+  const line = head.getByRole("option", { name: "All tool heads", exact: true });
+  await expect(option).toBeVisible();
+  expect((await option.boundingBox())!.height).toBeGreaterThan((await line.boundingBox())!.height);
+  await option.click();
+  await expect(page).toHaveURL((url) => url.searchParams.get("head") === "f-series tangential module");
+  await expect(head).toHaveValue("f-series tangential module");
+  expect((await head.boundingBox())!.height).toBeGreaterThan(closed);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+});
+
 test("live depth changes combine with facets and reject invalid values without changing results", async ({ page }) => {
   await page.goto("/blades?q=3910301&type=drag&machine=zund&material=foamex&head=uct&depth=4.8");
   const depth = page.getByRole("spinbutton", { name: "Minimum depth (mm)" });
