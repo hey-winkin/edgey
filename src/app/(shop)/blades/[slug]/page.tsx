@@ -44,7 +44,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     ...(variant && socialMetadata(
       variant.sku + " " + family.name,
       description,
-      siteUrl(productHref(family.slug, sku === variant.sku ? sku : null)),
+      siteUrl(productHref(family.slug, family.variants.length > 1 && sku === variant.sku ? sku : null)),
       { slug: family.slug, sku: variant.sku },
     )),
   };

@@ -40,9 +40,26 @@ test("HTML-only unfurlers get catalogue metadata and fetch the exact share-card 
     }
   }
   expect(images.at(-1)).not.toEqual(images[0]);
-  for (const query of ["blade=edg-z46&variant=EDG-Z46", "blade=edg-z10&variant=EDG-Z46", "blade=missing&variant=EDG-MISSING"]) {
+  for (const query of [
+    "blade=edg-z46&variant=EDG-Z46", "blade=edg-z10&variant=EDG-Z46", "blade=missing&variant=EDG-MISSING",
+    "blade=edg-z10", "variant=EDG-Z10", "blade=edg-z10&variant=" + "A".repeat(81),
+  ]) {
     expect((await request.get("/share-image?" + query)).status()).toBe(404);
   }
+});
+
+test("product card metadata has a stable fallback and keeps single-SKU links canonical", async ({ page }) => {
+  await page.goto("/blades/edg-z10?variant=EDG-Z10");
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", /\/blades\/edg-z10$/);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /blade=edg-z10&variant=EDG-Z10$/);
+  expect((await structuredData(page))[1]).toMatchObject({
+    "@type": "Product", sku: "EDG-Z10", offers: { availability: "https://schema.org/InStock" },
+  });
+
+  await page.goto("/blades/edg-sum-drg?variant=UNKNOWN");
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", /\/blades\/edg-sum-drg$/);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /blade=edg-sum-drg&variant=EDG-SUM-DRG-36$/);
+  expect((await structuredData(page))[1]["@type"]).toBe("ProductGroup");
 });
 
 test("breadcrumb JSON-LD matches the links and current page shown to buyers", async ({ page }) => {

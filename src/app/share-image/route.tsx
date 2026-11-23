@@ -14,8 +14,8 @@ function svgUrl(svg: string) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get("blade");
-  const family = slug ? await getFamily(slug) : null;
   const sku = searchParams.get("variant");
+  const family = slug && sku && sku.length <= 80 ? await getFamily(slug) : null;
   const variant = family?.variants.find((item) => item.sku === sku);
   if ((slug !== null || sku !== null) && !variant) {
     return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });

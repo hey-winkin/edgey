@@ -1,14 +1,6 @@
 import type { Database as GeneratedDatabase } from "./database.generated";
 
-export {
-  Constants,
-  type CompositeTypes,
-  type Enums,
-  type Json,
-  type Tables,
-  type TablesInsert,
-  type TablesUpdate,
-} from "./database.generated";
+export type { Json } from "./database.generated";
 
 export type StaffPurchaseStatus = "draft" | "sent" | "part_received" | "received" | "closed" | "cancelled";
 
@@ -56,11 +48,15 @@ type NullableArgs<Fn extends keyof Functions, Fields extends keyof Functions[Fn]
 
 type StaffAuthenticator = Functions["get_staff_authenticator"];
 type LastStaffPurchasePrice = Functions["last_staff_purchase_price"];
-type StaffFunctions = {
+type SelectionQuote = Functions["lookup_selection_quote"];
+type FunctionRefinements = {
   get_staff_authenticator: Omit<StaffAuthenticator, "Returns"> & {
     Returns: NullableFields<StaffAuthenticator["Returns"][number], "approved_factor_id" | "session_factor_id">[];
   };
   last_staff_purchase_price: Omit<LastStaffPurchasePrice, "Returns"> & { Returns: LastStaffPurchasePrice["Returns"] | null };
+  lookup_selection_quote: Omit<SelectionQuote, "Returns"> & {
+    Returns: NullableFields<SelectionQuote["Returns"][number], "option_label" | "photo">[];
+  };
   receive_staff_delivery: NullableArgs<"receive_staff_delivery", "p_note">;
   receive_staff_purchase_order: NullableArgs<"receive_staff_purchase_order", "p_note">;
   save_staff_purchase_order: NullableArgs<"save_staff_purchase_order", "p_id">;
@@ -79,6 +75,6 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
         : Tables[Table];
     };
     Views: Omit<Views, keyof StaffViews> & StaffViews;
-    Functions: Omit<Functions, keyof StaffFunctions> & StaffFunctions;
+    Functions: Omit<Functions, keyof FunctionRefinements> & FunctionRefinements;
   };
 };
