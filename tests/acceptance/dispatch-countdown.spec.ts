@@ -48,6 +48,7 @@ test("quotes one dispatch window across the buyer journey and updates the live c
   await expect(status).toHaveAttribute("data-change-count", "0");
   await expect(order.getByText("Estimated delivery", { exact: true })).toHaveCount(0);
 
+  await dispatchAt("2026-11-23T13:20:30Z");
   await page.getByLabel("Postcode").fill("SW1A 1AA");
   await expect(order.getByText("Estimated delivery", { exact: true })).toBeVisible();
   await expect(notice(order)).toHaveAttribute("datetime", "2026-11-23");
