@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { extractText } from "unpdf";
 import { createLocalAdminUser, localAdminClient } from "../../scripts/seed-admin";
 import { connectAccountDb, createAccountCatalogue } from "../helpers/account-fixture";
 import { scanBothThemes } from "../helpers/accessibility";
@@ -300,6 +302,8 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
 
     await page.getByRole("link", { name: "Printable PO" }).click();
     const sheet = page.locator("article.po-document");
+    await expect(sheet.getByRole("img", { name: "Edgey", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download PDF", exact: true })).toHaveAttribute("href", orderPath + "/export/pdf");
     await expect(sheet).toContainText(supplier);
     await expect(sheet).toContainText(buyerName);
     await expect(sheet).toContainText("EXAMPLE-1234");
@@ -316,6 +320,7 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await page.emulateMedia({ media: "print" });
     await expect(page.getByRole("link", { name: "Back to order" })).toBeHidden();
     await expect(sheet).toBeVisible();
+    await expect(page.locator("svg:has(#edgey)")).not.toHaveCSS("display", "none");
     await page.emulateMedia({ media: "screen" });
     const csv = await page.request.get(orderPath + "/export");
     expect(csv.ok()).toBe(true);
@@ -327,6 +332,14 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     await page.getByRole("link", { name: "Back to order", exact: true }).click();
     await page.getByRole("button", { name: "Mark as sent" }).click();
     await expect(page.getByText("Marked as sent", { exact: true })).toBeVisible();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Download PDF", exact: true }).click();
+    const pdf = await downloadPromise;
+    expect(pdf.suggestedFilename()).toBe(orderNumber + ".pdf");
+    const { text: pdfText } = await extractText(new Uint8Array(await readFile(await pdf.path())), { mergePages: true });
+    for (const field of [orderNumber, supplier, buyerName, first.sku, first.option, "PART-A",
+      '=Example, with "quotes"', "$61.70", "$106.70", "3 Dec 2026"]) expect(pdfText).toContain(field);
+    expect(pdfText).not.toMatch(/FICTIONAL PRIVATE|FICTIONAL SUPPLIER NOTE|exchange rate|landed cost|VAT number/i);
     await page.getByRole("link", { name: "Printable PO" }).click();
     await expect(sheet).not.toContainText("Draft — not issued");
     await capture(page, "supplier-purchase-order");
@@ -346,6 +359,8 @@ test("orders catalogue blades, documents the supplier order, and receives exactl
     const warehouseSource = await goods.request.get(orderPath);
     expect(await warehouseSource.text()).not.toMatch(new RegExp(`${supplier}|FICTIONAL PRIVATE|landed_unit_pence|supplier_part_number|12\\.34`));
     expect((await goods.request.get(orderPath + "/export")).status()).toBe(403);
+    expect((await goods.request.get(orderPath + "/export/pdf")).status()).toBe(403);
+    await expect(goods.getByRole("link", { name: "Download PDF", exact: true })).toHaveCount(0);
     await expect(goods.getByRole("link", { name: "Printable PO" })).toHaveCount(0);
     await goods.goto("/admin/stock");
     await expect(goods.getByRole("row").filter({ hasText: first.sku })).toContainText("9 Dec 2026");

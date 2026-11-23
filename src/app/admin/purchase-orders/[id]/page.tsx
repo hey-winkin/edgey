@@ -62,6 +62,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         {showCosts && <>
           <AdminLink href={`${pathname}/${id}/print`}>Printable PO</AdminLink>
           <AdminLink href={`${pathname}/${id}/export`}>Download PO CSV</AdminLink>
+          <a className="textlink" href={`${pathname}/${id}/export/pdf`}>Download PDF</a>
         </>}
       </nav>
       <AdminSection title="Order details">
